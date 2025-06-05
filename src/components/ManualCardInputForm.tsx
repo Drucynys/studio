@@ -24,14 +24,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import type { PokemonCard } from "@/types";
 import { PlusCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 // Zod schema for form validation
 const formSchema = z.object({
   selectedSetId: z.string().min(1, "Set is required"),
   selectedCardId: z.string().min(1, "Card is required"),
-  variant: z.string().min(1, "Variant is required"),
   condition: z.string().min(1, "Condition is required"),
 });
 
@@ -79,17 +78,23 @@ interface ApiPokemonCard {
   };
 }
 
-// Helper to get market price for a specific variant
-const getMarketPriceForVariant = (apiCard: ApiPokemonCard | null, variantKey: string): number => {
+// Helper to get market price, trying common variants
+const getMarketPrice = (apiCard: ApiPokemonCard | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
-  const priceData = apiCard.tcgplayer.prices[variantKey];
-  return priceData?.market ?? 0;
-};
-
-// Helper to format variant keys for display
-const formatVariantKey = (key: string): string => {
-  if (!key) return "N/A";
-  return key.replace(/([A-Z0-9])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
+  const prices = apiCard.tcgplayer.prices;
+  if (prices.normal?.market) return prices.normal.market;
+  if (prices.holofoil?.market) return prices.holofoil.market;
+  if (prices.reverseHolofoil?.market) return prices.reverseHolofoil.market;
+  if (prices.firstEditionNormal?.market) return prices.firstEditionNormal.market;
+  if (prices.firstEditionHolofoil?.market) return prices.firstEditionHolofoil.market;
+  
+  // Fallback to the first available market price
+  for (const key in prices) {
+    if (prices[key]?.market) {
+      return prices[key]!.market!;
+    }
+  }
+  return 0;
 };
 
 
@@ -105,14 +110,12 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
   const [errorCards, setErrorCards] = useState<string | null>(null);
 
   const [selectedCardData, setSelectedCardData] = useState<ApiPokemonCard | null>(null);
-  const [availableVariants, setAvailableVariants] = useState<string[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       selectedSetId: "",
       selectedCardId: "",
-      variant: "",
       condition: "",
     },
   });
@@ -143,18 +146,14 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     if (!watchedSetId) {
       setCardsInSelectedSet([]);
       setSelectedCardData(null);
-      setAvailableVariants([]);
       form.resetField("selectedCardId");
-      form.resetField("variant");
       return;
     }
     const fetchCardsForSet = async () => {
       setIsLoadingCards(true);
       setErrorCards(null);
       setSelectedCardData(null);
-      setAvailableVariants([]);
       form.resetField("selectedCardId", { defaultValue: "" });
-      form.resetField("variant", { defaultValue: "" });
 
       try {
         let allCards: ApiPokemonCard[] = [];
@@ -193,26 +192,10 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
   useEffect(() => {
     if (!watchedCardId) {
       setSelectedCardData(null);
-      setAvailableVariants([]);
-      form.resetField("variant");
       return;
     }
     const card = cardsInSelectedSet.find(c => c.id === watchedCardId);
     setSelectedCardData(card || null);
-
-    if (card && card.tcgplayer?.prices) {
-      const variants = Object.keys(card.tcgplayer.prices).sort();
-      setAvailableVariants(variants);
-      // Auto-select a default variant
-      let defaultVariant = "";
-      if (variants.includes("normal")) defaultVariant = "normal";
-      else if (variants.includes("holofoil")) defaultVariant = "holofoil";
-      else if (variants.length > 0) defaultVariant = variants[0];
-      form.setValue("variant", defaultVariant);
-    } else {
-      setAvailableVariants([]);
-      form.resetField("variant", { defaultValue: "" });
-    }
   }, [watchedCardId, cardsInSelectedSet, form]);
 
 
@@ -231,9 +214,8 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       name: selectedCardData.name,
       rarity: selectedCardData.rarity || "N/A",
       condition: values.condition,
-      variant: values.variant,
       imageUrl: selectedCardData.images.large,
-      value: getMarketPriceForVariant(selectedCardData, values.variant),
+      value: getMarketPrice(selectedCardData),
     };
 
     try {
@@ -244,31 +226,29 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
         item => item.name === newCard.name && 
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
-                item.condition === newCard.condition &&
-                item.variant === newCard.variant 
+                item.condition === newCard.condition
       );
 
       if (isDuplicate) {
         toast({
           variant: "destructive",
           title: "Duplicate Card",
-          description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) is already in your collection.`,
+          description: `${newCard.name} (${newCard.condition}) is already in your collection.`,
         });
-        return; // Don't reset form if duplicate
+        return; 
       }
       
-      onAddCard(newCard); // Call onAddCard from props
+      onAddCard(newCard); 
       toast({
         title: "Card Added!",
-        description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) from ${newCard.set} has been added.`,
+        description: `${newCard.name} (${newCard.condition}) from ${newCard.set} has been added.`,
         className: "bg-secondary text-secondary-foreground"
       });
 
       form.reset();
       setSelectedCardData(null); 
       setCardsInSelectedSet([]); 
-      setAvailableVariants([]);
-      form.setValue("selectedSetId", ""); // Explicitly reset set ID to trigger card list clearing
+      form.setValue("selectedSetId", ""); 
       
     } catch (e) {
       console.error("Failed to save card to localStorage", e);
@@ -287,7 +267,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
           <PlusCircle className="h-6 w-6 text-accent" />
           Add New Card
         </CardTitle>
-        <CardDescription>Select Set, Card, Variant, and Condition to add to your collection.</CardDescription>
+        <CardDescription>Select Set, Card, and Condition to add to your collection.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -301,12 +281,9 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                   <Select 
                     onValueChange={(value) => {
                       field.onChange(value);
-                      // Reset dependent fields when set changes
                       form.resetField("selectedCardId", { defaultValue: "" });
-                      form.resetField("variant", { defaultValue: "" });
                       setSelectedCardData(null);
                       setCardsInSelectedSet([]);
-                      setAvailableVariants([]);
                     }}
                     value={field.value}
                     disabled={isLoadingSets || !!errorSets || availableSets.length === 0}
@@ -338,10 +315,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                 <FormItem>
                   <FormLabel>Card</FormLabel>
                   <Select 
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      form.resetField("variant", { defaultValue: "" }); // Reset variant when card changes
-                    }}
+                    onValueChange={field.onChange}
                     value={field.value}
                     disabled={!watchedSetId || isLoadingCards || !!errorCards || cardsInSelectedSet.length === 0}
                   >
@@ -378,45 +352,13 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                   <div className="text-sm space-y-1">
                     <p><strong>Set:</strong> {selectedCardData.set.name}</p>
                     <p><strong>Rarity:</strong> {selectedCardData.rarity || "N/A"}</p>
+                    {selectedCardData.tcgplayer?.prices && (
+                        <p><strong>Est. Value:</strong> ${getMarketPrice(selectedCardData).toFixed(2)}</p>
+                    )}
                   </div>
                 </div>
               </Card>
             )}
-
-            <FormField
-              control={form.control}
-              name="variant"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Variant / Finish</FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value}
-                    disabled={!selectedCardData || availableVariants.length === 0}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={
-                          !selectedCardData ? "Select a card first" :
-                          availableVariants.length === 0 ? "No variants/pricing data" : "Select variant"
-                        } />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableVariants.map(variantKey => (
-                        <SelectItem key={variantKey} value={variantKey}>
-                          {formatVariantKey(variantKey)}
-                          {selectedCardData?.tcgplayer?.prices?.[variantKey]?.market !== undefined && 
-                           ` ($${selectedCardData.tcgplayer.prices[variantKey]!.market?.toFixed(2)})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {availableVariants.length === 0 && selectedCardData && <p className="text-xs text-muted-foreground mt-1">No specific variant pricing found for this card. Defaulting to general info if available.</p>}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}
@@ -427,7 +369,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                   <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCardData}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!selectedCardData ? "Select card and variant first" : "Select condition"} />
+                        <SelectValue placeholder={!selectedCardData ? "Select card first" : "Select condition"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

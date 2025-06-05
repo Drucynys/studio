@@ -20,26 +20,25 @@ import { getSafeTcgDexCardImageUrl, getSafeTcgDexSetAssetUrl } from '@/lib/tcgde
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-const getTcgDexPriceForVariant = (prices: TcgDexCardPrices | undefined, variantKey: string): number => {
+const getTcgDexPrice = (prices: TcgDexCardPrices | undefined): number => {
   if (!prices) return 0;
-  const priceVariant = prices[variantKey];
-  if (priceVariant && typeof priceVariant.market === 'number') {
-    return priceVariant.market;
+
+  if (prices.normal?.market) return prices.normal.market;
+  if (prices.holofoil?.market) return prices.holofoil.market;
+  if (prices.reverseHolo?.market) return prices.reverseHolo.market;
+  if (prices.firstEditionNormal?.market) return prices.firstEditionNormal.market;
+  if (prices.firstEditionHolofoil?.market) return prices.firstEditionHolofoil.market;
+  
+  // Fallback to the first available market price
+  for (const key in prices) {
+    if (Object.prototype.hasOwnProperty.call(prices, key)) {
+        const priceEntry = prices[key as keyof TcgDexCardPrices];
+        if (typeof priceEntry === 'object' && priceEntry !== null && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market) ) {
+            return priceEntry.market;
+        }
+    }
   }
   return 0; 
-};
-
-// Helper to format variant keys for display (consistent with other forms)
-const formatVariantKeyDialog = (key: string): string => {
-  if (!key) return "N/A";
-  if (key === "firstEditionNormal") return "1st Edition Normal";
-  if (key === "firstEditionHolofoil") return "1st Edition Holofoil";
-  if (key === "reverseHolo") return "Reverse Holo";
-  
-  return key
-    .replace(/([A-Z0-9])/g, ' $1') 
-    .replace(/^./, str => str.toUpperCase()) 
-    .trim();
 };
 
 
@@ -136,7 +135,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     setFilteredCards(filteredData);
   }, [searchTerm, cardsInSet]);
 
-  const handleAddCardToCollection = (condition: string, variant: string) => {
+  const handleAddCardToCollection = (condition: string) => {
     if (!fullSelectedCardDetails || !setDetails) { 
         toast({
             variant: "destructive",
@@ -156,9 +155,8 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       cardNumber: collectorNumber, 
       rarity: fullSelectedCardDetails.rarity || "N/A", 
       condition: condition,
-      value: getTcgDexPriceForVariant(fullSelectedCardDetails.prices, variant), 
+      value: getTcgDexPrice(fullSelectedCardDetails.prices), 
       imageUrl: displayImageUrl,
-      variant: variant, 
     };
 
     try {
@@ -169,15 +167,14 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
         card => card.name === newCard.name && 
                 card.set === newCard.set && 
                 card.cardNumber === newCard.cardNumber && 
-                card.condition === newCard.condition &&
-                card.variant === newCard.variant
+                card.condition === newCard.condition
       );
 
       if (isDuplicate) {
         toast({
           variant: "destructive",
           title: "Duplicate Card",
-          description: `${newCard.name} (${formatVariantKeyDialog(newCard.variant || "")}, ${newCard.condition}) is already in your collection.`,
+          description: `${newCard.name} (${newCard.condition}) is already in your collection.`,
         });
         setIsDialogOpen(false);
         return;
@@ -187,7 +184,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
       toast({
         title: "Card Added!",
-        description: `${newCard.name} (${formatVariantKeyDialog(newCard.variant || "")}, ${newCard.condition}) from ${newCard.set} has been added.`,
+        description: `${newCard.name} (${newCard.condition}) from ${newCard.set} has been added.`,
         className: "bg-secondary text-secondary-foreground"
       });
     } catch (e) {
@@ -271,7 +268,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                 </div>
             </div>
             <CardDescription className="mt-2 text-xs italic text-muted-foreground flex items-center gap-1">
-                <Info size={14}/> Cardmarket prices via TCGdex. Click card for variant options.
+                <Info size={14}/> Cardmarket prices via TCGdex.
             </CardDescription>
           </CardHeader>
           <CardContent>

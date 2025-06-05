@@ -45,18 +45,23 @@ interface ApiPokemonCard {
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-const getMarketPriceForVariant = (apiCard: ApiPokemonCard | null, variantKey: string): number => {
+// Helper to get market price, trying common variants
+const getMarketPrice = (apiCard: ApiPokemonCard | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
-  const priceData = apiCard.tcgplayer.prices[variantKey];
-  return priceData?.market ?? 0;
-};
-
-const formatVariantKey = (key: string): string => {
-  if (!key) return "N/A";
-  return key
-    .replace(/([A-Z0-9])/g, ' $1') 
-    .replace(/^./, str => str.toUpperCase())
-    .trim();
+  const prices = apiCard.tcgplayer.prices;
+  if (prices.normal?.market) return prices.normal.market;
+  if (prices.holofoil?.market) return prices.holofoil.market;
+  if (prices.reverseHolofoil?.market) return prices.reverseHolofoil.market;
+  if (prices.firstEditionNormal?.market) return prices.firstEditionNormal.market;
+  if (prices.firstEditionHolofoil?.market) return prices.firstEditionHolofoil.market;
+  
+  // Fallback to the first available market price
+  for (const key in prices) {
+    if (prices[key]?.market) {
+      return prices[key]!.market!;
+    }
+  }
+  return 0;
 };
 
 const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
@@ -70,8 +75,6 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<ApiPokemonCard | null>(null);
-  const [selectedCardVariants, setSelectedCardVariants] = useState<string[]>([]);
-  const [defaultVariant, setDefaultVariant] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -143,7 +146,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   }, [searchTerm, cardsInSet]);
 
 
-  const handleAddCardToCollection = (condition: string, variant: string) => {
+  const handleAddCardToCollection = (condition: string) => {
     if (!selectedCard) return;
 
     const newCard: PokemonCard = {
@@ -153,8 +156,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       cardNumber: selectedCard.number,
       rarity: selectedCard.rarity || "N/A",
       condition: condition,
-      variant: variant,
-      value: getMarketPriceForVariant(selectedCard, variant),
+      value: getMarketPrice(selectedCard),
       imageUrl: selectedCard.images.large,
     };
 
@@ -166,15 +168,14 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
         item => item.name === newCard.name && 
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
-                item.condition === newCard.condition &&
-                item.variant === newCard.variant 
+                item.condition === newCard.condition
       );
 
       if (isDuplicate) {
         toast({
           variant: "destructive",
           title: "Duplicate Card",
-          description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) is already in your collection.`,
+          description: `${newCard.name} (${newCard.condition}) is already in your collection.`,
         });
         setIsDialogOpen(false);
         return;
@@ -184,7 +185,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
       toast({
         title: "Card Added!",
-        description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) from ${newCard.set} has been added.`,
+        description: `${newCard.name} (${newCard.condition}) from ${newCard.set} has been added.`,
         className: "bg-secondary text-secondary-foreground"
       });
     } catch (e) {
@@ -200,19 +201,6 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
 
   const openDialogForCard = (card: ApiPokemonCard) => {
     setSelectedCard(card);
-    const variants = card.tcgplayer?.prices ? Object.keys(card.tcgplayer.prices).sort() : [];
-    setSelectedCardVariants(variants);
-    
-    let determinedDefaultVariant = "";
-    if (variants.includes("normal")) {
-      determinedDefaultVariant = "normal";
-    } else if (variants.includes("holofoil")) {
-      determinedDefaultVariant = "holofoil";
-    } else if (variants.length > 0) {
-      determinedDefaultVariant = variants[0];
-    }
-    setDefaultVariant(determinedDefaultVariant);
-
     setIsDialogOpen(true);
   };
 
@@ -231,7 +219,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
                     {setLogo && (
-                        <Image src={setLogo} alt={`${setName} logo`} width={100} height={40} style={{objectFit:"contain"}} className="mb-2" data-ai-hint="pokemon set logo" />
+                        <Image src={setLogo} alt={`${setName} logo`} width={100} height={40} style={{objectFit:"contain"}} className="mb-2" data-ai-hint="pokemon set logo"/>
                     )}
                     <CardTitle className="font-headline text-3xl text-foreground">{setName || `Set ${setId}`}</CardTitle>
                     <CardDescription>Browse cards from {setName || `set ${setId}`}. Click a card to add it to your collection.</CardDescription>
@@ -302,10 +290,8 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
           onClose={() => setIsDialogOpen(false)}
           sourceApi="pokemontcg"
           cardName={selectedCard.name}
-          cardImageUrl={selectedCard.images.small}
+          initialCardImageUrl={selectedCard.images.small}
           availableConditions={conditionOptions}
-          availableVariants={selectedCardVariants}
-          defaultVariant={defaultVariant}
           onAddCard={handleAddCardToCollection}
         />
       )}
