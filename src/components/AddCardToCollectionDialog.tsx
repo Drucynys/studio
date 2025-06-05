@@ -60,8 +60,8 @@ export function AddCardToCollectionDialog({
   cardName,
   cardImageUrl,
   availableConditions,
-  availableVariants: propsAvailableVariants, // Renamed to avoid conflict
-  defaultVariant: propsDefaultVariant,     // Renamed
+  availableVariants: propsAvailableVariants,
+  defaultVariant: propsDefaultVariant,
   tcgDexFullCard,
   isFetchingCardDetails,
   onAddCard,
@@ -75,10 +75,12 @@ export function AddCardToCollectionDialog({
     if (isOpen) {
       setSelectedCondition(""); 
 
-      if (tcgDexFullCard && tcgDexFullCard.prices) {
+      // This block handles TCGdex flow when full card details are available
+      if (tcgDexFullCard && tcgDexFullCard.prices && !isFetchingCardDetails) {
         const variantsFromTcgDex = Object.keys(tcgDexFullCard.prices).filter(
-          // Filter out non-variant keys and ensure market price exists for active variants
-          key => typeof tcgDexFullCard.prices![key] === 'object' && tcgDexFullCard.prices![key]?.market !== undefined && tcgDexFullCard.prices![key]?.market !== null
+          key => typeof tcgDexFullCard.prices![key] === 'object' && 
+                 tcgDexFullCard.prices![key]?.market !== undefined && 
+                 tcgDexFullCard.prices![key]?.market !== null
         ).sort();
         
         setCurrentAvailableVariants(variantsFromTcgDex);
@@ -87,34 +89,55 @@ export function AddCardToCollectionDialog({
         if (variantsFromTcgDex.includes("normal")) determinedDefault = "normal";
         else if (variantsFromTcgDex.includes("holofoil")) determinedDefault = "holofoil";
         else if (variantsFromTcgDex.length > 0) determinedDefault = variantsFromTcgDex[0];
+        
         setCurrentDefaultVariant(determinedDefault);
         setSelectedVariant(determinedDefault);
-
-      } else if (propsAvailableVariants) {
+      } 
+      // This block handles the PokemonTCG.io flow 
+      else if (propsAvailableVariants && !tcgDexFullCard && !isFetchingCardDetails) { 
         setCurrentAvailableVariants(propsAvailableVariants);
         const initialVariant = propsDefaultVariant || (propsAvailableVariants.length > 0 ? propsAvailableVariants[0] : "");
         setCurrentDefaultVariant(initialVariant);
         setSelectedVariant(initialVariant);
-      } else {
-        // No variants from either source
+      } 
+      // This block is for when fetching is done (for TCGdex) or no TCGdex flow active, 
+      // but no usable TCGDex variants or propsAvailableVariants were found
+      else if (!isFetchingCardDetails) { 
         setCurrentAvailableVariants([]);
         setCurrentDefaultVariant("");
         setSelectedVariant("");
       }
+      // If isFetchingCardDetails is true (for TCGdex flow), the states (currentAvailableVariants, etc.) are not changed here,
+      // they will be updated when isFetchingCardDetails becomes false and tcgDexFullCard is populated.
     }
-  }, [isOpen, propsAvailableVariants, propsDefaultVariant, tcgDexFullCard]);
+  }, [isOpen, propsAvailableVariants, propsDefaultVariant, tcgDexFullCard, isFetchingCardDetails]);
 
   const handleSubmit = () => {
-    if (selectedCondition && (selectedVariant || currentAvailableVariants.length === 0) ) {
-      // If no variants available, selectedVariant might be empty string, which is fine.
-      onAddCard(selectedCondition, selectedVariant || "Normal"); // Default to "Normal" if no variants shown/selected
+    // Determine the variant to save.
+    // If currentAvailableVariants has items (either from TCGdex or PokemonTCG.io via propsAvailableVariants), use selectedVariant.
+    // If no variants were available from any source, default to "Normal".
+    let variantToSave = "Normal"; // Default if no variants are applicable or selected.
+    if (currentAvailableVariants.length > 0 && selectedVariant) {
+      variantToSave = selectedVariant;
+    } else if (propsAvailableVariants && propsAvailableVariants.length > 0 && selectedVariant) {
+       variantToSave = selectedVariant;
+    }
+
+
+    if (selectedCondition) { // Simpler check: condition must be selected. Variant will be handled by variantToSave.
+      onAddCard(selectedCondition, variantToSave); 
       setSelectedCondition(""); 
-      setSelectedVariant("");
+      setSelectedVariant(""); 
       onClose();
     }
   };
+  
+  // Determine if any variant selector should be shown
+  const showAnyVariantSelector = !isFetchingCardDetails && (
+    (tcgDexFullCard && currentAvailableVariants.length > 0) || 
+    (propsAvailableVariants && propsAvailableVariants.length > 0 && !tcgDexFullCard)
+  );
 
-  const showVariantSelector = currentAvailableVariants && currentAvailableVariants.length > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -122,18 +145,24 @@ export function AddCardToCollectionDialog({
         <DialogHeader>
           <DialogTitle>Add "{cardName}" to Collection</DialogTitle>
           <DialogDescription>
-            Select the condition {showVariantSelector && !isFetchingCardDetails && "and variant "}of your card.
+            Select the condition {showAnyVariantSelector && "and variant "}of your card.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex justify-center mb-4">
             <div className="relative w-40 h-56 rounded-md overflow-hidden shadow-md" data-ai-hint="pokemon card front">
-              {isFetchingCardDetails ? (
+              {(isFetchingCardDetails && (!tcgDexFullCard && !propsAvailableVariants)) ? (
                 <div className="w-full h-full bg-muted flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : (
-                <Image src={cardImageUrl} alt={cardName} layout="fill" objectFit="contain" />
+                <Image 
+                  src={cardImageUrl} 
+                  alt={cardName} 
+                  layout="fill" 
+                  objectFit="contain"
+                  key={cardImageUrl} // Ensures re-render if src changes
+                />
               )}
             </div>
           </div>
@@ -144,13 +173,14 @@ export function AddCardToCollectionDialog({
             </div>
           )}
 
-          {!isFetchingCardDetails && showVariantSelector && (
+          {/* Variant selector for TCGdex flow */}
+          {!isFetchingCardDetails && tcgDexFullCard && currentAvailableVariants.length > 0 && (
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="variant" className="text-right col-span-1">
+              <Label htmlFor="variant-tcgdex" className="text-right col-span-1">
                 Variant
               </Label>
-              <Select value={selectedVariant} onValueChange={setSelectedVariant} disabled={isFetchingCardDetails}>
-                <SelectTrigger id="variant" className="col-span-3">
+              <Select value={selectedVariant} onValueChange={setSelectedVariant}>
+                <SelectTrigger id="variant-tcgdex" className="col-span-3">
                   <SelectValue placeholder="Select variant" />
                 </SelectTrigger>
                 <SelectContent>
@@ -166,7 +196,28 @@ export function AddCardToCollectionDialog({
             </div>
           )}
           
-          {!isFetchingCardDetails && !showVariantSelector && tcgDexFullCard && (
+          {/* Variant selector for PokemonTCG.io flow */}
+          {!isFetchingCardDetails && propsAvailableVariants && propsAvailableVariants.length > 0 && !tcgDexFullCard && (
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="variant-pokemontcg" className="text-right col-span-1">
+                Variant
+              </Label>
+              <Select value={selectedVariant} onValueChange={setSelectedVariant}>
+                <SelectTrigger id="variant-pokemontcg" className="col-span-3">
+                  <SelectValue placeholder="Select variant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {propsAvailableVariants.map((variant) => (
+                    <SelectItem key={variant} value={variant}>
+                      {formatVariantKey(variant)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          
+          {!isFetchingCardDetails && !showAnyVariantSelector && (tcgDexFullCard || propsAvailableVariants) && (
              <p className="text-xs text-center text-muted-foreground">No specific variants with pricing found for this card.</p>
           )}
 
@@ -194,7 +245,7 @@ export function AddCardToCollectionDialog({
           <Button 
             type="submit" 
             onClick={handleSubmit} 
-            disabled={isFetchingCardDetails || !selectedCondition || (showVariantSelector && !selectedVariant)} 
+            disabled={isFetchingCardDetails || !selectedCondition || (showAnyVariantSelector && !selectedVariant)} 
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
             {isFetchingCardDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
