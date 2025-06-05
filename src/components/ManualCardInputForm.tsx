@@ -89,7 +89,6 @@ const getMarketPriceForVariant = (apiCard: ApiPokemonCard | null, variantKey: st
 // Helper to format variant keys for display
 const formatVariantKey = (key: string): string => {
   if (!key) return "N/A";
-  // Add spaces before capital letters (e.g., reverseHolofoil -> Reverse Holofoil)
   return key.replace(/([A-Z0-9])/g, ' $1').replace(/^./, str => str.toUpperCase()).trim();
 };
 
@@ -97,7 +96,6 @@ const formatVariantKey = (key: string): string => {
 export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
   const { toast } = useToast();
   
-  // State for API data
   const [availableSets, setAvailableSets] = useState<ApiSet[]>([]);
   const [isLoadingSets, setIsLoadingSets] = useState(true);
   const [errorSets, setErrorSets] = useState<string | null>(null);
@@ -122,7 +120,6 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
   const watchedSetId = form.watch("selectedSetId");
   const watchedCardId = form.watch("selectedCardId");
 
-  // Fetch sets on mount
   useEffect(() => {
     const fetchSets = async () => {
       setIsLoadingSets(true);
@@ -142,7 +139,6 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     fetchSets();
   }, [toast]);
 
-  // Fetch cards when set ID changes
   useEffect(() => {
     if (!watchedSetId) {
       setCardsInSelectedSet([]);
@@ -194,7 +190,6 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     fetchCardsForSet();
   }, [watchedSetId, form, toast]);
 
-  // Update selected card data and variants when card ID changes
   useEffect(() => {
     if (!watchedCardId) {
       setSelectedCardData(null);
@@ -206,11 +201,18 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     setSelectedCardData(card || null);
 
     if (card && card.tcgplayer?.prices) {
-      setAvailableVariants(Object.keys(card.tcgplayer.prices).sort());
+      const variants = Object.keys(card.tcgplayer.prices).sort();
+      setAvailableVariants(variants);
+      // Auto-select a default variant
+      let defaultVariant = "";
+      if (variants.includes("normal")) defaultVariant = "normal";
+      else if (variants.includes("holofoil")) defaultVariant = "holofoil";
+      else if (variants.length > 0) defaultVariant = variants[0];
+      form.setValue("variant", defaultVariant);
     } else {
       setAvailableVariants([]);
+      form.resetField("variant", { defaultValue: "" });
     }
-    form.resetField("variant", { defaultValue: "" });
   }, [watchedCardId, cardsInSelectedSet, form]);
 
 
@@ -233,16 +235,49 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       imageUrl: selectedCardData.images.large,
       value: getMarketPriceForVariant(selectedCardData, values.variant),
     };
-    onAddCard(newCard);
-    toast({
-      title: "Card Added!",
-      description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) from ${newCard.set} has been added.`,
-      className: "bg-secondary text-secondary-foreground"
-    });
-    form.reset();
-    setSelectedCardData(null); // Also clear displayed card info
-    setCardsInSelectedSet([]); // Reset card list
-    setAvailableVariants([]);
+
+    try {
+      const storedCardsRaw = localStorage.getItem("pokemonCards");
+      const storedCards: PokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
+      
+      const isDuplicate = storedCards.some(
+        item => item.name === newCard.name && 
+                item.set === newCard.set && 
+                item.cardNumber === newCard.cardNumber &&
+                item.condition === newCard.condition &&
+                item.variant === newCard.variant 
+      );
+
+      if (isDuplicate) {
+        toast({
+          variant: "destructive",
+          title: "Duplicate Card",
+          description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) is already in your collection.`,
+        });
+        return; // Don't reset form if duplicate
+      }
+      
+      onAddCard(newCard); // Call onAddCard from props
+      toast({
+        title: "Card Added!",
+        description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) from ${newCard.set} has been added.`,
+        className: "bg-secondary text-secondary-foreground"
+      });
+
+      form.reset();
+      setSelectedCardData(null); 
+      setCardsInSelectedSet([]); 
+      setAvailableVariants([]);
+      form.setValue("selectedSetId", ""); // Explicitly reset set ID to trigger card list clearing
+      
+    } catch (e) {
+      console.error("Failed to save card to localStorage", e);
+      toast({
+        variant: "destructive",
+        title: "Storage Error",
+        description: "Could not save card to your collection.",
+      });
+    }
   }
 
   return (
@@ -264,7 +299,15 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                 <FormItem>
                   <FormLabel>Set</FormLabel>
                   <Select 
-                    onValueChange={field.onChange} 
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      // Reset dependent fields when set changes
+                      form.resetField("selectedCardId", { defaultValue: "" });
+                      form.resetField("variant", { defaultValue: "" });
+                      setSelectedCardData(null);
+                      setCardsInSelectedSet([]);
+                      setAvailableVariants([]);
+                    }}
                     value={field.value}
                     disabled={isLoadingSets || !!errorSets || availableSets.length === 0}
                   >
@@ -295,7 +338,10 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                 <FormItem>
                   <FormLabel>Card</FormLabel>
                   <Select 
-                    onValueChange={field.onChange} 
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      form.resetField("variant", { defaultValue: "" }); // Reset variant when card changes
+                    }}
                     value={field.value}
                     disabled={!watchedSetId || isLoadingCards || !!errorCards || cardsInSelectedSet.length === 0}
                   >
@@ -398,9 +444,9 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
             <Button 
               type="submit" 
               className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
-              disabled={isLoadingSets || isLoadingCards || !form.formState.isValid}
+              disabled={form.formState.isSubmitting || isLoadingSets || isLoadingCards || !form.formState.isValid}
             >
-              {(isLoadingSets || isLoadingCards) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {(form.formState.isSubmitting || isLoadingSets || isLoadingCards) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Card to Collection
             </Button>
           </form>
@@ -409,4 +455,3 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     </Card>
   );
 }
-

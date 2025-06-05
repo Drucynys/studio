@@ -3,14 +3,24 @@ import type { PokemonCard } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { Coins, Sparkles, ShieldCheck, ExternalLink } from "lucide-react";
+import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette } from "lucide-react"; // Added Palette icon
 
 type CardItemProps = {
   card: PokemonCard;
 };
 
+// Helper to format variant keys for display (consistent with other forms)
+const formatVariantKey = (key: string): string => {
+  if (!key) return "";
+  return key
+    .replace(/([A-Z0-9])/g, ' $1') 
+    .replace(/^./, str => str.toUpperCase())
+    .trim();
+};
+
 export function CardItem({ card }: CardItemProps) {
-  const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}&view=grid`;
+  const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? ` ${encodeURIComponent(formatVariantKey(card.variant))}` : ''}&view=grid`;
+  const displayVariant = card.variant ? formatVariantKey(card.variant) : null;
 
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 animate-card-appear flex flex-col">
@@ -34,8 +44,14 @@ export function CardItem({ card }: CardItemProps) {
           <Sparkles className="h-4 w-4 text-primary" />
           <strong>Rarity:</strong> <Badge variant="secondary">{card.rarity}</Badge>
         </div>
+        {displayVariant && (
+          <div className="flex items-center gap-2 text-sm">
+            <Palette className="h-4 w-4 text-purple-500" /> {/* This color might be overridden by theme */}
+            <strong>Variant:</strong> <Badge variant="outline" className="border-purple-500/50 text-purple-600">{displayVariant}</Badge>
+          </div>
+        )}
         <div className="flex items-center gap-2 text-sm">
-          <ShieldCheck className="h-4 w-4 text-green-500" /> {/* This color will be overridden by theme if text-green-500 is not a theme color */}
+          <ShieldCheck className="h-4 w-4 text-green-500" /> 
           <strong>Condition:</strong> <Badge variant="outline">{card.condition}</Badge>
         </div>
       </CardContent>

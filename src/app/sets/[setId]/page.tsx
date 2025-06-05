@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback, use } from "react"; // Imported use
+import { useEffect, useState, useCallback, use } from "react"; 
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -13,7 +13,7 @@ import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialo
 import type { PokemonCard } from "@/types";
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Input } from "@/components/ui/input"; // Added import for Input
+import { Input } from "@/components/ui/input"; 
 
 interface ApiPokemonCard {
   id: string;
@@ -39,40 +39,29 @@ interface ApiPokemonCard {
         high?: number | null;
       };
     };
+    url?: string; // TCGPlayer URL for the card
   };
 }
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-const getMarketPrice = (apiCard: ApiPokemonCard): number => {
-  const prices = apiCard.tcgplayer?.prices;
-  if (!prices) return 0;
+// Helper to get market price for a specific variant
+const getMarketPriceForVariant = (apiCard: ApiPokemonCard | null, variantKey: string): number => {
+  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
+  const priceData = apiCard.tcgplayer.prices[variantKey];
+  return priceData?.market ?? 0;
+};
 
-  const priceSources = [
-    prices.holofoil?.market,
-    prices.normal?.market,
-    prices['1stEditionHolofoil']?.market,
-    prices.reverseHolofoil?.market,
-    prices.unlimitedHolofoil?.market, // common for older sets
-    prices.unlimited?.market,
-    // Add more specific finishes if needed, or a generic fallback
-  ];
-
-  for (const price of priceSources) {
-    if (typeof price === 'number') return price;
-  }
-  
-  // Fallback: check any available market price
-  for (const key in prices) {
-    if (prices[key]?.market) return prices[key]!.market!;
-  }
-
-  return 0; // Default if no market price found
+// Helper to format variant keys for display
+const formatVariantKey = (key: string): string => {
+  if (!key) return "N/A";
+  return key
+    .replace(/([A-Z0-9])/g, ' $1') 
+    .replace(/^./, str => str.toUpperCase())
+    .trim();
 };
 
 const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
-  // Unwrap params using React.use() as per Next.js warning.
-  // This assumes Next.js provides `paramsFromProps` in a way that `use()` can consume it.
   const resolvedParams = use(paramsFromProps);
   const { setId } = resolvedParams;
 
@@ -83,6 +72,8 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<ApiPokemonCard | null>(null);
+  const [selectedCardVariants, setSelectedCardVariants] = useState<string[]>([]);
+  const [defaultVariant, setDefaultVariant] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -93,7 +84,6 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch set details first to get name and logo
       const setDetailsResponse = await fetch(`https://api.pokemontcg.io/v2/sets/${setId}`);
       if (!setDetailsResponse.ok) {
         throw new Error(`Failed to fetch set details: ${setDetailsResponse.statusText}`);
@@ -102,7 +92,6 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       setSetName(setData.data.name);
       setSetLogo(setData.data.images?.logo);
 
-      // Fetch cards for the set
       let allCards: ApiPokemonCard[] = [];
       let page = 1;
       let hasMore = true;
@@ -118,15 +107,14 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
         hasMore = data.page * data.pageSize < data.totalCount;
       }
       
-      // Sort cards by their collector number (ensuring numeric sort)
       allCards.sort((a, b) => {
-        const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0; // Extract numbers
+        const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
-        const suffixA = a.number.replace(/\d/g, ''); // Extract non-numeric suffix
+        const suffixA = a.number.replace(/\d/g, '');
         const suffixB = b.number.replace(/\d/g, '');
 
         if (numA === numB) {
-            return suffixA.localeCompare(suffixB); // Sort by suffix if numbers are equal
+            return suffixA.localeCompare(suffixB);
         }
         return numA - numB;
       });
@@ -157,7 +145,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   }, [searchTerm, cardsInSet]);
 
 
-  const handleAddCardToCollection = (condition: string) => {
+  const handleAddCardToCollection = (condition: string, variant: string) => {
     if (!selectedCard) return;
 
     const newCard: PokemonCard = {
@@ -167,7 +155,8 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       cardNumber: selectedCard.number,
       rarity: selectedCard.rarity || "N/A",
       condition: condition,
-      value: getMarketPrice(selectedCard),
+      variant: variant,
+      value: getMarketPriceForVariant(selectedCard, variant),
       imageUrl: selectedCard.images.large,
     };
 
@@ -175,19 +164,19 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       const storedCardsRaw = localStorage.getItem("pokemonCards");
       const storedCards: PokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
       
-      // Check for duplicates based on API ID and condition
       const isDuplicate = storedCards.some(
-        card => card.name === newCard.name && 
-                card.set === newCard.set && 
-                card.cardNumber === newCard.cardNumber &&
-                card.condition === newCard.condition 
+        item => item.name === newCard.name && 
+                item.set === newCard.set && 
+                item.cardNumber === newCard.cardNumber &&
+                item.condition === newCard.condition &&
+                item.variant === newCard.variant 
       );
 
       if (isDuplicate) {
         toast({
           variant: "destructive",
           title: "Duplicate Card",
-          description: `${newCard.name} (${newCard.condition}) is already in your collection.`,
+          description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) is already in your collection.`,
         });
         setIsDialogOpen(false);
         return;
@@ -197,7 +186,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
       toast({
         title: "Card Added!",
-        description: `${newCard.name} (${newCard.condition}) from ${newCard.set} has been added.`,
+        description: `${newCard.name} (${formatVariantKey(newCard.variant || "")}, ${newCard.condition}) from ${newCard.set} has been added.`,
         className: "bg-secondary text-secondary-foreground"
       });
     } catch (e) {
@@ -213,6 +202,20 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
 
   const openDialogForCard = (card: ApiPokemonCard) => {
     setSelectedCard(card);
+    const variants = card.tcgplayer?.prices ? Object.keys(card.tcgplayer.prices).sort() : [];
+    setSelectedCardVariants(variants);
+    
+    // Determine default variant: prefer "normal", then "holofoil", then first available
+    let determinedDefaultVariant = "";
+    if (variants.includes("normal")) {
+      determinedDefaultVariant = "normal";
+    } else if (variants.includes("holofoil")) {
+      determinedDefaultVariant = "holofoil";
+    } else if (variants.length > 0) {
+      determinedDefaultVariant = variants[0];
+    }
+    setDefaultVariant(determinedDefaultVariant);
+
     setIsDialogOpen(true);
   };
 
@@ -266,7 +269,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
               </div>
             )}
             {!isLoading && !error && (
-              <ScrollArea className="h-[calc(100vh-26rem)] md:h-[calc(100vh-30rem)]"> {/* Adjusted height */}
+              <ScrollArea className="h-[calc(100vh-26rem)] md:h-[calc(100vh-30rem)]"> 
                 {filteredCards.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {filteredCards.map((card) => (
@@ -303,6 +306,8 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
           cardName={selectedCard.name}
           cardImageUrl={selectedCard.images.small}
           availableConditions={conditionOptions}
+          availableVariants={selectedCardVariants}
+          defaultVariant={defaultVariant}
           onAddCard={handleAddCardToCollection}
         />
       )}
@@ -314,4 +319,3 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
 };
 
 export default SetDetailsPage;
-
