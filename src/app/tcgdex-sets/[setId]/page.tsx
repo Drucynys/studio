@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -10,15 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
-import type { PokemonCard as CollectionPokemonCard } from "@/types"; 
-import type { TcgDexCardResume, TcgDexSet, TcgDexCard, TcgDexCardPrices } from "@/types/tcgdex"; 
+import type { PokemonCard as CollectionPokemonCard } from "@/types";
+import type { TcgDexCardResume, TcgDexSet, TcgDexCard, TcgDexCardPrices } from "@/types/tcgdex";
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 
-const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 const TCGDEX_IMAGE_BASE_URL = "https://assets.tcgdex.net";
+const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
+// Helper function for TCGdex card images
 const getSafeTcgDexCardImageUrl = (
   basePathSegment: string | undefined | null,
   quality: 'high' | 'low' = 'low',
@@ -27,28 +28,28 @@ const getSafeTcgDexCardImageUrl = (
   if (!basePathSegment || typeof basePathSegment !== 'string' || basePathSegment.trim().length === 0) {
     return null;
   }
-
   let trimmedPath = basePathSegment.trim();
-  
-  if (trimmedPath.match(/\.(png|webp|jpg)$/i)) {
-    if (trimmedPath.startsWith('http')) return trimmedPath;
-    return `${TCGDEX_IMAGE_BASE_URL}${trimmedPath.startsWith('/') ? '' : '/'}${trimmedPath}`;
-  }
-  
-  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
-    try {
-      const url = new URL(trimmedPath);
-      if (url.hostname !== 'assets.tcgdex.net') return null; 
-      trimmedPath = url.pathname; 
-    } catch (e) { return null; }
-  }
 
-  let corePath = trimmedPath.replace(/^\/+|\/+$/g, '');
-  if (corePath.length < 3) return null;
+  // If the path already seems to have a common image extension, use it as is.
+  if (trimmedPath.match(/\.(png|webp|jpg)$/i)) {
+    if (trimmedPath.startsWith('http')) { // It's a full URL
+        if (trimmedPath.startsWith(TCGDEX_IMAGE_BASE_URL)) return trimmedPath; // Correct host
+        return null; // Full URL but wrong host
+    }
+    // It's a relative path with extension e.g. /en/base/base1/1.png or en/base/base1/1.png
+    return `${TCGDEX_IMAGE_BASE_URL}/${trimmedPath.replace(/^\/+/, "")}`;
+  }
+  
+  // Path segment needs quality and extension
+  let corePath = trimmedPath.replace(TCGDEX_IMAGE_BASE_URL, ''); // Remove base if accidentally included
+  corePath = corePath.replace(/^\/+|\/+$/g, ''); // Trim slashes from both ends
+
+  if (corePath.length < 3) return null; // Too short for a valid path segment like "en/set/id"
 
   return `${TCGDEX_IMAGE_BASE_URL}/${corePath}/${quality}.${extension}`;
 };
 
+// Helper function for TCGdex set logos/symbols
 const getSafeTcgDexSetAssetUrl = (
   assetPathInput: string | undefined | null,
   extension: 'png' | 'webp' = 'webp'
@@ -56,37 +57,40 @@ const getSafeTcgDexSetAssetUrl = (
   if (!assetPathInput || typeof assetPathInput !== 'string' || assetPathInput.trim().length === 0) {
     return null;
   }
-  
   let basePath = assetPathInput.trim();
 
+  // If the path already seems to have a common image extension
   if (basePath.match(/\.(png|webp|jpg)$/i)) {
-     if (basePath.startsWith('http')) return basePath;
-     return `${TCGDEX_IMAGE_BASE_URL}${basePath.startsWith('/') ? '' : '/'}${basePath}`;
+    if (basePath.startsWith('http')) { // It's a full URL
+        if (basePath.startsWith(TCGDEX_IMAGE_BASE_URL)) return basePath; // Correct host
+        return null; // Full URL but wrong host
+    }
+    // It's a relative path with extension
+    return `${TCGDEX_IMAGE_BASE_URL}/${basePath.replace(/^\/+/, "")}`;
   }
-  
-  if (basePath.startsWith('http://') || basePath.startsWith('https://')) {
-     try {
-      const url = new URL(basePath);
-      if (url.hostname !== 'assets.tcgdex.net') return null;
-      basePath = url.pathname;
-    } catch (e) { return null; }
-  }
-  
-  basePath = basePath.replace(/^\/+|\/+$/g, '');
-  if (basePath.length < 3) return null;
 
-  return `${TCGDEX_IMAGE_BASE_URL}/${basePath}.${extension}`;
+  // Path segment needs extension
+  let corePath = basePath.replace(TCGDEX_IMAGE_BASE_URL, '');
+  corePath = corePath.replace(/^\/+|\/+$/g, '');
+  
+  if (corePath.length < 3) return null; // Too short for a valid path segment
+
+  return `${TCGDEX_IMAGE_BASE_URL}/${corePath}.${extension}`;
 };
+
 
 const getTcgDexPriceForVariant = (prices: TcgDexCardPrices | undefined, variantKey: string): number => {
   if (!prices) return 0;
-  const priceData = prices[variantKey];
-  return priceData?.market ?? 0;
+  // Check if the variantKey directly exists (e.g. "normal", "holofoil")
+  if (prices[variantKey] && typeof prices[variantKey].market === 'number') {
+    return prices[variantKey].market!;
+  }
+  return 0; // Fallback if variant or market price not found
 };
 
+
 const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
-  const resolvedParams = use(paramsFromProps);
-  const { setId } = resolvedParams;
+  const { setId } = paramsFromProps.params; // Reverted to standard prop access
 
   const [setDetails, setSetDetails] = useState<TcgDexSet | null>(null);
   const [cardsInSet, setCardsInSet] = useState<TcgDexCardResume[]>([]);
@@ -107,42 +111,60 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     if (!setId) return;
     setIsLoading(true);
     setError(null);
+    setSetDetails(null); 
+    setCardsInSet([]); 
+    setFilteredCards([]); 
+
     try {
-      const setDetailsResponse = await fetch(`https://api.tcgdex.net/v2/en/sets/${setId}`);
-      if (!setDetailsResponse.ok) {
-        throw new Error(`Failed to fetch set details from TCGdex. API responded with status ${setDetailsResponse.status}${setDetailsResponse.statusText ? ': ' + setDetailsResponse.statusText : '.'}`);
-      }
-      const setData: TcgDexSet = await setDetailsResponse.json();
-      setSetDetails(setData);
+      const [setDetailsResponseSettled, cardsResponseSettled] = await Promise.allSettled([
+        fetch(`https://api.tcgdex.net/v2/en/sets/${setId}`),
+        fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`)
+      ]);
 
-      const cardsResponse = await fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`);
-      if(!cardsResponse.ok) {
-          throw new Error(`Failed to fetch cards for set ${setId} from TCGdex. API responded with status ${cardsResponse.status}${cardsResponse.statusText ? ': ' + cardsResponse.statusText : '.'}`);
-      }
-      let fetchedCards: TcgDexCardResume[] = await cardsResponse.json();
-
-      fetchedCards.sort((a, b) => {
-        const numA = parseInt(a.localId.replace(/\D/g, ''), 10) || 0;
-        const numB = parseInt(b.localId.replace(/\D/g, ''), 10) || 0;
-        const suffixA = a.localId.replace(/\d/g, ''); 
-        const suffixB = b.localId.replace(/\d/g, '');
-
-        if (numA === numB) {
-            return suffixA.localeCompare(suffixB); 
+      if (setDetailsResponseSettled.status === 'fulfilled') {
+        const setDetailsResponse = setDetailsResponseSettled.value;
+        if (setDetailsResponse.ok) {
+          const setData: TcgDexSet = await setDetailsResponse.json();
+          setSetDetails(setData);
+        } else {
+          console.warn(`Failed to fetch set details for ${setId}. API responded with status ${setDetailsResponse.status}${setDetailsResponse.statusText ? ': ' + setDetailsResponse.statusText : '.'}`);
+          setSetDetails(null); 
         }
-        return numA - numB;
-      });
-      
-      setCardsInSet(fetchedCards);
-      setFilteredCards(fetchedCards);
+      } else { 
+        console.warn(`Network error fetching set details for ${setId}:`, (setDetailsResponseSettled.reason as Error).message);
+        setSetDetails(null);
+      }
+
+      if (cardsResponseSettled.status === 'fulfilled') {
+        const cardsResponse = cardsResponseSettled.value;
+        if (cardsResponse.ok) {
+          let fetchedCards: TcgDexCardResume[] = await cardsResponse.json();
+          fetchedCards.sort((a, b) => {
+            const numA = parseInt(a.localId.replace(/\D/g, ''), 10) || 0;
+            const numB = parseInt(b.localId.replace(/\D/g, ''), 10) || 0;
+            const suffixA = a.localId.replace(/\d/g, ''); 
+            const suffixB = b.localId.replace(/\d/g, '');
+            if (numA === numB) {
+                return suffixA.localeCompare(suffixB); 
+            }
+            return numA - numB;
+          });
+          setCardsInSet(fetchedCards);
+          setFilteredCards(fetchedCards);
+        } else {
+          throw new Error(`Failed to fetch cards for set ${setId} from TCGdex. API responded with status ${cardsResponse.status}${cardsResponse.statusText ? ': ' + cardsResponse.statusText : '.'}`);
+        }
+      } else { 
+         throw new Error(`Network error fetching cards for set ${setId}: ${(cardsResponseSettled.reason as Error).message}`);
+      }
 
     } catch (err) {
-      console.error(`Error fetching TCGdex data for set ${setId}:`, err);
+      console.error(`Error in fetchSetAndCards for set ${setId}:`, err);
       setError(err instanceof Error ? err.message : "An unknown error occurred");
     } finally {
       setIsLoading(false);
     }
-  }, [setId]);
+  }, [setId, toast]);
 
   useEffect(() => {
     fetchSetAndCards();
@@ -158,15 +180,23 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   }, [searchTerm, cardsInSet]);
 
   const handleAddCardToCollection = (condition: string, variant: string) => {
-    if (!selectedCardResume || !fullSelectedCardDetails || !setDetails) return;
+    if (!fullSelectedCardDetails || !setDetails) { 
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Full card details or set details are missing. Cannot add to collection.",
+        });
+        return;
+    }
     
     const displayImageUrl = getSafeTcgDexCardImageUrl(fullSelectedCardDetails.image, 'high', 'webp') || "https://placehold.co/250x350.png";
-    
+    const collectorNumber = fullSelectedCardDetails.number || fullSelectedCardDetails.localId;
+
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
       name: fullSelectedCardDetails.name,
       set: setDetails.name, 
-      cardNumber: fullSelectedCardDetails.number, // Use full collector number
+      cardNumber: collectorNumber, 
       rarity: fullSelectedCardDetails.rarity || "N/A", 
       condition: condition,
       value: getTcgDexPriceForVariant(fullSelectedCardDetails.prices, variant), 
@@ -181,7 +211,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       const isDuplicate = storedCards.some(
         card => card.name === newCard.name && 
                 card.set === newCard.set && 
-                card.cardNumber === newCard.cardNumber &&
+                card.cardNumber === newCard.cardNumber && 
                 card.condition === newCard.condition &&
                 card.variant === newCard.variant
       );
@@ -213,18 +243,19 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     }
     setIsDialogOpen(false);
     setFullSelectedCardDetails(null); 
+    setSelectedCardResume(null);
   };
 
   const openDialogForCard = async (cardResume: TcgDexCardResume) => {
-    setSelectedCardResume(cardResume);
-    setFullSelectedCardDetails(null); // Clear previous full details
-    setIsDialogOpen(true); // Open dialog immediately to show basic info + loading
+    setSelectedCardResume(cardResume); 
+    setFullSelectedCardDetails(null); 
+    setIsDialogOpen(true); 
     setIsFetchingFullCardDetails(true);
 
     try {
       const response = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardResume.id}`);
       if (!response.ok) {
-        throw new Error(`Failed to fetch full card details for ${cardResume.name}. API responded with status ${response.status}`);
+        throw new Error(`Failed to fetch full card details for ${cardResume.name}. API responded with status ${response.status}${response.statusText ? ': ' + response.statusText : '.'}`);
       }
       const fullData: TcgDexCard = await response.json();
       setFullSelectedCardDetails(fullData);
@@ -235,15 +266,13 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
         title: "Error Fetching Details",
         description: err instanceof Error ? err.message : "Could not load full card details.",
       });
-      // Optionally close dialog or keep it open with an error message inside
-      // setIsDialogOpen(false); // Or handle error within dialog
     } finally {
       setIsFetchingFullCardDetails(false);
     }
   };
 
-  const setName = setDetails?.name || `Set ${setId}`;
-  const setLogoUrl = setDetails?.logo ? getSafeTcgDexSetAssetUrl(setDetails.logo, 'webp') : null;
+  const pageTitleName = setDetails?.name || `Set ${setId}`;
+  const pageSetLogoUrl = setDetails?.logo ? getSafeTcgDexSetAssetUrl(setDetails.logo, 'webp') : null;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -259,11 +288,11 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
-                    {setLogoUrl && (
-                        <Image src={setLogoUrl} alt={`${setName} logo`} width={100} height={40} objectFit="contain" className="mb-2" data-ai-hint="pokemon set logo" />
+                    {pageSetLogoUrl && (
+                        <Image src={pageSetLogoUrl} alt={`${pageTitleName} logo`} width={100} height={40} style={{objectFit: "contain"}} className="mb-2" data-ai-hint="pokemon set logo" />
                     )}
-                    <CardTitle className="font-headline text-3xl text-foreground">{setName}</CardTitle>
-                    <CardDescription>Browse cards from {setName}. Click a card to add it. (TCGdex API)</CardDescription>
+                    <CardTitle className="font-headline text-3xl text-foreground">{pageTitleName}</CardTitle>
+                    <CardDescription>Browse cards from {pageTitleName}. Click a card to add it. (TCGdex API)</CardDescription>
                 </div>
                 <div className="relative mt-4 md:mt-0 w-full md:w-1/3">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -291,7 +320,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
               <div className="flex flex-col items-center justify-center py-10 text-destructive">
                 <ServerCrash className="h-16 w-16 mb-4" />
                 <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                <p className="text-center">Could not load TCGdex cards for this set: {error}.<br />Please try again later.</p>
+                <p className="text-center">Could not load TCGdex cards for this set: {error}<br />Please try again later.</p>
               </div>
             )}
             {!isLoading && !error && (
@@ -314,7 +343,18 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                                     layout="fill" 
                                     objectFit="contain" 
                                     data-ai-hint="pokemon card front"
+                                    onError={(e) => { 
+                                      const parentNode = e.currentTarget.parentNode as HTMLElement | null;
+                                      if (parentNode?.nextSibling && parentNode.nextSibling instanceof HTMLElement) {
+                                        (parentNode.nextSibling as HTMLElement).style.setProperty('display','flex','important');
+                                      }
+                                      e.currentTarget.style.display = 'none'; 
+                                    }}
                                 />
+                                
+                                <div className="w-full h-full bg-muted rounded items-center justify-center hidden" data-ai-hint="image placeholder">
+                                  <span className="text-xs text-muted-foreground">No Image</span>
+                                </div>
                             ) : (
                                 <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="image placeholder">
                                   <span className="text-xs text-muted-foreground">No Image</span>
@@ -345,7 +385,8 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           isOpen={isDialogOpen}
           onClose={() => {
             setIsDialogOpen(false);
-            setFullSelectedCardDetails(null); // Clear details when dialog closes
+            setFullSelectedCardDetails(null); 
+            setSelectedCardResume(null);
           }}
           cardName={selectedCardResume.name}
           cardImageUrl={getSafeTcgDexCardImageUrl(fullSelectedCardDetails?.image || selectedCardResume.image, 'high', 'webp') || "https://placehold.co/200x280.png"}
@@ -363,4 +404,5 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
 };
 
 export default TcgDexSetDetailsPage;
+
     
