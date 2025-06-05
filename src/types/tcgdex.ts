@@ -27,6 +27,16 @@ export interface TcgDexCardStub {
   image?: string; // Relative image path if in set details, full if from /cards endpoint
 }
 
+// Represents the summary object returned by GET /cards?set.id={id}
+export interface TcgDexCardResume {
+  id: string; // Global card ID, e.g., "base1-1"
+  localId: string; // Card number within its set, e.g., "1"
+  name: string;
+  image: string; // RELATIVE image path, e.g., "/en/base/base1/1.png"
+  // Note: Full rarity and collector number (e.g., "1/102") are not in CardResume
+}
+
+
 export interface TcgDexCardPriceInfo {
   low?: number | null;
   mid?: number | null;
@@ -54,11 +64,12 @@ export interface TcgDexCardPrices {
   [key: string]: any; // For other potential price keys
 }
 
+// Represents the full card object, usually from GET /cards/{cardId}
 export interface TcgDexCard {
   id: string; // Global card ID 'base1-1'
   localId: string; // Card number within the set '1'
   name: string;
-  image?: string; // Full image URL
+  image?: string; // Full image URL e.g. "https://assets.tcgdex.net/en/base/base1/1.png"
   category: string; // e.g., "Pokémon", "Trainer", "Energy"
   rarity: string;
   variants?: {
@@ -78,7 +89,7 @@ export interface TcgDexCard {
       total: number;
     };
   };
-  number: string; // Collector number string
+  number: string; // Collector number string e.g. "1/102"
   hp?: number;
   types?: string[];
   illustrator?: string;

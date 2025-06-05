@@ -11,54 +11,42 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import type { PokemonCard as CollectionPokemonCard } from "@/types"; // Collection card type
-import type { TcgDexCard, TcgDexSet } from "@/types/tcgdex"; // TCGdex API types
+import type { TcgDexCardResume, TcgDexSet, TcgDexCard } from "@/types/tcgdex"; // TCGdex API types
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-const getMarketPriceFromTcgDex = (apiCard: TcgDexCard): number => {
-  const prices = apiCard.prices;
-  if (!prices) return 0;
-
-  // Prioritize market price for common variants, then average
-  if (prices.holofoil?.market) return prices.holofoil.market;
-  if (prices.normal?.market) return prices.normal.market;
-  if (prices.reverseHolo?.market) return prices.reverseHolo.market;
-  if (prices.average) return prices.average;
-  if (prices.low) return prices.low;
-  
-  // Fallback to any available market price key
-  for (const key in prices) {
-    if (typeof prices[key] === 'object' && prices[key]?.market) {
-      return prices[key]!.market!;
-    }
-  }
-  return 0;
-};
+// Placeholder for fetching full card details - for future enhancement
+// const getMarketPriceFromTcgDexFull = (apiCard: TcgDexCard): number => {
+//   const prices = apiCard.prices;
+//   if (!prices) return 0;
+//   // ... (logic from before)
+//   return 0;
+// };
 
 const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
   const resolvedParams = use(paramsFromProps);
   const { setId } = resolvedParams;
 
   const [setDetails, setSetDetails] = useState<TcgDexSet | null>(null);
-  const [cardsInSet, setCardsInSet] = useState<TcgDexCard[]>([]);
-  const [filteredCards, setFilteredCards] = useState<TcgDexCard[]>([]);
+  const [cardsInSet, setCardsInSet] = useState<TcgDexCardResume[]>([]);
+  const [filteredCards, setFilteredCards] = useState<TcgDexCardResume[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<TcgDexCard | null>(null);
+  const [selectedCard, setSelectedCard] = useState<TcgDexCardResume | null>(null); // Using TcgDexCardResume for now
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
   const { toast } = useToast();
+  const TCGDEX_IMAGE_BASE_URL = "https://assets.tcgdex.net";
 
   const fetchSetAndCards = useCallback(async () => {
     if (!setId) return;
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch set details first to get name and logo
       const setDetailsResponse = await fetch(`https://api.tcgdex.net/v2/en/sets/${setId}`);
       if (!setDetailsResponse.ok) {
         throw new Error(`Failed to fetch set details from TCGdex: ${setDetailsResponse.statusText}`);
@@ -66,17 +54,12 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       const setData: TcgDexSet = await setDetailsResponse.json();
       setSetDetails(setData);
 
-      // Fetch all cards for the set using /cards?set.id={id}
-      // The TCGdex API might paginate, but typically returns all cards for a set in one go or has a limit.
-      // For simplicity, we're assuming it returns all, or we handle the first page.
-      // A more robust solution would handle pagination if the API uses it for this endpoint.
       const cardsResponse = await fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`);
       if(!cardsResponse.ok) {
           throw new Error(`Failed to fetch cards for set ${setId} from TCGdex: ${cardsResponse.statusText}`);
       }
-      let fetchedCards: TcgDexCard[] = await cardsResponse.json();
+      let fetchedCards: TcgDexCardResume[] = await cardsResponse.json();
 
-      // Sort cards by their localId (collector number)
       fetchedCards.sort((a, b) => {
         const numA = parseInt(a.localId.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(b.localId.replace(/\D/g, ''), 10) || 0;
@@ -108,8 +91,8 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     const lowercasedFilter = searchTerm.toLowerCase();
     const filteredData = cardsInSet.filter(card =>
       card.name.toLowerCase().includes(lowercasedFilter) ||
-      card.number.toLowerCase().includes(lowercasedFilter) || // TCGdex uses 'number' for collector number string
-      (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter))
+      card.localId.toLowerCase().includes(lowercasedFilter)
+      // Rarity is not in TcgDexCardResume, so cannot filter by it here
     );
     setFilteredCards(filteredData);
   }, [searchTerm, cardsInSet]);
@@ -118,18 +101,18 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   const handleAddCardToCollection = (condition: string) => {
     if (!selectedCard || !setDetails) return;
 
+    const fullImageUrl = selectedCard.image ? `${TCGDEX_IMAGE_BASE_URL}${selectedCard.image}` : "https://placehold.co/250x350.png";
+
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
       name: selectedCard.name,
-      set: setDetails.name, // Use set name from fetched setDetails
-      cardNumber: selectedCard.number, // TCGdex uses 'number' for collector number string
-      rarity: selectedCard.rarity || "N/A",
+      set: setDetails.name, 
+      cardNumber: selectedCard.localId, // Using localId from CardResume
+      rarity: "N/A", // Rarity not available in CardResume
       condition: condition,
-      value: getMarketPriceFromTcgDex(selectedCard),
-      imageUrl: selectedCard.image || "https://placehold.co/250x350.png", // Fallback image
-      // Variant might need more specific handling if TCGdex provides clear variant selection tied to price.
-      // For now, we're using a general price.
-      variant: selectedCard.rarity.includes("Holo") ? "Holofoil" : "Normal", // Basic variant assumption
+      value: 0, // Price not available in CardResume
+      imageUrl: fullImageUrl,
+      variant: "Normal", // Defaulting, variant info not in CardResume
     };
 
     try {
@@ -171,7 +154,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     setIsDialogOpen(false);
   };
 
-  const openDialogForCard = (card: TcgDexCard) => {
+  const openDialogForCard = (card: TcgDexCardResume) => {
     setSelectedCard(card);
     setIsDialogOpen(true);
   };
@@ -203,7 +186,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                         type="text"
-                        placeholder="Search cards..."
+                        placeholder="Search cards by name or number..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10"
@@ -211,7 +194,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                 </div>
             </div>
             <CardDescription className="mt-2 text-xs italic text-muted-foreground flex items-center gap-1">
-                <Info size={14}/> Card values are market estimates from TCGdex API (likely Cardmarket based) and may vary.
+                <Info size={14}/> Full card details (rarity, collector #, value) require individual card lookup (feature pending).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -240,7 +223,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                         >
                         <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2">
                             {card.image ? (
-                                <Image src={card.image} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                                <Image src={`${TCGDEX_IMAGE_BASE_URL}${card.image}`} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
                             ) : (
                                 <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="image placeholder">
                                   <span className="text-xs text-muted-foreground">No Image</span>
@@ -249,7 +232,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                         </div>
                         <div className="text-center mt-auto">
                             <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
-                            <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
+                            <p className="text-xs text-muted-foreground">#{card.localId}</p>
                         </div>
                         </Card>
                     ))}
@@ -270,7 +253,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedCard.name}
-          cardImageUrl={selectedCard.image || "https://placehold.co/200x280.png"}
+          cardImageUrl={selectedCard.image ? `${TCGDEX_IMAGE_BASE_URL}${selectedCard.image}` : "https://placehold.co/200x280.png"}
           availableConditions={conditionOptions}
           onAddCard={handleAddCardToCollection}
         />
