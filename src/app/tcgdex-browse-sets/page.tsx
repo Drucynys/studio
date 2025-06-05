@@ -15,33 +15,39 @@ import type { TcgDexSet } from "@/types/tcgdex";
 
 const TCGDEX_IMAGE_BASE_URL = "https://assets.tcgdex.net";
 
-const getSafeTcgDexImageUrl = (imagePath: string | undefined | null): string | null => {
-  if (!imagePath || typeof imagePath !== 'string') return null;
-  const trimmedPath = imagePath.trim();
-  // If trimmed path is too short to be a real image path (e.g. "/", ".png")
-  if (!trimmedPath || trimmedPath.length < 5) return null;
-
-  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
-    try {
-      const url = new URL(trimmedPath);
-      if (url.hostname === 'assets.tcgdex.net') {
-        return trimmedPath; // Valid absolute URL for the correct host
-      }
-      // Absolute URL but for a different/unexpected host
-      return null; 
-    } catch (e) {
-      // Malformed absolute URL
-      return null;
-    }
-  } else {
-    // Assume relative path
-    if (trimmedPath.startsWith('/')) {
-      return `${TCGDEX_IMAGE_BASE_URL}${trimmedPath}`;
-    } else {
-      return `${TCGDEX_IMAGE_BASE_URL}/${trimmedPath}`;
-    }
+// Helper function for set logos and symbols
+const getSafeTcgDexSetAssetUrl = (
+  assetPathInput: string | undefined | null,
+  extension: 'png' | 'webp' = 'webp'
+): string | null => {
+  if (!assetPathInput || typeof assetPathInput !== 'string' || assetPathInput.trim().length === 0) {
+    return null;
   }
+  
+  let basePath = assetPathInput.trim();
+
+  // Normalize the base path: ensure it's an absolute URL or becomes one
+  if (basePath.startsWith('https://assets.tcgdex.net')) {
+    // It's already an absolute URL from the correct host
+    basePath = basePath.replace(/\/$/, ""); // Remove trailing slash for consistency
+  } else if (basePath.startsWith('/')) {
+    // It's a relative path starting with /
+    basePath = `${TCGDEX_IMAGE_BASE_URL}${basePath.replace(/\/$/, "")}`;
+  } else {
+    // It's a relative path not starting with / (or some other format) - this case is less likely for TCGdex structure
+    // but we'll prepend the base and ensure a slash
+    basePath = `${TCGDEX_IMAGE_BASE_URL}/${basePath.replace(/\/$/, "")}`;
+  }
+
+  // If the (now absolute) path already seems to have a common image extension, use it as is.
+  if (basePath.match(/\.(png|webp|jpg)$/i)) {
+    return basePath;
+  }
+
+  // Otherwise, append the desired extension.
+  return `${basePath}.${extension}`;
 };
+
 
 const TcgDexBrowseSetsPage: NextPage = () => {
   const [sets, setSets] = useState<TcgDexSet[]>([]);
@@ -77,7 +83,7 @@ const TcgDexBrowseSetsPage: NextPage = () => {
     const lowercasedFilter = searchTerm.toLowerCase();
     const filteredData = sets.filter(item =>
       item.name.toLowerCase().includes(lowercasedFilter) ||
-      item.serie?.name.toLowerCase().includes(lowercasedFilter) ||
+      (item.serie?.name || "").toLowerCase().includes(lowercasedFilter) ||
       item.id.toLowerCase().includes(lowercasedFilter)
     );
     setFilteredSets(filteredData);
@@ -121,7 +127,7 @@ const TcgDexBrowseSetsPage: NextPage = () => {
                 {filteredSets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {filteredSets.map((set) => {
-                      const displayLogoUrl = getSafeTcgDexImageUrl(set.logo);
+                      const displayLogoUrl = getSafeTcgDexSetAssetUrl(set.logo, 'webp');
                       return (
                         <Link key={set.id} href={`/tcgdex-sets/${set.id}`} passHref legacyBehavior>
                         <a className="block group">
