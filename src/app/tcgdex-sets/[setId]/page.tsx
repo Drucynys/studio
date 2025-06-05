@@ -20,7 +20,8 @@ import { getSafeTcgDexCardImageUrl, getSafeTcgDexSetAssetUrl } from '@/lib/tcgde
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-const getTcgDexPrice = (prices: TcgDexCardPrices | undefined): number => {
+// Helper to get a primary market price for collection storage from TCGdex
+const getPrimaryTcgDexPriceForCollection = (prices: TcgDexCardPrices | undefined): number => {
   if (!prices) return 0;
 
   if (prices.normal?.market) return prices.normal.market;
@@ -29,7 +30,6 @@ const getTcgDexPrice = (prices: TcgDexCardPrices | undefined): number => {
   if (prices.firstEditionNormal?.market) return prices.firstEditionNormal.market;
   if (prices.firstEditionHolofoil?.market) return prices.firstEditionHolofoil.market;
   
-  // Fallback to the first available market price
   for (const key in prices) {
     if (Object.prototype.hasOwnProperty.call(prices, key)) {
         const priceEntry = prices[key as keyof TcgDexCardPrices];
@@ -72,7 +72,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     try {
       const [setDetailsResponseSettled, cardsResponseSettled] = await Promise.allSettled([
         fetch(`https://api.tcgdex.net/v2/en/sets/${setId}`),
-        fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`)
+        fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`) // Fetches resume cards
       ]);
 
       if (setDetailsResponseSettled.status === 'fulfilled') {
@@ -135,7 +135,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     setFilteredCards(filteredData);
   }, [searchTerm, cardsInSet]);
 
-  const handleAddCardToCollection = (condition: string) => {
+  const handleAddCardToCollection = (condition: string, valueForCollection: number) => {
     if (!fullSelectedCardDetails || !setDetails) { 
         toast({
             variant: "destructive",
@@ -155,7 +155,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       cardNumber: collectorNumber, 
       rarity: fullSelectedCardDetails.rarity || "N/A", 
       condition: condition,
-      value: getTcgDexPrice(fullSelectedCardDetails.prices), 
+      value: valueForCollection, // Use value passed from dialog
       imageUrl: displayImageUrl,
     };
 
@@ -207,6 +207,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     setIsDialogOpen(true); 
     
     try {
+      // Fetch full card details when opening dialog
       const response = await fetch(`https://api.tcgdex.net/v2/en/cards/${cardResume.id}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch full card details for ${cardResume.name}. API responded with status ${response.status}${response.statusText ? ': ' + response.statusText : '.'}`);
@@ -220,7 +221,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
         title: "Error Fetching Details",
         description: err instanceof Error ? err.message : "Could not load full card details.",
       });
-      setFullSelectedCardDetails(null); 
+      setFullSelectedCardDetails(null); // Ensure dialog doesn't use stale data
     } finally {
       setIsFetchingFullCardDetails(false); 
     }
@@ -326,7 +327,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           </CardContent>
         </Card>
       </main>
-      {selectedCardResume && (
+      {selectedCardResume && ( // Dialog depends on selectedCardResume to initiate
         <AddCardToCollectionDialog
           isOpen={isDialogOpen}
           onClose={() => {
@@ -335,11 +336,11 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
             setSelectedCardResume(null);
           }}
           sourceApi="tcgdex"
-          cardName={selectedCardResume.name}
-          initialCardImageUrl={selectedCardResume.image} 
+          cardName={selectedCardResume.name} // Name from resume for initial display
+          initialCardImageUrl={selectedCardResume.image} // Image from resume for initial display
+          tcgDexFullCard={fullSelectedCardDetails} // Pass full details when available
+          isFetchingCardDetails={isFetchingFullCardDetails} // Pass fetching state
           availableConditions={conditionOptions}
-          tcgDexFullCard={fullSelectedCardDetails}
-          isFetchingCardDetails={isFetchingFullCardDetails}
           onAddCard={handleAddCardToCollection}
         />
       )}

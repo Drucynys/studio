@@ -20,9 +20,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import type { TcgDexCard } from "@/types/tcgdex";
-import { Loader2 } from "lucide-react";
+import type { TcgDexCard, TcgDexCardPriceInfo, TcgDexCardPrices } from "@/types/tcgdex";
+import type { ApiPokemonCard as PokemonTcgApiCard } from "@/app/sets/[setId]/page"; // Assuming type is exported or defined here
+import { Loader2, Tag, Gem } from "lucide-react";
 import { getSafeTcgDexCardImageUrl } from "@/lib/tcgdexUtils";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+
+// Helper to format variant keys for display
+const formatVariantKey = (key: string): string => {
+  if (key === "1stEditionNormal") return "1st Edition Normal";
+  if (key === "1stEditionHolofoil") return "1st Edition Holo";
+  if (key === "reverseHolofoil" || key === "reverseHolo") return "Reverse Holo";
+  if (key === "holofoil") return "Holofoil";
+  if (key === "normal") return "Normal";
+  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
+};
+
+
+type DisplayPriceInfo = {
+  variantName: string;
+  price: number | string; // string for "N/A"
+  currencySymbol?: string;
+};
 
 type AddCardToCollectionDialogProps = {
   isOpen: boolean;
@@ -32,11 +52,12 @@ type AddCardToCollectionDialogProps = {
   availableConditions: string[];
   sourceApi?: 'pokemontcg' | 'tcgdex';
 
-  // For TCGdex API
+  // API specific card data
+  pokemonTcgApiCard?: PokemonTcgApiCard | null;
   tcgDexFullCard?: TcgDexCard | null;
   isFetchingCardDetails?: boolean;
 
-  onAddCard: (condition: string) => void;
+  onAddCard: (condition: string, value: number) => void;
 };
 
 export function AddCardToCollectionDialog({
@@ -46,12 +67,15 @@ export function AddCardToCollectionDialog({
   initialCardImageUrl,
   availableConditions,
   sourceApi,
+  pokemonTcgApiCard,
   tcgDexFullCard,
   isFetchingCardDetails,
   onAddCard,
 }: AddCardToCollectionDialogProps) {
   const [selectedCondition, setSelectedCondition] = useState<string>("");
   const [finalDisplayImageUrl, setFinalDisplayImageUrl] = useState<string>("https://placehold.co/200x280.png");
+  const [displayPrices, setDisplayPrices] = useState<DisplayPriceInfo[]>([]);
+  const [cardRarity, setCardRarity] = useState<string | null>(null);
 
   // Effect for managing the display image URL
   useEffect(() => {
@@ -73,32 +97,102 @@ export function AddCardToCollectionDialog({
             } else {
                  imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image";
             }
-        } else if (initialCardImageUrl) {
+        } else if (initialCardImageUrl) { // Fallback for TCGdex if full card not yet loaded but resume image exists
             const lowRes = getSafeTcgDexCardImageUrl(initialCardImageUrl, 'low', 'webp');
             if (lowRes) imageUrlToSet = lowRes;
              else imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image+Available";
-        } else {
+        } else { // Generic fallback
             imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image+Data";
         }
-    } else if (initialCardImageUrl) { // For PokemonTCG.io or other sources
+    } else if (sourceApi === 'pokemontcg' && pokemonTcgApiCard?.images.large) {
+        imageUrlToSet = pokemonTcgApiCard.images.large;
+    } else if (initialCardImageUrl) { // Generic initial for other sources
         imageUrlToSet = initialCardImageUrl;
     }
     setFinalDisplayImageUrl(imageUrlToSet);
-  }, [isOpen, initialCardImageUrl, tcgDexFullCard, isFetchingCardDetails, sourceApi]);
+  }, [isOpen, initialCardImageUrl, tcgDexFullCard, pokemonTcgApiCard, isFetchingCardDetails, sourceApi]);
 
-  // Effect for resetting general states when dialog opens/closes
+  // Effect for processing prices and rarity
   useEffect(() => {
     if (!isOpen) {
       setSelectedCondition("");
+      setDisplayPrices([]);
+      setCardRarity(null);
       return;
     }
     // Reset when opening
     setSelectedCondition("");
-  }, [isOpen]);
+    setDisplayPrices([]);
+    setCardRarity(null);
+
+
+    const newPrices: DisplayPriceInfo[] = [];
+    let defaultPriceForCollection = 0;
+
+    if (sourceApi === 'pokemontcg' && pokemonTcgApiCard?.tcgplayer?.prices) {
+      setCardRarity(pokemonTcgApiCard.rarity || "N/A");
+      const prices = pokemonTcgApiCard.tcgplayer.prices;
+      for (const key in prices) {
+        if (Object.prototype.hasOwnProperty.call(prices, key)) {
+          const priceEntry = prices[key as keyof typeof prices];
+          if (priceEntry && typeof priceEntry.market === 'number') {
+            newPrices.push({ variantName: formatVariantKey(key), price: priceEntry.market, currencySymbol: '$' });
+            if (key === 'normal' && priceEntry.market) defaultPriceForCollection = priceEntry.market;
+            else if (key === 'holofoil' && priceEntry.market && defaultPriceForCollection === 0) defaultPriceForCollection = priceEntry.market;
+          }
+        }
+      }
+      if (newPrices.length > 0 && defaultPriceForCollection === 0) { // Fallback if no normal/holofoil
+        const firstPriced = newPrices.find(p => typeof p.price === 'number' && p.price > 0);
+        if (firstPriced && typeof firstPriced.price === 'number') defaultPriceForCollection = firstPriced.price;
+      }
+    } else if (sourceApi === 'tcgdex' && !isFetchingCardDetails && tcgDexFullCard?.prices) {
+      setCardRarity(tcgDexFullCard.rarity || "N/A");
+      const prices: TcgDexCardPrices = tcgDexFullCard.prices;
+      const variantOrder = ["normal", "holofoil", "reverseHolo", "1stEditionNormal", "1stEditionHolofoil"];
+      
+      const sortedPriceKeys = Object.keys(prices).sort((a, b) => {
+        const aIndex = variantOrder.indexOf(a);
+        const bIndex = variantOrder.indexOf(b);
+        if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      });
+
+      for (const key of sortedPriceKeys) {
+          const priceEntry = prices[key as keyof TcgDexCardPrices] as TcgDexCardPriceInfo;
+          if (typeof priceEntry === 'object' && priceEntry !== null && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
+            newPrices.push({ variantName: formatVariantKey(key), price: priceEntry.market, currencySymbol: '€' }); // Assuming TCGdex/Cardmarket is Euro
+             if (key === 'normal' && priceEntry.market) defaultPriceForCollection = priceEntry.market;
+             else if (key === 'holofoil' && priceEntry.market && defaultPriceForCollection === 0) defaultPriceForCollection = priceEntry.market;
+             else if (key === 'reverseHolo' && priceEntry.market && defaultPriceForCollection === 0) defaultPriceForCollection = priceEntry.market;
+          }
+      }
+       if (newPrices.length > 0 && defaultPriceForCollection === 0) {
+        const firstPriced = newPrices.find(p => typeof p.price === 'number' && p.price > 0);
+        if (firstPriced && typeof firstPriced.price === 'number') defaultPriceForCollection = firstPriced.price;
+      }
+    }
+    setDisplayPrices(newPrices);
+    // The actual `value` prop for onAddCard will be determined in handleSubmit now
+  }, [isOpen, sourceApi, pokemonTcgApiCard, tcgDexFullCard, isFetchingCardDetails]);
+
 
   const handleSubmit = () => {
     if (selectedCondition) {
-      onAddCard(selectedCondition);
+      let valueForCollection = 0;
+      // Determine value based on displayed prices, preferring "Normal" or the first available
+      const normalPriceEntry = displayPrices.find(p => p.variantName === "Normal" && typeof p.price === 'number');
+      if (normalPriceEntry && typeof normalPriceEntry.price === 'number') {
+        valueForCollection = normalPriceEntry.price;
+      } else if (displayPrices.length > 0) {
+        const firstAvailablePrice = displayPrices.find(p => typeof p.price === 'number' && p.price > 0);
+        if (firstAvailablePrice && typeof firstAvailablePrice.price === 'number') {
+            valueForCollection = firstAvailablePrice.price;
+        }
+      }
+      onAddCard(selectedCondition, valueForCollection);
       onClose();
     }
   };
@@ -106,25 +200,20 @@ export function AddCardToCollectionDialog({
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     setFinalDisplayImageUrl("https://placehold.co/200x280.png/CCCCCC/333333?text=Image+Error");
   };
-
-  const dialogDescriptionText = `Select the condition of your card.`;
   
-  const isAddButtonDisabled = (isFetchingCardDetails && sourceApi === 'tcgdex') ||
-                              !selectedCondition;
+  const isAddButtonDisabled = isFetchingCardDetails || !selectedCondition;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add "{cardName}" to Collection</DialogTitle>
-          <DialogDescription>
-            {dialogDescriptionText}
-          </DialogDescription>
+          {cardRarity && <DialogDescription>Rarity: <Badge variant="secondary">{cardRarity}</Badge></DialogDescription>}
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          <div className="flex justify-center mb-4">
-            <div className="relative w-40 h-56 rounded-md overflow-hidden shadow-md" data-ai-hint="pokemon card front">
+          <div className="flex justify-center mb-2">
+            <div className="relative w-48 h-64 rounded-md overflow-hidden shadow-md" data-ai-hint="pokemon card front">
               <Image
                 src={finalDisplayImageUrl}
                 alt={cardName}
@@ -132,7 +221,7 @@ export function AddCardToCollectionDialog({
                 objectFit="contain"
                 key={finalDisplayImageUrl}
                 onError={handleImageError}
-                unoptimized={sourceApi === 'tcgdex'}
+                unoptimized={sourceApi === 'tcgdex'} // TCGdex images might not need Next/Image optimization if direct URLs
               />
             </div>
           </div>
@@ -143,6 +232,31 @@ export function AddCardToCollectionDialog({
             </div>
           ) : (
             <>
+              {displayPrices.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-sm flex items-center gap-1"><Tag className="h-4 w-4 text-primary"/> Market Prices:</h4>
+                  <ScrollArea className="h-[100px] border rounded-md p-2 bg-muted/30">
+                    <ul className="space-y-1 text-xs">
+                      {displayPrices.map(p => (
+                        <li key={p.variantName} className="flex justify-between items-center">
+                          <span>{p.variantName}:</span>
+                          <span className="font-medium">
+                            {typeof p.price === 'number' ? `${p.currencySymbol || '$'}${p.price.toFixed(2)}` : p.price}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </ScrollArea>
+                </div>
+              )}
+              {displayPrices.length === 0 && !isFetchingCardDetails && (
+                <p className="text-xs text-center text-muted-foreground py-2">
+                  No specific market prices found for this card.
+                </p>
+              )}
+              
+              <Separator className="my-2"/>
+
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="condition" className="text-right col-span-1">
                   Condition
@@ -171,7 +285,7 @@ export function AddCardToCollectionDialog({
             disabled={isAddButtonDisabled}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
-            {(isFetchingCardDetails && sourceApi === 'tcgdex') && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isFetchingCardDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Add to Collection
           </Button>
         </DialogFooter>

@@ -10,12 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
-import type { PokemonCard } from "@/types";
+import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input"; 
 
-interface ApiPokemonCard {
+// This type needs to be accessible by AddCardToCollectionDialog
+export interface ApiPokemonCard {
   id: string;
   name: string;
   set: {
@@ -37,6 +38,7 @@ interface ApiPokemonCard {
         low?: number | null;
         mid?: number | null;
         high?: number | null;
+        // directLow, etc.
       };
     };
     url?: string; 
@@ -45,8 +47,8 @@ interface ApiPokemonCard {
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-// Helper to get market price, trying common variants
-const getMarketPrice = (apiCard: ApiPokemonCard | null): number => {
+// Helper to get a primary market price for collection storage
+const getPrimaryMarketPriceForCollection = (apiCard: ApiPokemonCard | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
   const prices = apiCard.tcgplayer.prices;
   if (prices.normal?.market) return prices.normal.market;
@@ -74,7 +76,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   const [setLogo, setSetLogo] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<ApiPokemonCard | null>(null);
+  const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -146,23 +148,23 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   }, [searchTerm, cardsInSet]);
 
 
-  const handleAddCardToCollection = (condition: string) => {
-    if (!selectedCard) return;
+  const handleAddCardToCollection = (condition: string, valueForCollection: number) => {
+    if (!selectedApiCard) return;
 
-    const newCard: PokemonCard = {
+    const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
-      name: selectedCard.name,
-      set: selectedCard.set.name,
-      cardNumber: selectedCard.number,
-      rarity: selectedCard.rarity || "N/A",
+      name: selectedApiCard.name,
+      set: selectedApiCard.set.name,
+      cardNumber: selectedApiCard.number,
+      rarity: selectedApiCard.rarity || "N/A",
       condition: condition,
-      value: getMarketPrice(selectedCard),
-      imageUrl: selectedCard.images.large,
+      value: valueForCollection, // Use the value passed from the dialog
+      imageUrl: selectedApiCard.images.large,
     };
 
     try {
       const storedCardsRaw = localStorage.getItem("pokemonCards");
-      const storedCards: PokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
+      const storedCards: CollectionPokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
       
       const isDuplicate = storedCards.some(
         item => item.name === newCard.name && 
@@ -200,7 +202,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   };
 
   const openDialogForCard = (card: ApiPokemonCard) => {
-    setSelectedCard(card);
+    setSelectedApiCard(card);
     setIsDialogOpen(true);
   };
 
@@ -284,13 +286,17 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
           </CardContent>
         </Card>
       </main>
-      {selectedCard && (
+      {selectedApiCard && (
         <AddCardToCollectionDialog
           isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
+          onClose={() => {
+            setIsDialogOpen(false);
+            setSelectedApiCard(null);
+          }}
           sourceApi="pokemontcg"
-          cardName={selectedCard.name}
-          initialCardImageUrl={selectedCard.images.small}
+          cardName={selectedApiCard.name}
+          initialCardImageUrl={selectedApiCard.images.small}
+          pokemonTcgApiCard={selectedApiCard} // Pass the full card object
           availableConditions={conditionOptions}
           onAddCard={handleAddCardToCollection}
         />
