@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, use } from "react"; // Imported use
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -69,8 +69,12 @@ const getMarketPrice = (apiCard: ApiPokemonCard): number => {
   return 0; // Default if no market price found
 };
 
-const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params }) => {
-  const { setId } = params;
+const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
+  // Unwrap params using React.use() as per Next.js warning.
+  // This assumes Next.js provides `paramsFromProps` in a way that `use()` can consume it.
+  const resolvedParams = use(paramsFromProps);
+  const { setId } = resolvedParams;
+
   const [cardsInSet, setCardsInSet] = useState<ApiPokemonCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
   const [setName, setSetName] = useState<string>("");
