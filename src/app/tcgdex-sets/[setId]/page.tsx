@@ -19,58 +19,60 @@ import { Input } from "@/components/ui/input";
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 const TCGDEX_IMAGE_BASE_URL = "https://assets.tcgdex.net";
 
-// Helper function for set logos (used for the set header on this page)
-const getSafeTcgDexSetAssetUrl = (
-  assetPathInput: string | undefined | null,
-  extension: 'png' | 'webp' = 'webp'
+// Helper function for set logos and card images from TCGdex API
+const getSafeTcgDexAssetUrl = (
+  basePathSegment: string | undefined | null,
+  type: 'logo' | 'symbol' | 'card',
+  quality?: 'high' | 'low',
+  extension: 'png' | 'webp' | 'jpg' = 'webp'
 ): string | null => {
-  if (!assetPathInput || typeof assetPathInput !== 'string' || assetPathInput.trim().length === 0) {
+  if (!basePathSegment || typeof basePathSegment !== 'string' || basePathSegment.trim().length === 0) {
     return null;
   }
-  let basePath = assetPathInput.trim();
-  if (basePath.startsWith('https://assets.tcgdex.net')) {
-    basePath = basePath.replace(/\/$/, "");
-  } else {
-    basePath = `${TCGDEX_IMAGE_BASE_URL}${basePath.startsWith('/') ? '' : '/'}${basePath.replace(/\/$/, "")}`;
-  }
-  if (basePath.match(/\.(png|webp|jpg)$/i)) {
-    if (basePath.startsWith('https://assets.tcgdex.net')) return basePath;
-    return null; 
-  }
-  return `${basePath}.${extension}`;
-};
 
-// Helper function for card images
-const getSafeTcgDexCardImageUrl = (
-  cardPathInput: string | undefined | null,
-  quality: 'high' | 'low' = 'low',
-  extension: 'png' | 'webp' = 'webp'
-): string | null => {
-  if (!cardPathInput || typeof cardPathInput !== 'string' || cardPathInput.trim().length === 0) {
-    return null;
-  }
-  let basePath = cardPathInput.trim();
+  let trimmedPath = basePathSegment.trim();
 
-  // Normalize the base path: ensure it's an absolute URL or becomes one
-  if (basePath.startsWith('https://assets.tcgdex.net')) {
-    // It's already an absolute URL from the correct host
-    basePath = basePath.replace(/\/$/, ""); // Remove trailing slash for consistency
-  } else if (basePath.startsWith('/')) {
-    // It's a relative path starting with /
-    basePath = `${TCGDEX_IMAGE_BASE_URL}${basePath.replace(/\/$/, "")}`;
-  } else {
-    // It's a relative path not starting with / (or some other format)
-    basePath = `${TCGDEX_IMAGE_BASE_URL}/${basePath.replace(/\/$/, "")}`;
+  // If it's already a full valid URL from assets.tcgdex.net, use it
+  if (trimmedPath.startsWith('https://assets.tcgdex.net/') && trimmedPath.match(/\.(png|webp|jpg)$/i)) {
+    return trimmedPath;
   }
   
-  // If the (now absolute) path already seems to include quality and a common image extension, use it as is.
-  // Also handles cases where just an extension is present (might happen for some direct API links)
-  if (basePath.match(/\/(high|low)\.(png|webp|jpg)$/i) || basePath.match(/\.(png|webp|jpg)$/i)) {
-     return basePath;
+  // If it's a full URL but not to assets.tcgdex.net, consider it invalid for this helper
+  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+    try {
+      const url = new URL(trimmedPath);
+      if (url.hostname !== 'assets.tcgdex.net') {
+        return null; 
+      }
+      // It's an assets.tcgdex.net URL but maybe without extension yet
+    } catch (e) {
+      return null; // Invalid URL
+    }
   }
 
-  // Otherwise, append the desired quality and extension.
-  return `${basePath}/${quality}.${extension}`;
+
+  // Base path construction for relative paths
+  let finalPath = trimmedPath;
+  if (finalPath.startsWith('https://assets.tcgdex.net')) {
+    // Already has base, remove it to re-construct properly if it's not fully formed
+    finalPath = finalPath.substring('https://assets.tcgdex.net'.length);
+  }
+  if (!finalPath.startsWith('/')) {
+    finalPath = `/${finalPath}`;
+  }
+  
+  // Strip any existing extensions if we are going to append a new one
+  finalPath = finalPath.replace(/\.(png|webp|jpg)$/i, '');
+   // Strip any existing quality segment if we are going to append a new one
+  finalPath = finalPath.replace(/\/(high|low)$/i, '');
+
+
+  if (type === 'card') {
+    if (!quality) quality = 'low'; // Default quality for cards
+    return `${TCGDEX_IMAGE_BASE_URL}${finalPath}/${quality}.${extension}`;
+  } else { // logo or symbol
+    return `${TCGDEX_IMAGE_BASE_URL}${finalPath}.${extension}`;
+  }
 };
 
 
@@ -97,16 +99,15 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       // Fetch set details
       const setDetailsResponse = await fetch(`https://api.tcgdex.net/v2/en/sets/${setId}`);
       if (!setDetailsResponse.ok) {
-        throw new Error(`Failed to fetch set details from TCGdex: ${setDetailsResponse.statusText}`);
+        throw new Error(`Failed to fetch set details from TCGdex. API responded with status ${setDetailsResponse.status}${setDetailsResponse.statusText ? ': ' + setDetailsResponse.statusText : '.'}`);
       }
       const setData: TcgDexSet = await setDetailsResponse.json();
       setSetDetails(setData);
 
-      // Fetch cards for the set (these are card summaries/resumes)
-      // The `image` field in TcgDexCardResume is the base path segment, e.g., "/en/base/base1/1"
+      // Fetch cards for the set
       const cardsResponse = await fetch(`https://api.tcgdex.net/v2/en/sets/${setId}/cards`);
       if(!cardsResponse.ok) {
-          throw new Error(`Failed to fetch cards for set ${setId} from TCGdex: ${cardsResponse.statusText}`);
+          throw new Error(`Failed to fetch cards for set ${setId} from TCGdex. API responded with status ${cardsResponse.status}${cardsResponse.statusText ? ': ' + cardsResponse.statusText : '.'}`);
       }
       let fetchedCards: TcgDexCardResume[] = await cardsResponse.json();
 
@@ -150,19 +151,18 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   const handleAddCardToCollection = (condition: string) => {
     if (!selectedCard || !setDetails) return;
     
-    // Use 'high' quality for the dialog/collection card image
-    const displayImageUrl = getSafeTcgDexCardImageUrl(selectedCard.image, 'high', 'webp') || "https://placehold.co/250x350.png";
+    const displayImageUrl = getSafeTcgDexAssetUrl(selectedCard.image, 'card', 'high', 'webp') || "https://placehold.co/250x350.png";
     
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
       name: selectedCard.name,
       set: setDetails.name, 
       cardNumber: selectedCard.localId, 
-      rarity: "N/A", // CardResume doesn't have rarity, full card object would
+      rarity: "N/A", 
       condition: condition,
-      value: 0, // CardResume doesn't have price, full card object might
+      value: 0, 
       imageUrl: displayImageUrl,
-      variant: "Normal", // Default, CardResume doesn't specify variant details
+      variant: "Normal", 
     };
 
     try {
@@ -210,7 +210,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   };
 
   const setName = setDetails?.name || `Set ${setId}`;
-  const setLogoUrl = setDetails?.logo ? getSafeTcgDexSetAssetUrl(setDetails.logo, 'webp') : null;
+  const setLogoUrl = setDetails?.logo ? getSafeTcgDexAssetUrl(setDetails.logo, 'logo', undefined, 'webp') : null;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -266,8 +266,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                 {filteredCards.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {filteredCards.map((card) => {
-                      // Use 'low' quality for grid display
-                      const displayCardImageUrl = getSafeTcgDexCardImageUrl(card.image, 'low', 'webp');
+                      const displayCardImageUrl = getSafeTcgDexAssetUrl(card.image, 'card', 'low', 'webp');
                       return (
                         <Card 
                             key={card.id} 
@@ -313,7 +312,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedCard.name}
-          cardImageUrl={getSafeTcgDexCardImageUrl(selectedCard.image, 'high', 'webp') || "https://placehold.co/200x280.png"}
+          cardImageUrl={getSafeTcgDexAssetUrl(selectedCard.image, 'card', 'high', 'webp') || "https://placehold.co/200x280.png"}
           availableConditions={conditionOptions}
           onAddCard={handleAddCardToCollection}
         />
@@ -326,4 +325,6 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
 };
 
 export default TcgDexSetDetailsPage;
+    
+
     
