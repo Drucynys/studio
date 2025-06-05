@@ -15,24 +15,23 @@ export interface TcgDexSet {
   cardCount: {
     official: number;
     total: number;
-    firstEd?: number; // Optional, might not always be present
+    firstEd?: number; 
   };
-  cards?: TcgDexCardStub[]; // Sometimes included in set list, but we'll fetch cards separately for detail
+  cards?: TcgDexCardStub[]; 
 }
 
 export interface TcgDexCardStub {
-  id: string; // Global card ID like 'base1-1'
-  localId: string; // Card number within the set like '1'
+  id: string; 
+  localId: string; 
   name: string;
-  image?: string; // Relative image path if in set details, full if from /cards endpoint
+  image?: string; 
 }
 
-// Represents the summary object returned by GET /cards?set.id={id}
 export interface TcgDexCardResume {
-  id: string; // Global card ID, e.g., "base1-1"
-  localId: string; // Card number within its set, e.g., "1"
+  id: string; 
+  localId: string; 
   name: string;
-  image?: string | null; // RELATIVE image path, e.g., "/en/base/base1/1.png", can be null or undefined
+  image?: string | null; 
 }
 
 
@@ -54,31 +53,33 @@ export interface TcgDexCardPrices {
   reverseHoloAvg1?: number | null;
   reverseHoloAvg7?: number | null;
   reverseHoloAvg30?: number | null;
-  // Prices for different variants/conditions
+  
   normal?: TcgDexCardPriceInfo;
   holofoil?: TcgDexCardPriceInfo;
   reverseHolo?: TcgDexCardPriceInfo;
   firstEditionNormal?: TcgDexCardPriceInfo;
   firstEditionHolofoil?: TcgDexCardPriceInfo;
-  [key: string]: any; // For other potential price keys
+  // Allow any string as a key for other potential price keys like "1stEditionHolofoil"
+  [key: string]: any; 
 }
 
-// Represents the full card object, usually from GET /cards/{cardId}
+export interface TcgDexCardVariants {
+  normal?: boolean;
+  reverse?: boolean;
+  holo?: boolean;
+  firstEdition?: boolean;
+  wotc?: boolean; 
+  [key: string]: boolean | undefined;
+}
+
 export interface TcgDexCard {
-  id: string; // Global card ID 'base1-1'
-  localId: string; // Card number within the set '1'
+  id: string; 
+  localId: string; 
   name: string;
-  image?: string; // Full image URL e.g. "https://assets.tcgdex.net/en/base/base1/1.png"
-  category: string; // e.g., "Pokémon", "Trainer", "Energy"
+  image?: string | null; 
+  category: string; 
   rarity: string;
-  variants?: {
-    normal?: boolean;
-    reverse?: boolean;
-    holo?: boolean;
-    firstEdition?: boolean;
-    wotc?: boolean; // Watermark of the Wizards of the Coast
-    [key: string]: boolean | undefined;
-  };
+  variants?: TcgDexCardVariants;
   set: {
     id: string;
     name: string;
@@ -92,9 +93,13 @@ export interface TcgDexCard {
   hp?: number;
   types?: string[];
   illustrator?: string;
-  description?: string; // Flavor text or card effect
-  suffix?: string; // e.g. V, VMAX, ex
+  description?: string; 
+  suffix?: string; 
   prices?: TcgDexCardPrices;
-  // Other fields as needed
+  attacks?: any[]; // Define more specific types if needed
+  abilities?: any[]; // Define more specific types if needed
+  weaknesses?: any[]; // Define more specific types if needed
+  resistances?: any[]; // Define more specific types if needed
+  legal?: any; // Define more specific types if needed
+  regulationMark?: string;
 }
-
