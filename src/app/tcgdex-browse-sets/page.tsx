@@ -13,6 +13,36 @@ import { Loader2, ServerCrash, Search } from "lucide-react";
 import Image from "next/image";
 import type { TcgDexSet } from "@/types/tcgdex";
 
+const TCGDEX_IMAGE_BASE_URL = "https://assets.tcgdex.net";
+
+const getSafeTcgDexImageUrl = (imagePath: string | undefined | null): string | null => {
+  if (!imagePath || typeof imagePath !== 'string') return null;
+  const trimmedPath = imagePath.trim();
+  // If trimmed path is too short to be a real image path (e.g. "/", ".png")
+  if (!trimmedPath || trimmedPath.length < 5) return null;
+
+  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+    try {
+      const url = new URL(trimmedPath);
+      if (url.hostname === 'assets.tcgdex.net') {
+        return trimmedPath; // Valid absolute URL for the correct host
+      }
+      // Absolute URL but for a different/unexpected host
+      return null; 
+    } catch (e) {
+      // Malformed absolute URL
+      return null;
+    }
+  } else {
+    // Assume relative path
+    if (trimmedPath.startsWith('/')) {
+      return `${TCGDEX_IMAGE_BASE_URL}${trimmedPath}`;
+    } else {
+      return `${TCGDEX_IMAGE_BASE_URL}/${trimmedPath}`;
+    }
+  }
+};
+
 const TcgDexBrowseSetsPage: NextPage = () => {
   const [sets, setSets] = useState<TcgDexSet[]>([]);
   const [filteredSets, setFilteredSets] = useState<TcgDexSet[]>([]);
@@ -25,13 +55,11 @@ const TcgDexBrowseSetsPage: NextPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        // TCGdex API uses /en/ for English
         const response = await fetch("https://api.tcgdex.net/v2/en/sets");
         if (!response.ok) {
           throw new Error(`Failed to fetch sets from TCGdex: ${response.statusText} (status: ${response.status})`);
         }
         const data: TcgDexSet[] = await response.json();
-        // Sort sets by release date, newest first
         const sortedSets = data.sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
         setSets(sortedSets);
         setFilteredSets(sortedSets);
@@ -92,13 +120,15 @@ const TcgDexBrowseSetsPage: NextPage = () => {
               <ScrollArea className="h-[calc(100vh-20rem)] md:h-[calc(100vh-25rem)]">
                 {filteredSets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {filteredSets.map((set) => (
+                    {filteredSets.map((set) => {
+                      const displayLogoUrl = getSafeTcgDexImageUrl(set.logo);
+                      return (
                         <Link key={set.id} href={`/tcgdex-sets/${set.id}`} passHref legacyBehavior>
                         <a className="block group">
                             <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                            {set.logo ? (
+                            {displayLogoUrl ? (
                                 <div className="relative w-32 h-16 mb-3">
-                                <Image src={set.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
+                                <Image src={displayLogoUrl} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
                                 </div>
                             ) : (
                                 <div className="w-32 h-16 mb-3 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
@@ -113,7 +143,8 @@ const TcgDexBrowseSetsPage: NextPage = () => {
                             </Card>
                         </a>
                         </Link>
-                    ))}
+                      );
+                    })}
                     </div>
                 ) : (
                     <div className="text-center py-10 text-muted-foreground">

@@ -17,6 +17,36 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
+const TCGDEX_IMAGE_BASE_URL = "https://assets.tcgdex.net";
+
+const getSafeTcgDexImageUrl = (imagePath: string | undefined | null): string | null => {
+  if (!imagePath || typeof imagePath !== 'string') return null;
+  const trimmedPath = imagePath.trim();
+  // If trimmed path is too short to be a real image path (e.g. "/", ".png")
+  if (!trimmedPath || trimmedPath.length < 5) return null;
+
+  if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+    try {
+      const url = new URL(trimmedPath);
+      if (url.hostname === 'assets.tcgdex.net') {
+        return trimmedPath; // Valid absolute URL for the correct host
+      }
+      // Absolute URL but for a different/unexpected host
+      return null; 
+    } catch (e) {
+      // Malformed absolute URL
+      return null;
+    }
+  } else {
+    // Assume relative path
+    if (trimmedPath.startsWith('/')) {
+      return `${TCGDEX_IMAGE_BASE_URL}${trimmedPath}`;
+    } else {
+      return `${TCGDEX_IMAGE_BASE_URL}/${trimmedPath}`;
+    }
+  }
+};
+
 
 const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
   const resolvedParams = use(paramsFromProps);
@@ -32,7 +62,6 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   const [searchTerm, setSearchTerm] = useState("");
 
   const { toast } = useToast();
-  const TCGDEX_IMAGE_BASE_URL = "https://assets.tcgdex.net";
 
   const fetchSetAndCards = useCallback(async () => {
     if (!setId) return;
@@ -46,25 +75,20 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       const setData: TcgDexSet = await setDetailsResponse.json();
       setSetDetails(setData);
 
-      // According to TCGdex docs, this endpoint should give card summaries for a set
-      // We need to handle potential pagination or just fetch all if the API allows (might need to check docs for pageSize limits)
-      // For now, assuming it returns all cards or a reasonable default page.
       const cardsResponse = await fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`);
       if(!cardsResponse.ok) {
           throw new Error(`Failed to fetch cards for set ${setId} from TCGdex: ${cardsResponse.statusText}`);
       }
       let fetchedCards: TcgDexCardResume[] = await cardsResponse.json();
 
-      // Sort cards by their localId (collector number within the set)
       fetchedCards.sort((a, b) => {
-        // Attempt to parse numeric part of localId for robust sorting
         const numA = parseInt(a.localId.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(b.localId.replace(/\D/g, ''), 10) || 0;
-        const suffixA = a.localId.replace(/\d/g, ''); // Capture any non-numeric suffix
+        const suffixA = a.localId.replace(/\d/g, ''); 
         const suffixB = b.localId.replace(/\d/g, '');
 
         if (numA === numB) {
-            return suffixA.localeCompare(suffixB); // Sort by suffix if numbers are equal
+            return suffixA.localeCompare(suffixB); 
         }
         return numA - numB;
       });
@@ -89,51 +113,25 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     const filteredData = cardsInSet.filter(card =>
       card.name.toLowerCase().includes(lowercasedFilter) ||
       card.localId.toLowerCase().includes(lowercasedFilter)
-      // Rarity is not in TcgDexCardResume, so cannot filter by it here
     );
     setFilteredCards(filteredData);
   }, [searchTerm, cardsInSet]);
 
-  const getSafeImageUrl = (imagePath: string | undefined | null): string | null => {
-    if (!imagePath || typeof imagePath !== 'string') return null;
-    const trimmedPath = imagePath.trim();
-    if (!trimmedPath) return null;
-
-    if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
-      try {
-        const url = new URL(trimmedPath);
-        if (url.hostname === 'assets.tcgdex.net') {
-          return trimmedPath; // Valid absolute URL for the correct host
-        }
-        return null; // Absolute URL but for a different/unexpected host
-      } catch (e) {
-        return null; // Malformed absolute URL
-      }
-    } else {
-      // Assume relative path
-      if (trimmedPath.startsWith('/')) {
-        return `${TCGDEX_IMAGE_BASE_URL}${trimmedPath}`;
-      } else {
-        return `${TCGDEX_IMAGE_BASE_URL}/${trimmedPath}`;
-      }
-    }
-  };
-
   const handleAddCardToCollection = (condition: string) => {
     if (!selectedCard || !setDetails) return;
     
-    const displayImageUrl = getSafeImageUrl(selectedCard.image) || "https://placehold.co/250x350.png";
+    const displayImageUrl = getSafeTcgDexImageUrl(selectedCard.image) || "https://placehold.co/250x350.png";
     
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
       name: selectedCard.name,
       set: setDetails.name, 
-      cardNumber: selectedCard.localId, // Using localId from TcgDexCardResume
-      rarity: "N/A", // Rarity is not in TcgDexCardResume
+      cardNumber: selectedCard.localId, 
+      rarity: "N/A", 
       condition: condition,
-      value: 0, // TcgDexCardResume does not typically include price; would need full card detail fetch
+      value: 0, 
       imageUrl: displayImageUrl,
-      variant: "Normal", // Default variant, TcgDexCardResume might not specify
+      variant: "Normal", 
     };
 
     try {
@@ -181,7 +179,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   };
 
   const setName = setDetails?.name || `Set ${setId}`;
-  const setLogo = setDetails?.logo;
+  const setLogoUrl = setDetails?.logo ? getSafeTcgDexImageUrl(setDetails.logo) : null;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -197,8 +195,8 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
-                    {setLogo && (
-                        <Image src={setLogo} alt={`${setName} logo`} width={100} height={40} objectFit="contain" className="mb-2" data-ai-hint="pokemon set logo" />
+                    {setLogoUrl && (
+                        <Image src={setLogoUrl} alt={`${setName} logo`} width={100} height={40} objectFit="contain" className="mb-2" data-ai-hint="pokemon set logo" />
                     )}
                     <CardTitle className="font-headline text-3xl text-foreground">{setName}</CardTitle>
                     <CardDescription>Browse cards from {setName}. Click a card to add it. (TCGdex API)</CardDescription>
@@ -237,7 +235,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                 {filteredCards.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {filteredCards.map((card) => {
-                      const displayImageUrl = getSafeImageUrl(card.image);
+                      const displayCardImageUrl = getSafeTcgDexImageUrl(card.image);
                       return (
                         <Card 
                             key={card.id} 
@@ -245,9 +243,9 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                             className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transition-all group flex flex-col"
                         >
                         <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2">
-                            {displayImageUrl ? (
+                            {displayCardImageUrl ? (
                                 <Image 
-                                    src={displayImageUrl}
+                                    src={displayCardImageUrl}
                                     alt={card.name} 
                                     layout="fill" 
                                     objectFit="contain" 
@@ -283,7 +281,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedCard.name}
-          cardImageUrl={getSafeImageUrl(selectedCard.image) || "https://placehold.co/200x280.png"}
+          cardImageUrl={getSafeTcgDexImageUrl(selectedCard.image) || "https://placehold.co/200x280.png"}
           availableConditions={conditionOptions}
           onAddCard={handleAddCardToCollection}
         />
