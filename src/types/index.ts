@@ -1,3 +1,4 @@
+
 export interface PokemonCard {
   id: string;
   set: string;
@@ -7,4 +8,5 @@ export interface PokemonCard {
   condition: string;
   value: number;
   imageUrl?: string; // Optional: for displaying card image if available
+  variant?: string; // e.g., "Holofoil", "Reverse Holo", "Normal"
 }
