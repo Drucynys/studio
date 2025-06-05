@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import type { TcgDexCard, TcgDexCardPrices } from "@/types/tcgdex"; // Added TcgDexCardPrices
+import type { TcgDexCard, TcgDexCardPrices } from "@/types/tcgdex"; 
 import { Loader2 } from "lucide-react";
 import { getSafeTcgDexCardImageUrl } from "@/lib/tcgdexUtils";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -37,16 +37,6 @@ const formatVariantKey = (key: string): string => {
     .replace(/([A-Z0-9])/g, ' $1') 
     .replace(/^./, str => str.toUpperCase()) 
     .trim();
-};
-
-// Helper to get market price for a specific variant from TCGdex data
-const getTcgDexPriceForVariant = (card: TcgDexCard | undefined | null, variantKey: string): number => {
-  if (!card?.prices) return 0;
-  const priceVariant = card.prices[variantKey];
-  if (priceVariant && typeof priceVariant.market === 'number') {
-    return priceVariant.market;
-  }
-  return 0; 
 };
 
 
@@ -97,6 +87,8 @@ export function AddCardToCollectionDialog({
 
   // Effect for managing the display image URL
   useEffect(() => {
+    if (!isOpen) return; 
+
     let imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=Loading...";
     if (sourceApi === 'tcgdex') {
         if (isFetchingCardDetails) {
@@ -106,63 +98,47 @@ export function AddCardToCollectionDialog({
         } else if (tcgDexFullCard?.image) {
             const highRes = getSafeTcgDexCardImageUrl(tcgDexFullCard.image, 'high', 'webp');
             if (highRes) imageUrlToSet = highRes;
-            else if (initialCardImageUrl) { // Fallback to initial if high-res path exists but is invalid
+            else if (initialCardImageUrl) { 
                  const lowResFallback = getSafeTcgDexCardImageUrl(initialCardImageUrl, 'low', 'webp');
                  if (lowResFallback) imageUrlToSet = lowResFallback;
                  else imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image";
             } else {
                  imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image";
             }
-        } else if (initialCardImageUrl) { // TCGdex, not fetching, but no full card data yet or no image in it
+        } else if (initialCardImageUrl) { 
             const lowRes = getSafeTcgDexCardImageUrl(initialCardImageUrl, 'low', 'webp');
             if (lowRes) imageUrlToSet = lowRes;
              else imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image";
         } else {
             imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image";
         }
-    } else if (initialCardImageUrl) { // For PokemonTCG.io or other sources
+    } else if (initialCardImageUrl) { 
         imageUrlToSet = initialCardImageUrl;
     }
     setFinalDisplayImageUrl(imageUrlToSet);
-  }, [initialCardImageUrl, tcgDexFullCard, isFetchingCardDetails, sourceApi]);
+  }, [isOpen, initialCardImageUrl, tcgDexFullCard, isFetchingCardDetails, sourceApi]);
 
   // Effect for resetting general states when dialog opens/closes or source API changes
   useEffect(() => {
     if (!isOpen) {
-      // Clear all when dialog closes
       setCurrentAvailableVariants([]);
       setSelectedVariant("");
       setSelectedCondition("");
       setChartData([]);
-      // finalDisplayImageUrl is handled by its own effect
       return;
     }
+    // Reset for new opening
+    setSelectedCondition(""); // Always reset condition
+    setChartData([]); // Always reset chart data
 
-    // Reset for new opening or API source change
-    setSelectedCondition("");
-    setChartData([]);
-    // If the source is not TCGdex, ensure TCGdex-specific states are clear
-    if (sourceApi !== 'tcgdex') {
-        setCurrentAvailableVariants([]);
-        setSelectedVariant("");
-    }
-    // If the source is not PokemonTCG, ensure its specific states are clear
-    if (sourceApi !== 'pokemontcg') {
-        // This might overlap with TCGdex clearing, but ensures clean state
-        // if propsAvailableVariants were from a previous PokemonTCG context.
-         if (propsAvailableVariants && propsAvailableVariants.length >0) {
-            setCurrentAvailableVariants([]);
-            setSelectedVariant("");
-        }
-    }
-
-  }, [isOpen, sourceApi]);
+    // API-specific resets are handled in their dedicated useEffects
+  }, [isOpen]);
 
 
   // Effect for TCGdex variant population
   useEffect(() => {
     if (!isOpen || sourceApi !== 'tcgdex') {
-      return; // Only run for TCGdex when open
+      return; 
     }
 
     if (isFetchingCardDetails) {
@@ -171,15 +147,14 @@ export function AddCardToCollectionDialog({
         return; 
     }
     
-    // This block runs AFTER isFetchingCardDetails is false for TCGdex
     if (tcgDexFullCard && tcgDexFullCard.prices) {
         const variantsFromTcgDex = Object.keys(tcgDexFullCard.prices).filter(
             key => {
                 const priceEntry = tcgDexFullCard.prices![key as keyof TcgDexCardPrices];
                 return typeof priceEntry === 'object' && 
                        priceEntry !== null &&
-                       priceEntry.market !== undefined && 
-                       priceEntry.market !== null;
+                       typeof priceEntry.market === 'number' && // Market price must be a number
+                       !isNaN(priceEntry.market); // And not NaN
             }
         ).sort();
         
@@ -193,7 +168,7 @@ export function AddCardToCollectionDialog({
           else determinedDefault = variantsFromTcgDex[0];
         }
         setSelectedVariant(determinedDefault);
-    } else { // No tcgDexFullCard or no prices object
+    } else { 
         setCurrentAvailableVariants([]);
         setSelectedVariant("");
     }
@@ -202,7 +177,7 @@ export function AddCardToCollectionDialog({
   // Effect for PokemonTCG.io variant population
   useEffect(() => {
     if (!isOpen || sourceApi !== 'pokemontcg') {
-      return; // Only run for PokemonTCG when open
+      return; 
     }
 
     if (propsAvailableVariants) {
@@ -224,47 +199,41 @@ export function AddCardToCollectionDialog({
       const selectedVariantPriceData = currentPrices[selectedVariant as keyof TcgDexCardPrices] as { market?: number | null };
       const selectedVariantMarketPrice = selectedVariantPriceData?.market;
 
-
       const isReverse = selectedVariant.toLowerCase().includes('reverse');
 
       if (isReverse) {
-        if (currentPrices.reverseHoloAvg30 !== null && currentPrices.reverseHoloAvg30 !== undefined) newChartDataPoints.push({ name: "30d Avg", price: currentPrices.reverseHoloAvg30 });
-        if (currentPrices.reverseHoloAvg7 !== null && currentPrices.reverseHoloAvg7 !== undefined) newChartDataPoints.push({ name: "7d Avg", price: currentPrices.reverseHoloAvg7 });
-        if (currentPrices.reverseHoloAvg1 !== null && currentPrices.reverseHoloAvg1 !== undefined) newChartDataPoints.push({ name: "1d Avg", price: currentPrices.reverseHoloAvg1 });
+        if (typeof currentPrices.reverseHoloAvg30 === 'number') newChartDataPoints.push({ name: "30d Avg", price: currentPrices.reverseHoloAvg30 });
+        if (typeof currentPrices.reverseHoloAvg7 === 'number') newChartDataPoints.push({ name: "7d Avg", price: currentPrices.reverseHoloAvg7 });
+        if (typeof currentPrices.reverseHoloAvg1 === 'number') newChartDataPoints.push({ name: "1d Avg", price: currentPrices.reverseHoloAvg1 });
       } else {
-        // Check for general averages if not reverse, and they are numbers
         if (typeof currentPrices.avg30 === 'number') newChartDataPoints.push({ name: "30d Avg", price: currentPrices.avg30 });
         if (typeof currentPrices.avg7 === 'number') newChartDataPoints.push({ name: "7d Avg", price: currentPrices.avg7 });
         if (typeof currentPrices.avg1 === 'number') newChartDataPoints.push({ name: "1d Avg", price: currentPrices.avg1 });
       }
       
-      if (selectedVariantMarketPrice !== null && selectedVariantMarketPrice !== undefined) {
+      if (typeof selectedVariantMarketPrice === 'number') {
         newChartDataPoints.push({ name: "Market", price: selectedVariantMarketPrice });
       } else if (!currentAvailableVariants.includes(selectedVariant) && typeof currentPrices.market === 'number') {
-        // Fallback to general market if selectedVariant isn't a specific priced variant but general market exists
         newChartDataPoints.push({ name: "Market", price: currentPrices.market });
       }
-      setChartData(newChartDataPoints.filter(p => p.price !== null && p.price !== undefined && !isNaN(p.price)));
+      setChartData(newChartDataPoints.filter(p => typeof p.price === 'number' && !isNaN(p.price)));
     } else {
-      setChartData([]); // Clear chart if not TCGdex, or fetching, or no data
+      setChartData([]); 
     }
   }, [selectedVariant, tcgDexFullCard, isFetchingCardDetails, sourceApi, currentAvailableVariants]);
 
 
   const handleSubmit = () => {
-    let variantToSave = "Normal"; // Default if no variants are selectable
+    let variantToSave = "Normal"; 
     
     if (currentAvailableVariants.length > 0 && selectedVariant) {
       variantToSave = selectedVariant;
     } else if (sourceApi === 'pokemontcg' && propsAvailableVariants && propsAvailableVariants.length === 0) {
-        // If pokemontcg and API explicitly returned no variants (e.g. only one version of card)
-        variantToSave = "Normal"; // Or some other appropriate default like "" or "Standard"
+        variantToSave = "Normal"; 
     } else if (sourceApi === 'tcgdex' && currentAvailableVariants.length === 0 && !isFetchingCardDetails) {
-        // If TCGdex, done fetching, and no priced variants were found, it defaults to "Normal"
         variantToSave = "Normal";
     }
-    // If selectedVariant has a value (from dropdown), it will be used. Otherwise, variantToSave is "Normal".
-
+    
     if (selectedCondition) { 
       onAddCard(selectedCondition, variantToSave); 
       onClose(); 
@@ -301,7 +270,7 @@ export function AddCardToCollectionDialog({
                 objectFit="contain"
                 key={finalDisplayImageUrl} 
                 onError={handleImageError}
-                unoptimized={sourceApi === 'tcgdex'} // TCGdex images can be varied, safer to unoptimize
+                unoptimized={sourceApi === 'tcgdex'} 
               />
             </div>
           </div>
@@ -326,12 +295,12 @@ export function AddCardToCollectionDialog({
                         let priceDisplay = "";
                         if (sourceApi === 'tcgdex' && tcgDexFullCard?.prices) {
                             const priceInfo = tcgDexFullCard.prices[variant as keyof TcgDexCardPrices] as {market?: number | null};
-                            if (priceInfo?.market !== undefined && priceInfo.market !== null) {
+                            if (typeof priceInfo?.market === 'number') {
                                 priceDisplay = ` ($${priceInfo.market.toFixed(2)})`;
                             }
-                        } else if (sourceApi === 'pokemontcg' && tcgDexFullCard?.tcgplayer?.prices) { // Assuming tcgDexFullCard might be misnamed here and it's actually for pokemontcg
+                        } else if (sourceApi === 'pokemontcg' && tcgDexFullCard && 'tcgplayer' in tcgDexFullCard && tcgDexFullCard.tcgplayer?.prices) { 
                             const priceInfo = tcgDexFullCard.tcgplayer.prices[variant as keyof TcgDexCardPrices] as {market?: number | null};
-                             if (priceInfo?.market !== undefined && priceInfo.market !== null) {
+                             if (typeof priceInfo?.market === 'number') {
                                 priceDisplay = ` ($${priceInfo.market.toFixed(2)})`;
                             }
                         }
@@ -427,5 +396,3 @@ export function AddCardToCollectionDialog({
     </Dialog>
   );
 }
-
-  
