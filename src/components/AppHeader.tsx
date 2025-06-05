@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch } from "lucide-react";
+import { PackageSearch, Database } from "lucide-react"; // Added Database icon
 
 export function AppHeader() {
   return (
@@ -16,12 +16,20 @@ export function AppHeader() {
             </h1>
           </a>
         </Link>
-        <Link href="/browse-sets" passHref legacyBehavior>
-          <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground">
-            <PackageSearch className="mr-2 h-5 w-5" />
-            Browse Sets
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/browse-sets" passHref legacyBehavior>
+            <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground">
+              <PackageSearch className="mr-2 h-5 w-5" />
+              Browse (PokemonTCG API)
+            </Button>
+          </Link>
+          <Link href="/tcgdex-browse-sets" passHref legacyBehavior>
+            <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground">
+              <Database className="mr-2 h-5 w-5" />
+              Browse (TCGdex API)
+            </Button>
+          </Link>
+        </div>
       </div>
     </header>
   );
