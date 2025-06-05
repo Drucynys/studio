@@ -46,20 +46,25 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       const setData: TcgDexSet = await setDetailsResponse.json();
       setSetDetails(setData);
 
+      // According to TCGdex docs, this endpoint should give card summaries for a set
+      // We need to handle potential pagination or just fetch all if the API allows (might need to check docs for pageSize limits)
+      // For now, assuming it returns all cards or a reasonable default page.
       const cardsResponse = await fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`);
       if(!cardsResponse.ok) {
           throw new Error(`Failed to fetch cards for set ${setId} from TCGdex: ${cardsResponse.statusText}`);
       }
       let fetchedCards: TcgDexCardResume[] = await cardsResponse.json();
 
+      // Sort cards by their localId (collector number within the set)
       fetchedCards.sort((a, b) => {
+        // Attempt to parse numeric part of localId for robust sorting
         const numA = parseInt(a.localId.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(b.localId.replace(/\D/g, ''), 10) || 0;
-        const suffixA = a.localId.replace(/\d/g, '');
+        const suffixA = a.localId.replace(/\d/g, ''); // Capture any non-numeric suffix
         const suffixB = b.localId.replace(/\d/g, '');
 
         if (numA === numB) {
-            return suffixA.localeCompare(suffixB);
+            return suffixA.localeCompare(suffixB); // Sort by suffix if numbers are equal
         }
         return numA - numB;
       });
@@ -84,32 +89,51 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     const filteredData = cardsInSet.filter(card =>
       card.name.toLowerCase().includes(lowercasedFilter) ||
       card.localId.toLowerCase().includes(lowercasedFilter)
+      // Rarity is not in TcgDexCardResume, so cannot filter by it here
     );
     setFilteredCards(filteredData);
   }, [searchTerm, cardsInSet]);
 
+  const getSafeImageUrl = (imagePath: string | undefined | null): string | null => {
+    if (!imagePath || typeof imagePath !== 'string') return null;
+    const trimmedPath = imagePath.trim();
+    if (!trimmedPath) return null;
+
+    if (trimmedPath.startsWith('http://') || trimmedPath.startsWith('https://')) {
+      try {
+        const url = new URL(trimmedPath);
+        if (url.hostname === 'assets.tcgdex.net') {
+          return trimmedPath; // Valid absolute URL for the correct host
+        }
+        return null; // Absolute URL but for a different/unexpected host
+      } catch (e) {
+        return null; // Malformed absolute URL
+      }
+    } else {
+      // Assume relative path
+      if (trimmedPath.startsWith('/')) {
+        return `${TCGDEX_IMAGE_BASE_URL}${trimmedPath}`;
+      } else {
+        return `${TCGDEX_IMAGE_BASE_URL}/${trimmedPath}`;
+      }
+    }
+  };
 
   const handleAddCardToCollection = (condition: string) => {
     if (!selectedCard || !setDetails) return;
-
-    let displayImageUrl = "https://placehold.co/250x350.png"; // Default placeholder
-    const rawImagePath = selectedCard.image;
-    if (rawImagePath && rawImagePath.trim() !== '') {
-        displayImageUrl = rawImagePath.startsWith('http') 
-            ? rawImagePath 
-            : `${TCGDEX_IMAGE_BASE_URL}${rawImagePath}`;
-    }
+    
+    const displayImageUrl = getSafeImageUrl(selectedCard.image) || "https://placehold.co/250x350.png";
     
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
       name: selectedCard.name,
       set: setDetails.name, 
-      cardNumber: selectedCard.localId, 
-      rarity: "N/A", 
+      cardNumber: selectedCard.localId, // Using localId from TcgDexCardResume
+      rarity: "N/A", // Rarity is not in TcgDexCardResume
       condition: condition,
-      value: 0, 
+      value: 0, // TcgDexCardResume does not typically include price; would need full card detail fetch
       imageUrl: displayImageUrl,
-      variant: "Normal", 
+      variant: "Normal", // Default variant, TcgDexCardResume might not specify
     };
 
     try {
@@ -191,7 +215,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                 </div>
             </div>
             <CardDescription className="mt-2 text-xs italic text-muted-foreground flex items-center gap-1">
-                <Info size={14}/> Full card details (rarity, collector #, value) require individual card lookup (feature pending).
+                <Info size={14}/> Card summaries from TCGdex. Full details (rarity, value) may require further API calls per card.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -213,14 +237,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                 {filteredCards.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {filteredCards.map((card) => {
-                      const rawImagePath = card.image;
-                      let displayImageUrl: string | null = null;
-                      if (rawImagePath && rawImagePath.trim() !== '') {
-                        displayImageUrl = rawImagePath.startsWith('http') 
-                            ? rawImagePath 
-                            : `${TCGDEX_IMAGE_BASE_URL}${rawImagePath}`;
-                      }
-
+                      const displayImageUrl = getSafeImageUrl(card.image);
                       return (
                         <Card 
                             key={card.id} 
@@ -266,16 +283,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedCard.name}
-          cardImageUrl={(() => {
-            const rawImagePath = selectedCard.image;
-            let dialogImageUrl = "https://placehold.co/200x280.png"; // Default placeholder
-            if (rawImagePath && rawImagePath.trim() !== '') {
-              dialogImageUrl = rawImagePath.startsWith('http') 
-                ? rawImagePath 
-                : `${TCGDEX_IMAGE_BASE_URL}${rawImagePath}`;
-            }
-            return dialogImageUrl;
-          })()}
+          cardImageUrl={getSafeImageUrl(selectedCard.image) || "https://placehold.co/200x280.png"}
           availableConditions={conditionOptions}
           onAddCard={handleAddCardToCollection}
         />
