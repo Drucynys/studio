@@ -32,27 +32,25 @@ interface ApiPokemonCard {
   };
   tcgplayer?: {
     prices?: {
-      [key: string]: { // normal, holofoil, reverseHolofoil, 1stEditionHolofoil etc.
+      [key: string]: { 
         market?: number | null;
         low?: number | null;
         mid?: number | null;
         high?: number | null;
       };
     };
-    url?: string; // TCGPlayer URL for the card
+    url?: string; 
   };
 }
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-// Helper to get market price for a specific variant
 const getMarketPriceForVariant = (apiCard: ApiPokemonCard | null, variantKey: string): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
   const priceData = apiCard.tcgplayer.prices[variantKey];
   return priceData?.market ?? 0;
 };
 
-// Helper to format variant keys for display
 const formatVariantKey = (key: string): string => {
   if (!key) return "N/A";
   return key
@@ -205,7 +203,6 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
     const variants = card.tcgplayer?.prices ? Object.keys(card.tcgplayer.prices).sort() : [];
     setSelectedCardVariants(variants);
     
-    // Determine default variant: prefer "normal", then "holofoil", then first available
     let determinedDefaultVariant = "";
     if (variants.includes("normal")) {
       determinedDefaultVariant = "normal";
@@ -234,7 +231,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div>
                     {setLogo && (
-                        <Image src={setLogo} alt={`${setName} logo`} width={100} height={40} objectFit="contain" className="mb-2" data-ai-hint="pokemon set logo" />
+                        <Image src={setLogo} alt={`${setName} logo`} width={100} height={40} style={{objectFit:"contain"}} className="mb-2" data-ai-hint="pokemon set logo" />
                     )}
                     <CardTitle className="font-headline text-3xl text-foreground">{setName || `Set ${setId}`}</CardTitle>
                     <CardDescription>Browse cards from {setName || `set ${setId}`}. Click a card to add it to your collection.</CardDescription>
@@ -303,6 +300,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
         <AddCardToCollectionDialog
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
+          sourceApi="pokemontcg"
           cardName={selectedCard.name}
           cardImageUrl={selectedCard.images.small}
           availableConditions={conditionOptions}
