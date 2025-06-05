@@ -25,6 +25,7 @@ import { Loader2 } from "lucide-react";
 
 const formatVariantKey = (key: string): string => {
   if (!key) return "N/A";
+  // Specific common keys for better formatting
   if (key === "firstEditionNormal") return "1st Edition Normal";
   if (key === "firstEditionHolofoil") return "1st Edition Holofoil";
   if (key === "reverseHolo") return "Reverse Holo";
@@ -39,7 +40,7 @@ type AddCardToCollectionDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   cardName: string;
-  cardImageUrl: string;
+  cardImageUrl: string; // This will be the initial low-res or placeholder
   availableConditions: string[];
   sourceApi?: 'pokemontcg' | 'tcgdex';
   
@@ -58,7 +59,7 @@ export function AddCardToCollectionDialog({
   isOpen,
   onClose,
   cardName,
-  cardImageUrl,
+  cardImageUrl: initialCardImageUrl, // Renamed to avoid conflict with derived URL
   availableConditions,
   sourceApi,
   availableVariants: propsAvailableVariants,
@@ -70,21 +71,20 @@ export function AddCardToCollectionDialog({
   const [selectedCondition, setSelectedCondition] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<string>("");
   const [currentAvailableVariants, setCurrentAvailableVariants] = useState<string[]>([]);
-  // const [currentDefaultVariant, setCurrentDefaultVariant] = useState<string>(""); // Not strictly needed if we just set selectedVariant
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedCondition(""); // Always reset condition
+      setSelectedCondition(""); // Always reset condition on open
 
-      if (isFetchingCardDetails && sourceApi === 'tcgdex') {
-        // We are actively fetching details for TCGdex flow
-        setCurrentAvailableVariants([]);
-        // setCurrentDefaultVariant("");
-        setSelectedVariant("");
-        // The loading spinner will be shown by the JSX based on isFetchingCardDetails
-      } else {
-        // Fetching is complete or not applicable (e.g. PokemonTCG.io flow, or TCGdex fetch finished)
-        if (sourceApi === 'tcgdex' && tcgDexFullCard && tcgDexFullCard.prices) {
+      if (sourceApi === 'tcgdex') {
+        if (isFetchingCardDetails) {
+          // TCGdex: Actively fetching details
+          setCurrentAvailableVariants([]);
+          setSelectedVariant("");
+          // JSX will show loading spinner based on isFetchingCardDetails
+          return; 
+        } else if (tcgDexFullCard && tcgDexFullCard.prices) {
+          // TCGdex: Fetching complete, process variants
           const variantsFromTcgDex = Object.keys(tcgDexFullCard.prices).filter(
             key => typeof tcgDexFullCard.prices![key] === 'object' && 
                    tcgDexFullCard.prices![key]?.market !== undefined && 
@@ -97,42 +97,45 @@ export function AddCardToCollectionDialog({
           if (variantsFromTcgDex.includes("normal")) determinedDefault = "normal";
           else if (variantsFromTcgDex.includes("holofoil")) determinedDefault = "holofoil";
           else if (variantsFromTcgDex.length > 0) determinedDefault = variantsFromTcgDex[0];
-          
-          // setCurrentDefaultVariant(determinedDefault);
           setSelectedVariant(determinedDefault);
-        } else if (sourceApi === 'pokemontcg' && propsAvailableVariants) { 
-          setCurrentAvailableVariants(propsAvailableVariants);
-          const initialVariant = propsDefaultVariant || (propsAvailableVariants.length > 0 ? propsAvailableVariants[0] : "");
-          // setCurrentDefaultVariant(initialVariant);
-          setSelectedVariant(initialVariant);
-        } else { 
-          // No TCGdex card details with prices, and no propsAvailableVariants
-          // (e.g. TCGdex card fetch failed, or card has no variants/prices, or non-variant PokemonTCG.io card)
+        } else {
+          // TCGdex: Fetching complete, but no card details or no prices
           setCurrentAvailableVariants([]);
-          // setCurrentDefaultVariant("");
           setSelectedVariant("");
         }
+      } else if (sourceApi === 'pokemontcg' && propsAvailableVariants) { 
+        // PokemonTCG.io flow
+        setCurrentAvailableVariants(propsAvailableVariants);
+        const initialVariant = propsDefaultVariant || (propsAvailableVariants.length > 0 ? propsAvailableVariants[0] : "");
+        setSelectedVariant(initialVariant);
+      } else { 
+        // Fallback or no variants applicable
+        setCurrentAvailableVariants([]);
+        setSelectedVariant("");
       }
     }
   }, [isOpen, sourceApi, propsAvailableVariants, propsDefaultVariant, tcgDexFullCard, isFetchingCardDetails]);
 
+
   const handleSubmit = () => {
-    let variantToSave = "Normal"; 
+    let variantToSave = "Normal"; // Default if no variants are applicable/selected
     if (currentAvailableVariants.length > 0 && selectedVariant) {
       variantToSave = selectedVariant;
+    } else if (sourceApi === 'pokemontcg' && propsAvailableVariants && propsAvailableVariants.length === 0) {
+      // If pokemontcg flow and explicitly no variants passed, it's just normal.
+      variantToSave = "Normal";
     }
     
     if (selectedCondition) { 
       onAddCard(selectedCondition, variantToSave); 
-      // Resetting fields after successful add is good practice
-      setSelectedCondition(""); 
-      setSelectedVariant(""); 
-      setCurrentAvailableVariants([]);
-      onClose();
+      onClose(); // Close after adding
     }
   };
   
   const showVariantSelector = currentAvailableVariants.length > 0;
+  const displayCardImageUrl = (sourceApi === 'tcgdex' && tcgDexFullCard?.image) 
+                              ? tcgDexFullCard.image // Use high-res from full details if available
+                              : initialCardImageUrl; // Otherwise, use initial (low-res/placeholder)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -140,35 +143,29 @@ export function AddCardToCollectionDialog({
         <DialogHeader>
           <DialogTitle>Add "{cardName}" to Collection</DialogTitle>
           <DialogDescription>
-            Select the condition {showVariantSelector && "and variant "}of your card.
+            Select the condition { (showVariantSelector && !(isFetchingCardDetails && sourceApi === 'tcgdex')) && "and variant "}of your card.
           </DialogDescription>
         </DialogHeader>
+
         <div className="grid gap-4 py-4">
           <div className="flex justify-center mb-4">
             <div className="relative w-40 h-56 rounded-md overflow-hidden shadow-md" data-ai-hint="pokemon card front">
-              {(isFetchingCardDetails && sourceApi === 'tcgdex') ? (
-                <div className="w-full h-full bg-muted flex items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : (
-                <Image 
-                  src={cardImageUrl} 
-                  alt={cardName} 
-                  layout="fill" 
-                  objectFit="contain"
-                  key={cardImageUrl} 
-                />
-              )}
+              <Image 
+                src={displayCardImageUrl} 
+                alt={cardName} 
+                layout="fill" 
+                objectFit="contain"
+                key={displayCardImageUrl} 
+              />
             </div>
           </div>
           
-          {isFetchingCardDetails && sourceApi === 'tcgdex' ? (
+          {(isFetchingCardDetails && sourceApi === 'tcgdex') ? (
             <div className="flex items-center justify-center text-muted-foreground py-4">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading card details...
             </div>
           ) : (
             <>
-              {/* Variant Selector Logic */}
               {showVariantSelector && (
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="variant-selector" className="text-right col-span-1">
@@ -191,17 +188,15 @@ export function AddCardToCollectionDialog({
                 </div>
               )}
 
-              {/* No Variants Message */}
-              {!showVariantSelector && (
-                (sourceApi === 'tcgdex' && tcgDexFullCard !== undefined) || // TCGdex flow was attempted
-                (sourceApi === 'pokemontcg' && propsAvailableVariants !== undefined && propsAvailableVariants.length === 0) // PokemonTCG.io flow was attempted but no variants
+              {!showVariantSelector && !(isFetchingCardDetails && sourceApi === 'tcgdex') && (
+                (sourceApi === 'tcgdex' && tcgDexFullCard !== null) || 
+                (sourceApi === 'pokemontcg' && propsAvailableVariants && propsAvailableVariants.length === 0)
               ) && (
                 <p className="text-xs text-center text-muted-foreground py-2">
                   No specific variants with pricing found. Adding as "Normal".
                 </p>
               )}
               
-              {/* Condition Selector */}
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="condition" className="text-right col-span-1">
                   Condition
@@ -227,10 +222,10 @@ export function AddCardToCollectionDialog({
           <Button 
             type="submit" 
             onClick={handleSubmit} 
-            disabled={isFetchingCardDetails || !selectedCondition || (showVariantSelector && !selectedVariant)} 
+            disabled={(isFetchingCardDetails && sourceApi === 'tcgdex') || !selectedCondition || (showVariantSelector && !selectedVariant)} 
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
-            {isFetchingCardDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {(isFetchingCardDetails && sourceApi === 'tcgdex') && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Add to Collection
           </Button>
         </DialogFooter>
@@ -238,3 +233,5 @@ export function AddCardToCollectionDialog({
     </Dialog>
   );
 }
+
+    
