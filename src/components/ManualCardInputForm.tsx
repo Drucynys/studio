@@ -31,6 +31,9 @@ import Image from "next/image";
 const formSchema = z.object({
   selectedSetId: z.string().min(1, "Set is required"),
   selectedCardId: z.string().min(1, "Card is required"),
+  // Variant field removed for manual input form to simplify, 
+  // as determining available variants without full API card data is complex.
+  // User can add variants when selecting from the API browser.
   condition: z.string().min(1, "Condition is required"),
 });
 
@@ -78,8 +81,8 @@ interface ApiPokemonCard {
   };
 }
 
-// Helper to get market price, trying common variants
-const getMarketPrice = (apiCard: ApiPokemonCard | null): number => {
+// Helper to get a default market price (e.g., for 'normal' or 'holofoil')
+const getDefaultMarketPrice = (apiCard: ApiPokemonCard | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
   const prices = apiCard.tcgplayer.prices;
   if (prices.normal?.market) return prices.normal.market;
@@ -88,7 +91,6 @@ const getMarketPrice = (apiCard: ApiPokemonCard | null): number => {
   if (prices.firstEditionNormal?.market) return prices.firstEditionNormal.market;
   if (prices.firstEditionHolofoil?.market) return prices.firstEditionHolofoil.market;
   
-  // Fallback to the first available market price
   for (const key in prices) {
     if (prices[key]?.market) {
       return prices[key]!.market!;
@@ -213,9 +215,12 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       cardNumber: selectedCardData.number,
       name: selectedCardData.name,
       rarity: selectedCardData.rarity || "N/A",
+      // For manual entry, variant is not selected. Could be set to 'normal' or undefined.
+      // If undefined, CardItem will not display a variant badge.
+      variant: selectedCardData.tcgplayer?.prices?.normal ? 'normal' : undefined, 
       condition: values.condition,
       imageUrl: selectedCardData.images.large,
-      value: getMarketPrice(selectedCardData),
+      value: getDefaultMarketPrice(selectedCardData), // Use default price for manual entry
     };
 
     try {
@@ -226,6 +231,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
         item => item.name === newCard.name && 
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
+                item.variant === newCard.variant && // Check variant too
                 item.condition === newCard.condition
       );
 
@@ -233,7 +239,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
         toast({
           variant: "destructive",
           title: "Duplicate Card",
-          description: `${newCard.name} (${newCard.condition}) is already in your collection.`,
+          description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) is already in your collection.`,
         });
         return; 
       }
@@ -241,7 +247,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       onAddCard(newCard); 
       toast({
         title: "Card Added!",
-        description: `${newCard.name} (${newCard.condition}) from ${newCard.set} has been added.`,
+        description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) from ${newCard.set} has been added.`,
         className: "bg-secondary text-secondary-foreground"
       });
 
@@ -353,7 +359,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                     <p><strong>Set:</strong> {selectedCardData.set.name}</p>
                     <p><strong>Rarity:</strong> {selectedCardData.rarity || "N/A"}</p>
                     {selectedCardData.tcgplayer?.prices && (
-                        <p><strong>Est. Value:</strong> ${getMarketPrice(selectedCardData).toFixed(2)}</p>
+                        <p><strong>Est. Value:</strong> ${getDefaultMarketPrice(selectedCardData).toFixed(2)}</p>
                     )}
                   </div>
                 </div>

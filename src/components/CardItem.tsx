@@ -3,14 +3,25 @@ import type { PokemonCard } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
-import { Coins, Sparkles, ShieldCheck, ExternalLink } from "lucide-react";
+import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette } from "lucide-react"; // Added Palette for variant
 
 type CardItemProps = {
   card: PokemonCard;
 };
 
+// Helper to format variant keys for display
+const formatDisplayVariant = (variantKey?: string): string | null => {
+  if (!variantKey) return null;
+  return variantKey
+    .replace(/([A-Z0-9])/g, " $1")
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
+};
+
+
 export function CardItem({ card }: CardItemProps) {
-  const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}&view=grid`;
+  const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant) : ''}&view=grid`;
+  const displayVariant = formatDisplayVariant(card.variant);
 
   return (
     <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 animate-card-appear flex flex-col">
@@ -34,6 +45,12 @@ export function CardItem({ card }: CardItemProps) {
           <Sparkles className="h-4 w-4 text-primary" />
           <strong>Rarity:</strong> <Badge variant="secondary">{card.rarity}</Badge>
         </div>
+        {displayVariant && (
+          <div className="flex items-center gap-2 text-sm">
+            <Palette className="h-4 w-4 text-blue-500" />
+            <strong>Variant:</strong> <Badge variant="outline" className="border-blue-500/50 text-blue-600">{displayVariant}</Badge>
+          </div>
+        )}
         <div className="flex items-center gap-2 text-sm">
           <ShieldCheck className="h-4 w-4 text-green-500" /> 
           <strong>Condition:</strong> <Badge variant="outline">{card.condition}</Badge>

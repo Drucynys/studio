@@ -15,7 +15,6 @@ import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input"; 
 
-// This type needs to be accessible by AddCardToCollectionDialog
 export interface ApiPokemonCard {
   id: string;
   name: string;
@@ -45,24 +44,6 @@ export interface ApiPokemonCard {
 }
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
-
-// Helper to get a primary market price for collection storage (simplified after TCGdex removal)
-const getPrimaryMarketPriceForCollection = (apiCard: ApiPokemonCard | null): number => {
-  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
-  const prices = apiCard.tcgplayer.prices;
-  if (prices.normal?.market) return prices.normal.market;
-  if (prices.holofoil?.market) return prices.holofoil.market;
-  if (prices.reverseHolofoil?.market) return prices.reverseHolofoil.market;
-  if (prices.firstEditionNormal?.market) return prices.firstEditionNormal.market;
-  if (prices.firstEditionHolofoil?.market) return prices.firstEditionHolofoil.market;
-  
-  for (const key in prices) {
-    if (prices[key]?.market) {
-      return prices[key]!.market!;
-    }
-  }
-  return 0;
-};
 
 const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
   const resolvedParams = use(paramsFromProps);
@@ -146,7 +127,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   }, [searchTerm, cardsInSet]);
 
 
-  const handleAddCardToCollection = (condition: string, valueForCollection: number) => {
+  const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string) => {
     if (!selectedApiCard) return;
 
     const newCard: CollectionPokemonCard = {
@@ -155,6 +136,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       set: selectedApiCard.set.name,
       cardNumber: selectedApiCard.number,
       rarity: selectedApiCard.rarity || "N/A",
+      variant: variant,
       condition: condition,
       value: valueForCollection,
       imageUrl: selectedApiCard.images.large,
@@ -168,6 +150,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
         item => item.name === newCard.name && 
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
+                item.variant === newCard.variant && // Check variant too
                 item.condition === newCard.condition
       );
 
@@ -175,7 +158,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
         toast({
           variant: "destructive",
           title: "Duplicate Card",
-          description: `${newCard.name} (${newCard.condition}) is already in your collection.`,
+          description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) is already in your collection.`,
         });
         setIsDialogOpen(false);
         return;
@@ -185,7 +168,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
       toast({
         title: "Card Added!",
-        description: `${newCard.name} (${newCard.condition}) from ${newCard.set} has been added.`,
+        description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) from ${newCard.set} has been added.`,
         className: "bg-secondary text-secondary-foreground"
       });
     } catch (e) {
