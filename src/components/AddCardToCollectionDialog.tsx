@@ -88,6 +88,7 @@ export function AddCardToCollectionDialog({
   const [finalDisplayImageUrl, setFinalDisplayImageUrl] = useState<string>("https://placehold.co/200x280.png");
   const [chartData, setChartData] = useState<{ name: string; price: number }[]>([]);
 
+  // Effect for managing the display image URL
   useEffect(() => {
     if (!isOpen) return;
 
@@ -114,19 +115,21 @@ export function AddCardToCollectionDialog({
         } else {
             imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image+Data";
         }
-    } else if (initialCardImageUrl) {
+    } else if (initialCardImageUrl) { // For PokemonTCG.io or other sources
         imageUrlToSet = initialCardImageUrl;
     }
     setFinalDisplayImageUrl(imageUrlToSet);
   }, [isOpen, initialCardImageUrl, tcgDexFullCard, isFetchingCardDetails, sourceApi]);
 
+  // Effect for resetting general states when dialog opens/closes
   useEffect(() => {
     if (!isOpen) {
       setSelectedCondition("");
       setChartData([]);
-      // currentAvailableVariants and selectedVariant are reset by API-specific effects if needed
+      // Variant states are handled by API-specific effects
       return;
     }
+    // Reset when opening
     setSelectedCondition(""); 
     setChartData([]); 
   }, [isOpen]);
@@ -135,7 +138,7 @@ export function AddCardToCollectionDialog({
   // Effect for TCGdex variant population & default selection
   useEffect(() => {
     if (!isOpen || sourceApi !== 'tcgdex') {
-      if (sourceApi !== 'tcgdex' && isOpen) {
+      if (sourceApi !== 'tcgdex' && isOpen) { // Clear if dialog open but for different API
          setCurrentAvailableVariants([]);
          setSelectedVariant("");
       }
@@ -168,7 +171,7 @@ export function AddCardToCollectionDialog({
         else determinedDefault = pricedVariants[0];
         setSelectedVariant(determinedDefault);
       } else {
-        setSelectedVariant("");
+        setSelectedVariant(""); 
       }
     } else {
       setCurrentAvailableVariants([]);
@@ -180,7 +183,7 @@ export function AddCardToCollectionDialog({
   // Effect for PokemonTCG.io variant population
   useEffect(() => {
     if (!isOpen || sourceApi !== 'pokemontcg') {
-       if (sourceApi !== 'pokemontcg' && isOpen) {
+       if (sourceApi !== 'pokemontcg' && isOpen) { // Clear if dialog open but for different API
          setCurrentAvailableVariants([]);
          setSelectedVariant("");
       }
@@ -198,6 +201,7 @@ export function AddCardToCollectionDialog({
   }, [isOpen, sourceApi, propsAvailableVariants, propsDefaultVariant]);
 
 
+  // Effect for Chart Data population (primarily for TCGdex)
   useEffect(() => {
     if (sourceApi === 'tcgdex' && !isFetchingCardDetails && tcgDexFullCard?.prices && selectedVariant && currentAvailableVariants.includes(selectedVariant)) {
       const currentPrices = tcgDexFullCard.prices;
@@ -227,32 +231,36 @@ export function AddCardToCollectionDialog({
          return order.indexOf(a.name) - order.indexOf(b.name);
       }));
     } else {
-      setChartData([]);
+      setChartData([]); // Clear chart data if conditions not met
     }
   }, [selectedVariant, tcgDexFullCard, isFetchingCardDetails, sourceApi, currentAvailableVariants]);
 
 
   const handleSubmit = () => {
-    let variantToSave = "Normal"; 
+    let variantToSave = "Normal"; // Default to "Normal" if no other variant info
     if (currentAvailableVariants.length > 0 && selectedVariant) {
       variantToSave = selectedVariant;
     } else if (currentAvailableVariants.length === 0 && sourceApi === 'tcgdex' && !isFetchingCardDetails) {
-      variantToSave = "Normal";
+      // For TCGdex, if no priced variants, it implies a 'Normal' version without specific market data for other finishes
+      variantToSave = "Normal"; 
     } else if (currentAvailableVariants.length === 0 && sourceApi === 'pokemontcg') {
+       // For PokemonTCG.io, if propsAvailableVariants was empty, default to "Normal"
        variantToSave = "Normal";
     }
 
+
     if (selectedCondition) {
       onAddCard(selectedCondition, variantToSave);
-      onClose();
+      onClose(); // Close dialog after adding
     }
+    // No specific error toast here for missing condition/variant as button should be disabled
   };
 
   const showVariantSelector = currentAvailableVariants.length > 0 && !(isFetchingCardDetails && sourceApi === 'tcgdex');
   
   const noPricedVariantsFoundForTcgDex = sourceApi === 'tcgdex' && 
                                          !isFetchingCardDetails && 
-                                         tcgDexFullCard !== null && 
+                                         tcgDexFullCard !== null && // Ensure we have card data to check
                                          currentAvailableVariants.length === 0;
   
   const noVariantsForPokemonTcg = sourceApi === 'pokemontcg' && 
@@ -264,6 +272,11 @@ export function AddCardToCollectionDialog({
   };
 
   const dialogDescriptionText = `Select the condition${ (showVariantSelector || (sourceApi === 'pokemontcg' && propsAvailableVariants && propsAvailableVariants.length > 0)) ? " and variant " : " " }of your card.`;
+  
+  const isAddButtonDisabled = (isFetchingCardDetails && sourceApi === 'tcgdex') || 
+                              !selectedCondition || 
+                              (showVariantSelector && !selectedVariant);
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -285,7 +298,7 @@ export function AddCardToCollectionDialog({
                 objectFit="contain"
                 key={finalDisplayImageUrl} 
                 onError={handleImageError}
-                unoptimized={sourceApi === 'tcgdex'}
+                unoptimized={sourceApi === 'tcgdex'} // TCGdex images sometimes have issues with Next/Image optimization
               />
             </div>
           </div>
@@ -309,8 +322,9 @@ export function AddCardToCollectionDialog({
                       {currentAvailableVariants.map((variantKey) => {
                         let priceDisplay = "";
                         if (sourceApi === 'tcgdex' && tcgDexFullCard?.prices) {
+                            // Ensure priceDetail and market price exist
                             const priceDetail = tcgDexFullCard.prices[variantKey as keyof TcgDexCardPrices] as { market?: number | null };
-                            if (priceDetail && typeof priceDetail.market === 'number') {
+                            if (priceDetail && typeof priceDetail.market === 'number' && !isNaN(priceDetail.market) ) {
                                 priceDisplay = ` ($${priceDetail.market.toFixed(2)})`;
                             }
                         } else if (sourceApi === 'pokemontcg' && propsAvailableVariants?.includes(variantKey)) {
@@ -370,7 +384,7 @@ export function AddCardToCollectionDialog({
                           tickLine={false}
                           axisLine={false}
                           fontSize={10}
-                          interval={0}
+                          interval={0} // Show all ticks if space allows
                           padding={{ left: 10, right: 10 }}
                         />
                         <YAxis
@@ -398,7 +412,7 @@ export function AddCardToCollectionDialog({
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={(isFetchingCardDetails && sourceApi === 'tcgdex') || !selectedCondition || (showVariantSelector && !selectedVariant)}
+            disabled={isAddButtonDisabled}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
             {(isFetchingCardDetails && sourceApi === 'tcgdex') && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -409,3 +423,5 @@ export function AddCardToCollectionDialog({
     </Dialog>
   );
 }
+
+    
