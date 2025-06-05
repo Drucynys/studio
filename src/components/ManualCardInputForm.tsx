@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PokemonCard } from "@/types";
 import { PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
 
 const formSchema = z.object({
   set: z.string().min(1, "Set is required"),
@@ -38,11 +40,85 @@ type ManualCardInputFormProps = {
   onAddCard: (card: PokemonCard) => void;
 };
 
-const rarityOptions = ["Common", "Uncommon", "Rare", "Holo Rare", "Reverse Holo", "Amazing Rare", "Ultra Rare", "Secret Rare", "Promo", "Shiny Holo Rare", "Illustration Rare", "Special Illustration Rare"];
+// Condition options remain static as they are subjective user inputs
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
+
+interface ApiSet {
+  id: string;
+  name: string;
+  series: string;
+  printedTotal: number;
+  total: number;
+  releaseDate: string;
+  updatedAt: string;
+  images: {
+    symbol: string;
+    logo: string;
+  };
+}
 
 export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
   const { toast } = useToast();
+  const [availableSets, setAvailableSets] = useState<ApiSet[]>([]);
+  const [availableRarities, setAvailableRarities] = useState<string[]>([]);
+  const [isLoadingSets, setIsLoadingSets] = useState(true);
+  const [isLoadingRarities, setIsLoadingRarities] = useState(true);
+  const [errorSets, setErrorSets] = useState<string | null>(null);
+  const [errorRarities, setErrorRarities] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSets = async () => {
+      setIsLoadingSets(true);
+      setErrorSets(null);
+      try {
+        const response = await fetch("https://api.pokemontcg.io/v2/sets");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch sets: ${response.statusText}`);
+        }
+        const data = await response.json();
+        // Sort sets by release date, newest first
+        const sortedSets = (data.data as ApiSet[]).sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+        setAvailableSets(sortedSets);
+      } catch (error) {
+        console.error("Error fetching sets:", error);
+        setErrorSets(error instanceof Error ? error.message : "An unknown error occurred");
+        toast({
+          variant: "destructive",
+          title: "Error fetching Sets",
+          description: "Could not load Pokémon TCG sets. Please try again later.",
+        });
+      } finally {
+        setIsLoadingSets(false);
+      }
+    };
+
+    const fetchRarities = async () => {
+      setIsLoadingRarities(true);
+      setErrorRarities(null);
+      try {
+        const response = await fetch("https://api.pokemontcg.io/v2/rarities");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch rarities: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setAvailableRarities(data.data || []);
+      } catch (error) {
+        console.error("Error fetching rarities:", error);
+        setErrorRarities(error instanceof Error ? error.message : "An unknown error occurred");
+        toast({
+          variant: "destructive",
+          title: "Error fetching Rarities",
+          description: "Could not load Pokémon TCG rarities. Please try again later.",
+        });
+      } finally {
+        setIsLoadingRarities(false);
+      }
+    };
+
+    fetchSets();
+    fetchRarities();
+  }, [toast]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -59,7 +135,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     const newCard: PokemonCard = {
       id: crypto.randomUUID(),
       ...values,
-      value: values.value || 0, // Ensure value is a number
+      value: values.value || 0, 
     };
     onAddCard(newCard);
     toast({
@@ -87,9 +163,28 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Set</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Base Set, 151" {...field} />
-                  </FormControl>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value} 
+                    value={field.value}
+                    disabled={isLoadingSets || !!errorSets || availableSets.length === 0}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={
+                          isLoadingSets ? "Loading sets..." : 
+                          errorSets ? "Error loading sets" : 
+                          availableSets.length === 0 ? "No sets available" :
+                          "Select set"
+                        } />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {!isLoadingSets && !errorSets && availableSets.map(set => (
+                        <SelectItem key={set.id} value={set.name}>{set.name} ({set.id.toUpperCase()})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -126,14 +221,24 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Rarity</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value} 
+                    value={field.value}
+                    disabled={isLoadingRarities || !!errorRarities || availableRarities.length === 0}
+                  >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select rarity" />
+                        <SelectValue placeholder={
+                          isLoadingRarities ? "Loading rarities..." : 
+                          errorRarities ? "Error loading rarities" : 
+                          availableRarities.length === 0 ? "No rarities available" :
+                          "Select rarity"
+                        } />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {rarityOptions.map(option => (
+                      {!isLoadingRarities && !errorRarities && availableRarities.map(option => (
                         <SelectItem key={option} value={option}>{option}</SelectItem>
                       ))}
                     </SelectContent>
@@ -186,3 +291,5 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     </Card>
   );
 }
+
+    
