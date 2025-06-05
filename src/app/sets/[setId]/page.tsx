@@ -13,6 +13,7 @@ import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialo
 import type { PokemonCard } from "@/types";
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input"; // Added import for Input
 
 interface ApiPokemonCard {
   id: string;
@@ -313,3 +314,4 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
 };
 
 export default SetDetailsPage;
+
