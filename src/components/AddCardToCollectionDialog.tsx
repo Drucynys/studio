@@ -25,10 +25,11 @@ import { Tag, Gem, DollarSign } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { MarketPriceHistoryChart } from "@/components/MarketPriceHistoryChart"; // Import the chart
+import { MarketPriceHistoryChart } from "@/components/MarketPriceHistoryChart"; 
 
 // Helper to format variant keys for display
 const formatVariantKey = (key: string): string => {
+  if (!key) return "N/A";
   return key
     .replace(/([A-Z0-9])/g, " $1")
     .replace(/^./, (str) => str.toUpperCase())
@@ -36,8 +37,8 @@ const formatVariantKey = (key: string): string => {
 };
 
 type DisplayPriceInfo = {
-  variantKey: string; // original key like "holofoil", "normal"
-  variantName: string; // formatted name like "Holofoil"
+  variantKey: string; 
+  variantName: string; 
   price: number | string;
   currencySymbol?: string;
 };
@@ -49,7 +50,7 @@ type AddCardToCollectionDialogProps = {
   initialCardImageUrl?: string | null;
   availableConditions: string[];
   pokemonTcgApiCard: PokemonTcgApiCard | null;
-  onAddCard: (condition: string, value: number, variant?: string) => void; // Added variant
+  onAddCard: (condition: string, value: number, variant?: string) => void;
 };
 
 export function AddCardToCollectionDialog({
@@ -92,14 +93,13 @@ export function AddCardToCollectionDialog({
       
       const prices = pokemonTcgApiCard.tcgplayer.prices;
       const sortedPriceKeys = Object.keys(prices).sort((a,b) => {
-        // Prioritize normal, holofoil, reverseHolofoil
-        const order = ['normal', 'holofoil', 'reverseHolofoil'];
+        const order = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
         const indexA = order.indexOf(a);
         const indexB = order.indexOf(b);
         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
         if (indexA !== -1) return -1;
         if (indexB !== -1) return 1;
-        return a.localeCompare(b); // alphabetical for others
+        return a.localeCompare(b); 
       });
 
       for (const key of sortedPriceKeys) {
@@ -113,11 +113,13 @@ export function AddCardToCollectionDialog({
       }
       setCurrentAvailableVariants(pricedVariants);
       if (pricedVariants.length > 0) {
-        // Set default variant: normal > holofoil > reverseHolofoil > first available
-        let defaultVariant = pricedVariants.find(v => v === 'normal') || 
-                             pricedVariants.find(v => v === 'holofoil') || 
-                             pricedVariants.find(v => v === 'reverseHolofoil') || 
-                             pricedVariants[0];
+        let defaultVariant = 
+            pricedVariants.find(v => v === 'normal') || 
+            pricedVariants.find(v => v === 'holofoil') || 
+            pricedVariants.find(v => v === 'reverseHolofoil') ||
+            pricedVariants.find(v => v === '1stEditionNormal') ||
+            pricedVariants.find(v => v === 'unlimitedNormal') ||
+            pricedVariants[0];
         setSelectedVariant(defaultVariant || "");
       } else {
         setSelectedVariant("");
@@ -152,32 +154,95 @@ export function AddCardToCollectionDialog({
   };
   
   const isAddButtonDisabled = !selectedCondition || (currentAvailableVariants.length > 0 && !selectedVariant);
+  const formattedSelectedVariantName = useMemo(() => selectedVariant ? formatVariantKey(selectedVariant) : undefined, [selectedVariant]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-lg"> {/* Increased max width for chart */}
+      <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl"> {/* Increased max width for chart */}
         <DialogHeader>
           <DialogTitle>Add "{cardName}" to Collection</DialogTitle>
           {cardRarity && <DialogDescription>Rarity: <Badge variant="secondary">{cardRarity}</Badge></DialogDescription>}
         </DialogHeader>
 
-        <ScrollArea className="max-h-[80vh] pr-6">
+        <ScrollArea className="max-h-[75vh] md:max-h-[80vh] pr-6">
           <div className="grid gap-4 py-4">
-            <div className="flex justify-center mb-2">
-              <div className="relative w-48 h-64 rounded-md overflow-hidden shadow-md" data-ai-hint="pokemon card front">
-                <Image
-                  src={finalDisplayImageUrl}
-                  alt={cardName}
-                  layout="fill"
-                  objectFit="contain"
-                  key={finalDisplayImageUrl}
-                  onError={handleImageError}
-                />
+            <div className="flex flex-col md:flex-row gap-4 items-start">
+              <div className="flex-shrink-0 w-full md:w-48 flex justify-center">
+                <div className="relative w-48 h-64 rounded-md overflow-hidden shadow-md" data-ai-hint="pokemon card front">
+                  <Image
+                    src={finalDisplayImageUrl}
+                    alt={cardName}
+                    layout="fill"
+                    objectFit="contain"
+                    key={finalDisplayImageUrl}
+                    onError={handleImageError}
+                  />
+                </div>
+              </div>
+            
+              <div className="flex-grow space-y-3 w-full">
+                {currentAvailableVariants.length > 0 && (
+                  <div className="grid grid-cols-4 items-center gap-x-4 gap-y-2">
+                    <Label htmlFor="variant" className="text-right col-span-1">
+                      Variant
+                    </Label>
+                    <Select value={selectedVariant} onValueChange={setSelectedVariant}>
+                      <SelectTrigger id="variant" className="col-span-3">
+                        <SelectValue placeholder="Select variant" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {currentAvailableVariants.map((variantKey) => {
+                          const priceInfo = displayPrices.find(p => p.variantKey === variantKey);
+                          const priceDisplay = priceInfo && typeof priceInfo.price === 'number' ? `(${priceInfo.currencySymbol || '$'}${priceInfo.price.toFixed(2)})` : '';
+                          return (
+                            <SelectItem key={variantKey} value={variantKey}>
+                              {formatVariantKey(variantKey)} {priceDisplay}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-4 items-center gap-x-4 gap-y-2">
+                  <Label htmlFor="condition" className="text-right col-span-1">
+                    Condition
+                  </Label>
+                  <Select value={selectedCondition} onValueChange={setSelectedCondition}>
+                    <SelectTrigger id="condition" className="col-span-3">
+                      <SelectValue placeholder="Select condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableConditions.map((condition) => (
+                        <SelectItem key={condition} value={condition}>
+                          {condition}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedVariant && marketPriceForSelectedVariant > 0 && (
+                    <p className="text-sm text-center text-foreground flex items-center justify-center gap-1">
+                        <DollarSign className="h-4 w-4 text-green-500"/> Selected Value: <strong>${marketPriceForSelectedVariant.toFixed(2)}</strong>
+                    </p>
+                )}
+                {(currentAvailableVariants.length === 0 && displayPrices.length > 0) && (
+                     <p className="text-xs text-center text-muted-foreground py-2">
+                      No specific market prices found for variants. Adding with value $0.00.
+                    </p>
+                )}
+                 {displayPrices.length === 0 && (
+                    <p className="text-xs text-center text-muted-foreground py-2">
+                        No market price data available for this card from the API.
+                    </p>
+                 )}
               </div>
             </div>
             
             {displayPrices.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-2 mt-4">
                 <h4 className="font-semibold text-sm flex items-center gap-1"><Tag className="h-4 w-4 text-primary"/> Market Prices (PokemonTCG.io):</h4>
                 <ScrollArea className="h-[100px] border rounded-md p-2 bg-muted/30">
                   <ul className="space-y-1 text-xs">
@@ -194,63 +259,11 @@ export function AddCardToCollectionDialog({
               </div>
             )}
             
-            <Separator className="my-2"/>
-
-            {currentAvailableVariants.length > 0 && (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="variant" className="text-right col-span-1">
-                  Variant
-                </Label>
-                <Select value={selectedVariant} onValueChange={setSelectedVariant}>
-                  <SelectTrigger id="variant" className="col-span-3">
-                    <SelectValue placeholder="Select variant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currentAvailableVariants.map((variantKey) => {
-                      const priceInfo = displayPrices.find(p => p.variantKey === variantKey);
-                      const priceDisplay = priceInfo && typeof priceInfo.price === 'number' ? `($${priceInfo.price.toFixed(2)})` : '';
-                      return (
-                        <SelectItem key={variantKey} value={variantKey}>
-                          {formatVariantKey(variantKey)} {priceDisplay}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="condition" className="text-right col-span-1">
-                Condition
-              </Label>
-              <Select value={selectedCondition} onValueChange={setSelectedCondition}>
-                <SelectTrigger id="condition" className="col-span-3">
-                  <SelectValue placeholder="Select condition" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableConditions.map((condition) => (
-                    <SelectItem key={condition} value={condition}>
-                      {condition}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedVariant && marketPriceForSelectedVariant > 0 && (
-                <p className="text-sm text-center text-foreground flex items-center justify-center gap-1">
-                    <DollarSign className="h-4 w-4 text-green-500"/> Selected Value: <strong>${marketPriceForSelectedVariant.toFixed(2)}</strong>
-                </p>
-            )}
-            {(currentAvailableVariants.length === 0 && displayPrices.length === 0) && (
-                 <p className="text-xs text-center text-muted-foreground py-2">
-                  No specific market prices found. Adding with value $0.00.
-                </p>
-            )}
-
-            <Separator className="my-2"/>
-            <MarketPriceHistoryChart />
+            <Separator className="my-4"/>
+            <MarketPriceHistoryChart 
+                variantName={formattedSelectedVariantName}
+                variantMarketPrice={marketPriceForSelectedVariant}
+            />
 
           </div>
         </ScrollArea>
@@ -269,3 +282,4 @@ export function AddCardToCollectionDialog({
     </Dialog>
   );
 }
+
