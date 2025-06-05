@@ -32,8 +32,7 @@ export interface TcgDexCardResume {
   id: string; // Global card ID, e.g., "base1-1"
   localId: string; // Card number within its set, e.g., "1"
   name: string;
-  image: string; // RELATIVE image path, e.g., "/en/base/base1/1.png"
-  // Note: Full rarity and collector number (e.g., "1/102") are not in CardResume
+  image?: string | null; // RELATIVE image path, e.g., "/en/base/base1/1.png", can be null or undefined
 }
 
 
@@ -98,3 +97,4 @@ export interface TcgDexCard {
   prices?: TcgDexCardPrices;
   // Other fields as needed
 }
+

@@ -46,14 +46,12 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       const setData: TcgDexSet = await setDetailsResponse.json();
       setSetDetails(setData);
 
-      // Changed to fetch cards by set ID directly as CardResume
       const cardsResponse = await fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`);
       if(!cardsResponse.ok) {
           throw new Error(`Failed to fetch cards for set ${setId} from TCGdex: ${cardsResponse.statusText}`);
       }
       let fetchedCards: TcgDexCardResume[] = await cardsResponse.json();
 
-      // Sort cards by their localId (collector number within set)
       fetchedCards.sort((a, b) => {
         const numA = parseInt(a.localId.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(b.localId.replace(/\D/g, ''), 10) || 0;
@@ -94,11 +92,12 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   const handleAddCardToCollection = (condition: string) => {
     if (!selectedCard || !setDetails) return;
 
-    let fullImageUrl = "https://placehold.co/250x350.png";
-    if (selectedCard.image) {
-      fullImageUrl = selectedCard.image.startsWith('http') 
-        ? selectedCard.image 
-        : `${TCGDEX_IMAGE_BASE_URL}${selectedCard.image}`;
+    let displayImageUrl = "https://placehold.co/250x350.png"; // Default placeholder
+    const rawImagePath = selectedCard.image;
+    if (rawImagePath && rawImagePath.trim() !== '') {
+        displayImageUrl = rawImagePath.startsWith('http') 
+            ? rawImagePath 
+            : `${TCGDEX_IMAGE_BASE_URL}${rawImagePath}`;
     }
     
     const newCard: CollectionPokemonCard = {
@@ -106,11 +105,11 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       name: selectedCard.name,
       set: setDetails.name, 
       cardNumber: selectedCard.localId, 
-      rarity: "N/A", // Rarity not available in CardResume
+      rarity: "N/A", 
       condition: condition,
-      value: 0, // Price not available in CardResume
-      imageUrl: fullImageUrl,
-      variant: "Normal", // Defaulting, variant info not in CardResume
+      value: 0, 
+      imageUrl: displayImageUrl,
+      variant: "Normal", 
     };
 
     try {
@@ -213,16 +212,25 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
               <ScrollArea className="h-[calc(100vh-26rem)] md:h-[calc(100vh-30rem)]">
                 {filteredCards.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {filteredCards.map((card) => (
+                    {filteredCards.map((card) => {
+                      const rawImagePath = card.image;
+                      let displayImageUrl: string | null = null;
+                      if (rawImagePath && rawImagePath.trim() !== '') {
+                        displayImageUrl = rawImagePath.startsWith('http') 
+                            ? rawImagePath 
+                            : `${TCGDEX_IMAGE_BASE_URL}${rawImagePath}`;
+                      }
+
+                      return (
                         <Card 
                             key={card.id} 
                             onClick={() => openDialogForCard(card)}
                             className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transition-all group flex flex-col"
                         >
                         <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2">
-                            {card.image ? (
+                            {displayImageUrl ? (
                                 <Image 
-                                    src={card.image.startsWith('http') ? card.image : `${TCGDEX_IMAGE_BASE_URL}${card.image}`} 
+                                    src={displayImageUrl}
                                     alt={card.name} 
                                     layout="fill" 
                                     objectFit="contain" 
@@ -239,7 +247,8 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                             <p className="text-xs text-muted-foreground">#{card.localId}</p>
                         </div>
                         </Card>
-                    ))}
+                      );
+                    })}
                     </div>
                 ): (
                     <div className="text-center py-10 text-muted-foreground">
@@ -257,11 +266,16 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedCard.name}
-          cardImageUrl={
-            selectedCard.image 
-              ? (selectedCard.image.startsWith('http') ? selectedCard.image : `${TCGDEX_IMAGE_BASE_URL}${selectedCard.image}`) 
-              : "https://placehold.co/200x280.png"
-          }
+          cardImageUrl={(() => {
+            const rawImagePath = selectedCard.image;
+            let dialogImageUrl = "https://placehold.co/200x280.png"; // Default placeholder
+            if (rawImagePath && rawImagePath.trim() !== '') {
+              dialogImageUrl = rawImagePath.startsWith('http') 
+                ? rawImagePath 
+                : `${TCGDEX_IMAGE_BASE_URL}${rawImagePath}`;
+            }
+            return dialogImageUrl;
+          })()}
           availableConditions={conditionOptions}
           onAddCard={handleAddCardToCollection}
         />
@@ -274,5 +288,4 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
 };
 
 export default TcgDexSetDetailsPage;
-
     
