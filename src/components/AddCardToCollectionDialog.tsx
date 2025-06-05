@@ -32,7 +32,7 @@ const formatVariantKey = (key: string): string => {
   if (key === "firstEditionNormal") return "1st Edition Normal";
   if (key === "firstEditionHolofoil") return "1st Edition Holofoil";
   if (key === "reverseHolo" || key === "reverseHolofoil") return "Reverse Holo";
-  if (key === "reverse") return "Reverse Holo"; 
+  if (key === "reverse") return "Reverse Holo";
   if (key === "holofoil") return "Holofoil";
   if (key === "normal") return "Normal";
 
@@ -131,8 +131,8 @@ export function AddCardToCollectionDialog({
       return;
     }
     // Reset when opening
-    setSelectedCondition(""); 
-    setChartData([]); 
+    setSelectedCondition("");
+    setChartData([]);
     setCurrentAvailableVariants([]);
     setSelectedVariant("");
   }, [isOpen]);
@@ -150,36 +150,27 @@ export function AddCardToCollectionDialog({
       return;
     }
 
-    // At this point, isOpen is true, sourceApi is 'tcgdex', and isFetchingCardDetails is false.
-    // We should have tcgDexFullCard data.
+    const pricedVariants: string[] = [];
     if (tcgDexFullCard && typeof tcgDexFullCard.prices === 'object' && tcgDexFullCard.prices !== null) {
-      const pricedVariants: string[] = [];
-      for (const key in tcgDexFullCard.prices) {
-        if (Object.prototype.hasOwnProperty.call(tcgDexFullCard.prices, key)) {
-          const priceEntry = tcgDexFullCard.prices[key as keyof TcgDexCardPrices];
-          if (typeof priceEntry === 'object' && priceEntry !== null && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
-            pricedVariants.push(key);
-          }
+        for (const key in tcgDexFullCard.prices) {
+            if (Object.prototype.hasOwnProperty.call(tcgDexFullCard.prices, key)) {
+                const priceEntry = tcgDexFullCard.prices[key as keyof TcgDexCardPrices];
+                if (typeof priceEntry === 'object' && priceEntry !== null && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
+                    pricedVariants.push(key);
+                }
+            }
         }
-      }
-      pricedVariants.sort();
-      setCurrentAvailableVariants(pricedVariants);
-
-      if (pricedVariants.length > 0) {
-        let determinedDefault = "";
-        if (pricedVariants.includes("normal")) determinedDefault = "normal";
-        else if (pricedVariants.includes("holofoil")) determinedDefault = "holofoil";
-        else if (pricedVariants.includes("reverseHolo")) determinedDefault = "reverseHolo";
-        else if (pricedVariants.includes("reverse")) determinedDefault = "reverse";
-        else determinedDefault = pricedVariants[0]; 
-        setSelectedVariant(determinedDefault);
-      } else {
-        setSelectedVariant("");
-      }
-    } else {
-      setCurrentAvailableVariants([]);
-      setSelectedVariant("");
     }
+    pricedVariants.sort(); // Sort keys alphabetically (e.g., "normal" before "reverseHolo")
+
+    setCurrentAvailableVariants(pricedVariants);
+
+    if (pricedVariants.length > 0) {
+        setSelectedVariant(pricedVariants[0]); // Select the first available variant
+    } else {
+        setSelectedVariant(""); // No priced variants found
+    }
+
   }, [isOpen, sourceApi, isFetchingCardDetails, tcgDexFullCard]);
 
 
@@ -236,11 +227,11 @@ export function AddCardToCollectionDialog({
 
 
   const handleSubmit = () => {
-    let variantToSave = "Normal"; 
+    let variantToSave = "Normal";
     if (currentAvailableVariants.length > 0 && selectedVariant) {
       variantToSave = selectedVariant;
     } else if (currentAvailableVariants.length === 0 && sourceApi === 'tcgdex' && !isFetchingCardDetails) {
-      variantToSave = "Normal"; 
+      variantToSave = "Normal";
     } else if (currentAvailableVariants.length === 0 && sourceApi === 'pokemontcg') {
        variantToSave = "Normal";
     }
@@ -248,18 +239,18 @@ export function AddCardToCollectionDialog({
 
     if (selectedCondition) {
       onAddCard(selectedCondition, variantToSave);
-      onClose(); 
+      onClose();
     }
   };
 
   const showVariantSelector = currentAvailableVariants.length > 0 && !(isFetchingCardDetails && sourceApi === 'tcgdex');
   
-  const noPricedVariantsFoundForTcgDex = sourceApi === 'tcgdex' && 
-                                         !isFetchingCardDetails && 
-                                         tcgDexFullCard !== null && 
+  const noPricedVariantsFoundForTcgDex = sourceApi === 'tcgdex' &&
+                                         !isFetchingCardDetails &&
+                                         tcgDexFullCard !== null &&
                                          currentAvailableVariants.length === 0;
   
-  const noVariantsForPokemonTcg = sourceApi === 'pokemontcg' && 
+  const noVariantsForPokemonTcg = sourceApi === 'pokemontcg' &&
                                   (!propsAvailableVariants || propsAvailableVariants.length === 0);
 
 
@@ -269,8 +260,8 @@ export function AddCardToCollectionDialog({
 
   const dialogDescriptionText = `Select the condition${ (showVariantSelector || (sourceApi === 'pokemontcg' && propsAvailableVariants && propsAvailableVariants.length > 0)) ? " and variant " : " " }of your card.`;
   
-  const isAddButtonDisabled = (isFetchingCardDetails && sourceApi === 'tcgdex') || 
-                              !selectedCondition || 
+  const isAddButtonDisabled = (isFetchingCardDetails && sourceApi === 'tcgdex') ||
+                              !selectedCondition ||
                               (showVariantSelector && !selectedVariant);
 
 
@@ -292,9 +283,9 @@ export function AddCardToCollectionDialog({
                 alt={cardName}
                 layout="fill"
                 objectFit="contain"
-                key={finalDisplayImageUrl} 
+                key={finalDisplayImageUrl}
                 onError={handleImageError}
-                unoptimized={sourceApi === 'tcgdex'} 
+                unoptimized={sourceApi === 'tcgdex'}
               />
             </div>
           </div>
@@ -379,7 +370,7 @@ export function AddCardToCollectionDialog({
                           tickLine={false}
                           axisLine={false}
                           fontSize={10}
-                          interval={0} 
+                          interval={0}
                           padding={{ left: 10, right: 10 }}
                         />
                         <YAxis
@@ -418,5 +409,3 @@ export function AddCardToCollectionDialog({
     </Dialog>
   );
 }
-
-    
