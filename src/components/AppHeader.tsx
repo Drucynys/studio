@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch } from "lucide-react";
+import { PackageSearch, Shield } from "lucide-react"; // Added Shield for TCGPlayer
 
 export function AppHeader() {
   return (
@@ -21,6 +21,12 @@ export function AppHeader() {
             <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground">
               <PackageSearch className="mr-2 h-5 w-5" />
               Browse Sets (PokemonTCG.io)
+            </Button>
+          </Link>
+          <Link href="/browse-tcgplayer-sets" passHref legacyBehavior>
+            <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground">
+              <Shield className="mr-2 h-5 w-5" />
+              Browse Sets (TCGPlayer API)
             </Button>
           </Link>
         </div>
