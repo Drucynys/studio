@@ -23,12 +23,6 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'assets.tcgdex.net',
-        port: '',
-        pathname: '/**',
-      }
     ],
   },
   // Add the Firebase Studio preview origin to allowedDevOrigins

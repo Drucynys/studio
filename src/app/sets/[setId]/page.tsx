@@ -38,7 +38,6 @@ export interface ApiPokemonCard {
         low?: number | null;
         mid?: number | null;
         high?: number | null;
-        // directLow, etc.
       };
     };
     url?: string; 
@@ -47,7 +46,7 @@ export interface ApiPokemonCard {
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-// Helper to get a primary market price for collection storage
+// Helper to get a primary market price for collection storage (simplified after TCGdex removal)
 const getPrimaryMarketPriceForCollection = (apiCard: ApiPokemonCard | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
   const prices = apiCard.tcgplayer.prices;
@@ -57,7 +56,6 @@ const getPrimaryMarketPriceForCollection = (apiCard: ApiPokemonCard | null): num
   if (prices.firstEditionNormal?.market) return prices.firstEditionNormal.market;
   if (prices.firstEditionHolofoil?.market) return prices.firstEditionHolofoil.market;
   
-  // Fallback to the first available market price
   for (const key in prices) {
     if (prices[key]?.market) {
       return prices[key]!.market!;
@@ -158,7 +156,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       cardNumber: selectedApiCard.number,
       rarity: selectedApiCard.rarity || "N/A",
       condition: condition,
-      value: valueForCollection, // Use the value passed from the dialog
+      value: valueForCollection,
       imageUrl: selectedApiCard.images.large,
     };
 
@@ -293,10 +291,9 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
             setIsDialogOpen(false);
             setSelectedApiCard(null);
           }}
-          sourceApi="pokemontcg"
           cardName={selectedApiCard.name}
           initialCardImageUrl={selectedApiCard.images.small}
-          pokemonTcgApiCard={selectedApiCard} // Pass the full card object
+          pokemonTcgApiCard={selectedApiCard}
           availableConditions={conditionOptions}
           onAddCard={handleAddCardToCollection}
         />

@@ -20,23 +20,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import type { TcgDexCard, TcgDexCardPriceInfo, TcgDexCardPrices } from "@/types/tcgdex";
 import type { ApiPokemonCard as PokemonTcgApiCard } from "@/app/sets/[setId]/page";
-import { Loader2, Tag, Gem } from "lucide-react"; // Gem for rarity
-import { getSafeTcgDexCardImageUrl } from "@/lib/tcgdexUtils";
+import { Loader2, Tag, Gem } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge"; // Added missing Badge import
+import { Badge } from "@/components/ui/badge";
 
 // Helper to format variant keys for display
 const formatVariantKey = (key: string): string => {
   if (key === "1stEditionNormal") return "1st Edition Normal";
   if (key === "1stEditionHolofoil") return "1st Edition Holo";
-  if (key === "reverseHolofoil" || key === "reverseHolo") return "Reverse Holo";
+  if (key === "reverseHolofoil") return "Reverse Holo"; // PokemonTCG.io specific
   if (key === "holofoil") return "Holofoil";
   if (key === "normal") return "Normal";
-  // Generic formatting for other keys
-  return key.replace(/([A-Z0-9])/g, ' $1').replace(/^./, (str) => str.toUpperCase()).trim();
+  // Generic formatting for other keys from PokemonTCG.io (like 'unlimitedHolofoil', 'reverseHolo', etc.)
+  return key
+    .replace(/([A-Z0-9])/g, " $1")
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
 };
 
 type DisplayPriceInfo = {
@@ -51,10 +52,7 @@ type AddCardToCollectionDialogProps = {
   cardName: string;
   initialCardImageUrl?: string | null;
   availableConditions: string[];
-  sourceApi?: 'pokemontcg' | 'tcgdex';
-  pokemonTcgApiCard?: PokemonTcgApiCard | null;
-  tcgDexFullCard?: TcgDexCard | null;
-  isFetchingCardDetails?: boolean;
+  pokemonTcgApiCard: PokemonTcgApiCard | null; // Now non-optional if dialog is always for this
   onAddCard: (condition: string, value: number) => void;
 };
 
@@ -64,21 +62,17 @@ export function AddCardToCollectionDialog({
   cardName,
   initialCardImageUrl,
   availableConditions,
-  sourceApi,
   pokemonTcgApiCard,
-  tcgDexFullCard,
-  isFetchingCardDetails,
   onAddCard,
 }: AddCardToCollectionDialogProps) {
   const [selectedCondition, setSelectedCondition] = useState<string>("");
   const [finalDisplayImageUrl, setFinalDisplayImageUrl] = useState<string>("https://placehold.co/200x280.png");
   const [displayPrices, setDisplayPrices] = useState<DisplayPriceInfo[]>([]);
   const [cardRarity, setCardRarity] = useState<string | null>(null);
-  const [collectionValue, setCollectionValue] = useState<number>(0); // Value to be stored for the collection
+  const [collectionValue, setCollectionValue] = useState<number>(0);
 
   useEffect(() => {
     if (!isOpen) {
-      // Reset states when dialog is closed
       setSelectedCondition("");
       setDisplayPrices([]);
       setCardRarity(null);
@@ -87,96 +81,57 @@ export function AddCardToCollectionDialog({
       return;
     }
 
-    // Image URL Logic
     let imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=Loading...";
-    if (sourceApi === 'tcgdex') {
-      if (isFetchingCardDetails) {
-        const lowRes = getSafeTcgDexCardImageUrl(initialCardImageUrl, 'low', 'webp');
-        imageUrlToSet = lowRes || "https://placehold.co/200x280.png/CCCCCC/333333?text=Fetching...";
-      } else if (tcgDexFullCard?.image) {
-        const highRes = getSafeTcgDexCardImageUrl(tcgDexFullCard.image, 'high', 'webp');
-        imageUrlToSet = highRes || getSafeTcgDexCardImageUrl(initialCardImageUrl, 'low', 'webp') || "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image";
-      } else if (initialCardImageUrl) {
-        imageUrlToSet = getSafeTcgDexCardImageUrl(initialCardImageUrl, 'low', 'webp') || "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image+Available";
-      } else {
-        imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=No+Image+Data";
-      }
-    } else if (sourceApi === 'pokemontcg' && pokemonTcgApiCard?.images.large) {
-      imageUrlToSet = pokemonTcgApiCard.images.large;
-    } else if (initialCardImageUrl) {
-      imageUrlToSet = initialCardImageUrl;
-    }
-    setFinalDisplayImageUrl(imageUrlToSet);
-
-    // Price & Rarity Processing Logic
     const newPrices: DisplayPriceInfo[] = [];
     let defaultPriceForCollection = 0;
-    setCardRarity(null); // Reset rarity
+    setCardRarity(null);
 
-    if (sourceApi === 'pokemontcg' && pokemonTcgApiCard?.tcgplayer?.prices) {
+    if (pokemonTcgApiCard) {
+      imageUrlToSet = pokemonTcgApiCard.images.large || initialCardImageUrl || "https://placehold.co/200x280.png";
       setCardRarity(pokemonTcgApiCard.rarity || "N/A");
-      const prices = pokemonTcgApiCard.tcgplayer.prices;
-      for (const key in prices) {
-        if (Object.prototype.hasOwnProperty.call(prices, key)) {
-          const priceEntry = prices[key as keyof typeof prices];
-          if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
-            newPrices.push({ variantName: formatVariantKey(key), price: priceEntry.market, currencySymbol: '$' });
-            if (key === 'normal' && priceEntry.market) defaultPriceForCollection = priceEntry.market;
-            else if (key === 'holofoil' && priceEntry.market && defaultPriceForCollection === 0) defaultPriceForCollection = priceEntry.market;
-          }
-        }
-      }
-      if (newPrices.length > 0 && defaultPriceForCollection === 0) {
-        const firstPriced = newPrices.find(p => typeof p.price === 'number' && p.price > 0);
-        if (firstPriced && typeof firstPriced.price === 'number') defaultPriceForCollection = firstPriced.price;
-      }
-    } else if (sourceApi === 'tcgdex' && !isFetchingCardDetails && tcgDexFullCard && typeof tcgDexFullCard.prices === 'object' && tcgDexFullCard.prices !== null) {
-      setCardRarity(tcgDexFullCard.rarity || "N/A");
-      const prices = tcgDexFullCard.prices;
-      
-      for (const key in prices) {
-        if (Object.prototype.hasOwnProperty.call(prices, key)) {
-          // Skip known aggregate keys that don't represent specific card variants with market prices
-          if (['average', 'low', 'trend', 'avg1', 'avg7', 'avg30', 'reverseHoloAvg1', 'reverseHoloAvg7', 'reverseHoloAvg30'].includes(key)) {
-            continue;
-          }
-          
-          const priceEntry = prices[key as keyof TcgDexCardPrices];
-          if (priceEntry && typeof priceEntry === 'object' && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
-            newPrices.push({
-              variantName: formatVariantKey(key),
-              price: priceEntry.market,
-              currencySymbol: '€',
-            });
 
-            // Determine default value for collection (simplified: prefer normal, then holofoil, then reverseHolo, then first available)
-            if (key === 'normal' && priceEntry.market > 0) {
+      if (pokemonTcgApiCard.tcgplayer?.prices) {
+        const prices = pokemonTcgApiCard.tcgplayer.prices;
+        const sortedPriceKeys = Object.keys(prices).sort();
+
+        for (const key of sortedPriceKeys) {
+          if (Object.prototype.hasOwnProperty.call(prices, key)) {
+            const priceEntry = prices[key as keyof typeof prices];
+            if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
+              newPrices.push({ variantName: formatVariantKey(key), price: priceEntry.market, currencySymbol: '$' });
+              
+              // Determine default value for collection (prefer normal, then holofoil, then first available)
+              if (key === 'normal' && priceEntry.market > 0) {
                 if(defaultPriceForCollection === 0 || key === 'normal') defaultPriceForCollection = priceEntry.market;
-            } else if (key === 'holofoil' && priceEntry.market > 0 && (defaultPriceForCollection === 0 || prices['normal']?.market === undefined) ) {
+              } else if (key === 'holofoil' && priceEntry.market > 0 && (defaultPriceForCollection === 0 || prices['normal']?.market === undefined) ) {
                 defaultPriceForCollection = priceEntry.market;
-            } else if ((key === 'reverseHolo' || key === 'reverseHolofoil') && priceEntry.market > 0 && (defaultPriceForCollection === 0 || (prices['normal']?.market === undefined && prices['holofoil']?.market === undefined))) {
+              } else if (key === 'reverseHolofoil' && priceEntry.market > 0 && (defaultPriceForCollection === 0 || (prices['normal']?.market === undefined && prices['holofoil']?.market === undefined))) {
                 defaultPriceForCollection = priceEntry.market;
+              }
             }
           }
         }
-      }
-       // Fallback if no specific (normal, holo, reverseHolo) market price was found for collection value
-      if (defaultPriceForCollection === 0 && newPrices.length > 0) {
-        const firstPriced = newPrices.find(p => typeof p.price === 'number' && p.price > 0);
-        if (firstPriced && typeof firstPriced.price === 'number') {
-          defaultPriceForCollection = firstPriced.price;
+        // Fallback if no specific (normal, holofoil, reverseHolofoil) market price was found for collection value
+        if (defaultPriceForCollection === 0 && newPrices.length > 0) {
+            const firstPriced = newPrices.find(p => typeof p.price === 'number' && p.price > 0);
+            if (firstPriced && typeof firstPriced.price === 'number') {
+              defaultPriceForCollection = firstPriced.price;
+            }
         }
       }
+    } else if (initialCardImageUrl) {
+      imageUrlToSet = initialCardImageUrl;
     }
     
+    setFinalDisplayImageUrl(imageUrlToSet);
     setDisplayPrices(newPrices);
     setCollectionValue(defaultPriceForCollection);
 
-  }, [isOpen, sourceApi, pokemonTcgApiCard, tcgDexFullCard, isFetchingCardDetails, initialCardImageUrl, cardName]);
+  }, [isOpen, pokemonTcgApiCard, initialCardImageUrl, cardName]);
 
   const handleSubmit = () => {
     if (selectedCondition) {
-      onAddCard(selectedCondition, collectionValue);
+      onAddCard(selectedCondition, collectionValue); // Pass the determined collectionValue
       onClose();
     }
   };
@@ -185,7 +140,7 @@ export function AddCardToCollectionDialog({
     setFinalDisplayImageUrl("https://placehold.co/200x280.png/CCCCCC/333333?text=Image+Error");
   };
   
-  const isAddButtonDisabled = isFetchingCardDetails || !selectedCondition;
+  const isAddButtonDisabled = !selectedCondition;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -205,20 +160,13 @@ export function AddCardToCollectionDialog({
                 objectFit="contain"
                 key={finalDisplayImageUrl}
                 onError={handleImageError}
-                unoptimized={sourceApi === 'tcgdex'}
               />
             </div>
           </div>
-
-          {(isFetchingCardDetails && sourceApi === 'tcgdex') ? (
-            <div className="flex items-center justify-center text-muted-foreground py-4">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading card details...
-            </div>
-          ) : (
             <>
               {displayPrices.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-sm flex items-center gap-1"><Tag className="h-4 w-4 text-primary"/> Market Prices:</h4>
+                  <h4 className="font-semibold text-sm flex items-center gap-1"><Tag className="h-4 w-4 text-primary"/> Market Prices (PokemonTCG.io):</h4>
                   <ScrollArea className="h-[100px] border rounded-md p-2 bg-muted/30">
                     <ul className="space-y-1 text-xs">
                       {displayPrices.map((p, index) => (
@@ -231,11 +179,14 @@ export function AddCardToCollectionDialog({
                       ))}
                     </ul>
                   </ScrollArea>
+                   <p className="text-xs text-muted-foreground">
+                    Selected card value for collection: ${collectionValue.toFixed(2)} (based on common print)
+                  </p>
                 </div>
               )}
-              {displayPrices.length === 0 && !isFetchingCardDetails && (
+              {displayPrices.length === 0 && (
                 <p className="text-xs text-center text-muted-foreground py-2">
-                  No specific market prices found for this card.
+                  No specific market prices found for this card. Adding with value $0.00.
                 </p>
               )}
               
@@ -259,7 +210,6 @@ export function AddCardToCollectionDialog({
                 </Select>
               </div>
             </>
-          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -269,7 +219,6 @@ export function AddCardToCollectionDialog({
             disabled={isAddButtonDisabled}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
-            {isFetchingCardDetails && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Add to Collection
           </Button>
         </DialogFooter>
