@@ -11,20 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import type { PokemonCard as CollectionPokemonCard } from "@/types"; // Collection card type
-import type { TcgDexCardResume, TcgDexSet, TcgDexCard } from "@/types/tcgdex"; // TCGdex API types
+import type { TcgDexCardResume, TcgDexSet } from "@/types/tcgdex"; // TCGdex API types
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
-
-// Placeholder for fetching full card details - for future enhancement
-// const getMarketPriceFromTcgDexFull = (apiCard: TcgDexCard): number => {
-//   const prices = apiCard.prices;
-//   if (!prices) return 0;
-//   // ... (logic from before)
-//   return 0;
-// };
 
 const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
   const resolvedParams = use(paramsFromProps);
@@ -35,7 +27,7 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   const [filteredCards, setFilteredCards] = useState<TcgDexCardResume[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<TcgDexCardResume | null>(null); // Using TcgDexCardResume for now
+  const [selectedCard, setSelectedCard] = useState<TcgDexCardResume | null>(null); 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -54,12 +46,14 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
       const setData: TcgDexSet = await setDetailsResponse.json();
       setSetDetails(setData);
 
+      // Changed to fetch cards by set ID directly as CardResume
       const cardsResponse = await fetch(`https://api.tcgdex.net/v2/en/cards?set.id=${setId}`);
       if(!cardsResponse.ok) {
           throw new Error(`Failed to fetch cards for set ${setId} from TCGdex: ${cardsResponse.statusText}`);
       }
       let fetchedCards: TcgDexCardResume[] = await cardsResponse.json();
 
+      // Sort cards by their localId (collector number within set)
       fetchedCards.sort((a, b) => {
         const numA = parseInt(a.localId.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(b.localId.replace(/\D/g, ''), 10) || 0;
@@ -92,7 +86,6 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
     const filteredData = cardsInSet.filter(card =>
       card.name.toLowerCase().includes(lowercasedFilter) ||
       card.localId.toLowerCase().includes(lowercasedFilter)
-      // Rarity is not in TcgDexCardResume, so cannot filter by it here
     );
     setFilteredCards(filteredData);
   }, [searchTerm, cardsInSet]);
@@ -101,13 +94,18 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
   const handleAddCardToCollection = (condition: string) => {
     if (!selectedCard || !setDetails) return;
 
-    const fullImageUrl = selectedCard.image ? `${TCGDEX_IMAGE_BASE_URL}${selectedCard.image}` : "https://placehold.co/250x350.png";
-
+    let fullImageUrl = "https://placehold.co/250x350.png";
+    if (selectedCard.image) {
+      fullImageUrl = selectedCard.image.startsWith('http') 
+        ? selectedCard.image 
+        : `${TCGDEX_IMAGE_BASE_URL}${selectedCard.image}`;
+    }
+    
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
       name: selectedCard.name,
       set: setDetails.name, 
-      cardNumber: selectedCard.localId, // Using localId from CardResume
+      cardNumber: selectedCard.localId, 
       rarity: "N/A", // Rarity not available in CardResume
       condition: condition,
       value: 0, // Price not available in CardResume
@@ -223,7 +221,13 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
                         >
                         <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2">
                             {card.image ? (
-                                <Image src={`${TCGDEX_IMAGE_BASE_URL}${card.image}`} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                                <Image 
+                                    src={card.image.startsWith('http') ? card.image : `${TCGDEX_IMAGE_BASE_URL}${card.image}`} 
+                                    alt={card.name} 
+                                    layout="fill" 
+                                    objectFit="contain" 
+                                    data-ai-hint="pokemon card front"
+                                />
                             ) : (
                                 <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="image placeholder">
                                   <span className="text-xs text-muted-foreground">No Image</span>
@@ -253,7 +257,11 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedCard.name}
-          cardImageUrl={selectedCard.image ? `${TCGDEX_IMAGE_BASE_URL}${selectedCard.image}` : "https://placehold.co/200x280.png"}
+          cardImageUrl={
+            selectedCard.image 
+              ? (selectedCard.image.startsWith('http') ? selectedCard.image : `${TCGDEX_IMAGE_BASE_URL}${selectedCard.image}`) 
+              : "https://placehold.co/200x280.png"
+          }
           availableConditions={conditionOptions}
           onAddCard={handleAddCardToCollection}
         />
@@ -266,3 +274,5 @@ const TcgDexSetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params:
 };
 
 export default TcgDexSetDetailsPage;
+
+    
