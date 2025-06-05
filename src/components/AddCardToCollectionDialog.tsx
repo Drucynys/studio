@@ -126,64 +126,59 @@ export function AddCardToCollectionDialog({
     if (!isOpen) {
       setSelectedCondition("");
       setChartData([]);
-      // Variant states are handled by API-specific effects
+      setCurrentAvailableVariants([]);
+      setSelectedVariant("");
       return;
     }
     // Reset when opening
     setSelectedCondition(""); 
     setChartData([]); 
+    setCurrentAvailableVariants([]);
+    setSelectedVariant("");
   }, [isOpen]);
 
 
   // Effect for TCGdex variant population & default selection
   useEffect(() => {
     if (!isOpen || sourceApi !== 'tcgdex') {
-        if (sourceApi !== 'tcgdex' && isOpen) { 
-             setCurrentAvailableVariants([]);
-             setSelectedVariant("");
-        }
-        return;
+      return;
     }
 
     if (isFetchingCardDetails) {
-        setCurrentAvailableVariants([]);
-        setSelectedVariant("");
-        return;
+      setCurrentAvailableVariants([]);
+      setSelectedVariant("");
+      return;
     }
 
     // At this point, isOpen is true, sourceApi is 'tcgdex', and isFetchingCardDetails is false.
     // We should have tcgDexFullCard data.
     if (tcgDexFullCard && typeof tcgDexFullCard.prices === 'object' && tcgDexFullCard.prices !== null) {
-        const actualPricedVariants: string[] = [];
-        for (const key in tcgDexFullCard.prices) {
-            // Ensure the key is an own property and not from the prototype chain
-            if (Object.prototype.hasOwnProperty.call(tcgDexFullCard.prices, key)) {
-                const priceEntry = tcgDexFullCard.prices[key];
-                // Check if priceEntry is an object and has a numeric 'market' property
-                if (typeof priceEntry === 'object' && priceEntry !== null && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
-                    actualPricedVariants.push(key);
-                }
-            }
+      const pricedVariants: string[] = [];
+      for (const key in tcgDexFullCard.prices) {
+        if (Object.prototype.hasOwnProperty.call(tcgDexFullCard.prices, key)) {
+          const priceEntry = tcgDexFullCard.prices[key as keyof TcgDexCardPrices];
+          if (typeof priceEntry === 'object' && priceEntry !== null && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
+            pricedVariants.push(key);
+          }
         }
-        actualPricedVariants.sort(); // Sort for consistent order
-        setCurrentAvailableVariants(actualPricedVariants);
+      }
+      pricedVariants.sort();
+      setCurrentAvailableVariants(pricedVariants);
 
-        if (actualPricedVariants.length > 0) {
-            let determinedDefault = "";
-            if (actualPricedVariants.includes("normal")) determinedDefault = "normal";
-            else if (actualPricedVariants.includes("holofoil")) determinedDefault = "holofoil";
-            else if (actualPricedVariants.includes("reverseHolo")) determinedDefault = "reverseHolo";
-            else if (actualPricedVariants.includes("reverse")) determinedDefault = "reverse"; // General reverse as fallback
-            else determinedDefault = actualPricedVariants[0]; // Fallback to the first one found
-            setSelectedVariant(determinedDefault);
-        } else {
-            // No priced variants with a 'market' value were found in tcgDexFullCard.prices
-            setSelectedVariant("");
-        }
-    } else {
-        // tcgDexFullCard.prices is undefined, null, or not an object.
-        setCurrentAvailableVariants([]);
+      if (pricedVariants.length > 0) {
+        let determinedDefault = "";
+        if (pricedVariants.includes("normal")) determinedDefault = "normal";
+        else if (pricedVariants.includes("holofoil")) determinedDefault = "holofoil";
+        else if (pricedVariants.includes("reverseHolo")) determinedDefault = "reverseHolo";
+        else if (pricedVariants.includes("reverse")) determinedDefault = "reverse";
+        else determinedDefault = pricedVariants[0]; 
+        setSelectedVariant(determinedDefault);
+      } else {
         setSelectedVariant("");
+      }
+    } else {
+      setCurrentAvailableVariants([]);
+      setSelectedVariant("");
     }
   }, [isOpen, sourceApi, isFetchingCardDetails, tcgDexFullCard]);
 
@@ -191,10 +186,6 @@ export function AddCardToCollectionDialog({
   // Effect for PokemonTCG.io variant population
   useEffect(() => {
     if (!isOpen || sourceApi !== 'pokemontcg') {
-       if (sourceApi !== 'pokemontcg' && isOpen) { 
-         setCurrentAvailableVariants([]);
-         setSelectedVariant("");
-      }
       return;
     }
 
@@ -427,3 +418,5 @@ export function AddCardToCollectionDialog({
     </Dialog>
   );
 }
+
+    
