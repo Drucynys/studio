@@ -206,7 +206,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     setSelectedCardData(card || null);
 
     if (card && card.tcgplayer?.prices) {
-      setAvailableVariants(Object.keys(card.tcgplayer.prices));
+      setAvailableVariants(Object.keys(card.tcgplayer.prices).sort());
     } else {
       setAvailableVariants([]);
     }
@@ -409,3 +409,4 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     </Card>
   );
 }
+
