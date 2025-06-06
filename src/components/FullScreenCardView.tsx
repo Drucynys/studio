@@ -30,25 +30,21 @@ export function FullScreenCardView({
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [cardDimensions, setCardDimensions] = useState({ width: 1, height: 1 }); // Initial non-zero
+  // Initialize with 1,1 to ensure MIN_DIMENSION_FOR_TILT_EFFECT guard works before first valid measurement
+  const [cardDimensions, setCardDimensions] = useState({ width: 1, height: 1 });
 
   const currentCard = currentIndex !== null ? cards[currentIndex] : null;
 
+  // Effect to reset states when the dialog is closed
   useEffect(() => {
-    if (isOpen && cardRef.current) {
-      // Set dimensions when the dialog is open and the ref is available
-      setCardDimensions({
-        width: cardRef.current.offsetWidth,
-        height: cardRef.current.offsetHeight,
-      });
-      // DO NOT reset isHovering here when opening. Let mouse events handle it.
-    } else if (!isOpen) {
-      // Reset dimensions and hover state only when the dialog is explicitly closed
-      setCardDimensions({ width: 1, height: 1 });
-      setIsHovering(false); 
+    if (!isOpen) {
+      setCardDimensions({ width: 1, height: 1 }); // Reset to initial non-effect-triggering values
+      setIsHovering(false);
+      setMousePosition({ x: 0, y: 0 });
     }
-  }, [isOpen, currentCard, currentIndex]); 
+  }, [isOpen]); // Only depend on isOpen for this reset logic
 
+  // Keyboard navigation effect
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isOpen || currentIndex === null) return;
@@ -73,11 +69,28 @@ export function FullScreenCardView({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !isOpen) {
-      if (isHovering) setIsHovering(false); 
+      if (isHovering) setIsHovering(false);
       return;
     }
+
+    const currentWidth = cardRef.current.offsetWidth;
+    const currentHeight = cardRef.current.offsetHeight;
+
+    // Update dimensions if they are different from stored,
+    // OR if stored dimensions are still the initial/invalid ones.
+    // Only commit the update if the newly measured dimensions are valid.
+    if (cardDimensions.width !== currentWidth || 
+        cardDimensions.height !== currentHeight || 
+        cardDimensions.width <= MIN_DIMENSION_FOR_TILT_EFFECT ||
+        cardDimensions.height <= MIN_DIMENSION_FOR_TILT_EFFECT) {
+      
+      if (currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT && currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT) {
+        setCardDimensions({ width: currentWidth, height: currentHeight });
+      }
+    }
+
     if (!isHovering) setIsHovering(true);
-    
+
     const rect = cardRef.current.getBoundingClientRect();
     setMousePosition({
       x: e.clientX - rect.left,
@@ -109,6 +122,7 @@ export function FullScreenCardView({
 
   if (
     isHovering &&
+    cardRef.current && // Ensure ref is current for calculations
     cardDimensions.width > MIN_DIMENSION_FOR_TILT_EFFECT &&
     cardDimensions.height > MIN_DIMENSION_FOR_TILT_EFFECT
   ) {
@@ -132,7 +146,7 @@ export function FullScreenCardView({
   const cardStyle: React.CSSProperties = {
     transform: dynamicCardTransform,
     transformStyle: "preserve-3d",
-    transition: "transform 0.1s linear", 
+    transition: "transform 0.05s linear", 
   };
 
   const shineStyle: React.CSSProperties = {
@@ -143,7 +157,7 @@ export function FullScreenCardView({
     mixBlendMode: "color-dodge",
     pointerEvents: "none",
     zIndex: 1,
-    transition: "opacity 0.1s linear", 
+    transition: "opacity 0.05s linear", 
   };
   
   const tiltContainerStyle: React.CSSProperties = {
@@ -161,7 +175,7 @@ export function FullScreenCardView({
         </DialogHeader>
 
         <div 
-            className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28" 
+            className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28 h-full w-full"
             style={tiltContainerStyle}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -178,6 +192,7 @@ export function FullScreenCardView({
             </Button>
           )}
 
+          {/* Keying this div ensures it remounts with a fresh ref and state context when currentCard changes, crucial for subsequent cards */}
           <div
             ref={cardRef}
             key={currentCard.id} 
@@ -186,7 +201,7 @@ export function FullScreenCardView({
             data-ai-hint="pokemon card front large interactive"
           >
             <Image
-              key={currentCard.id + '-image'} 
+              key={`${currentCard.id}-image`} 
               src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
               alt={currentCard.name || "Pokémon Card"}
               layout="fill"
@@ -231,3 +246,4 @@ export function FullScreenCardView({
     </Dialog>
   );
 }
+
