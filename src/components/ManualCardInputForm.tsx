@@ -31,9 +31,6 @@ import Image from "next/image";
 const formSchema = z.object({
   selectedSetId: z.string().min(1, "Set is required"),
   selectedCardId: z.string().min(1, "Card is required"),
-  // Variant field removed for manual input form to simplify, 
-  // as determining available variants without full API card data is complex.
-  // User can add variants when selecting from the API browser.
   condition: z.string().min(1, "Condition is required"),
 });
 
@@ -71,7 +68,7 @@ interface ApiPokemonCard {
   };
   tcgplayer?: {
     prices?: {
-      [key: string]: { // e.g., normal, holofoil, reverseHolofoil
+      [key: string]: { 
         market?: number | null;
         low?: number | null;
         mid?: number | null;
@@ -82,21 +79,25 @@ interface ApiPokemonCard {
 }
 
 // Helper to get a default market price (e.g., for 'normal' or 'holofoil')
-const getDefaultMarketPrice = (apiCard: ApiPokemonCard | null): number => {
-  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
+const getDefaultMarketPrice = (apiCard: ApiPokemonCard | null): { value: number, variant?: string } => {
+  if (!apiCard || !apiCard.tcgplayer?.prices) return { value: 0 };
   const prices = apiCard.tcgplayer.prices;
-  if (prices.normal?.market) return prices.normal.market;
-  if (prices.holofoil?.market) return prices.holofoil.market;
-  if (prices.reverseHolofoil?.market) return prices.reverseHolofoil.market;
-  if (prices.firstEditionNormal?.market) return prices.firstEditionNormal.market;
-  if (prices.firstEditionHolofoil?.market) return prices.firstEditionHolofoil.market;
   
-  for (const key in prices) {
-    if (prices[key]?.market) {
-      return prices[key]!.market!;
+  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
+
+  for (const variant of variantPriority) {
+    if (prices[variant]?.market && typeof prices[variant]!.market === 'number') {
+      return { value: prices[variant]!.market!, variant: variant };
     }
   }
-  return 0;
+  
+  // Fallback to the first available market price
+  for (const key in prices) {
+    if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market && typeof prices[key]!.market === 'number') {
+      return { value: prices[key]!.market!, variant: key };
+    }
+  }
+  return { value: 0 };
 };
 
 
@@ -130,7 +131,11 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       setIsLoadingSets(true);
       setErrorSets(null);
       try {
-        const response = await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate");
+        const headers: HeadersInit = {};
+        if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
+          headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
+        }
+        const response = await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate", { headers });
         if (!response.ok) throw new Error(`Failed to fetch sets: ${response.statusText}`);
         const data = await response.json();
         setAvailableSets((data.data as ApiSet[]).sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()));
@@ -158,12 +163,16 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       form.resetField("selectedCardId", { defaultValue: "" });
 
       try {
+        const headers: HeadersInit = {};
+        if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
+          headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
+        }
         let allCards: ApiPokemonCard[] = [];
         let page = 1;
         let hasMore = true;
         
         while(hasMore) {
-          const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${watchedSetId}&page=${page}&pageSize=250&orderBy=number`);
+          const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${watchedSetId}&page=${page}&pageSize=250&orderBy=number`, { headers });
           if (!response.ok) throw new Error(`Failed to fetch cards for set ${watchedSetId}: ${response.statusText}`);
           const data = await response.json();
           allCards = allCards.concat(data.data as ApiPokemonCard[]);
@@ -208,6 +217,8 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       toast({ variant: "destructive", title: "Error", description: "Selected set or card data is missing." });
       return;
     }
+    
+    const { value: cardValue, variant: cardVariant } = getDefaultMarketPrice(selectedCardData);
 
     const newCard: PokemonCard = {
       id: crypto.randomUUID(),
@@ -215,12 +226,10 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       cardNumber: selectedCardData.number,
       name: selectedCardData.name,
       rarity: selectedCardData.rarity || "N/A",
-      // For manual entry, variant is not selected. Could be set to 'normal' or undefined.
-      // If undefined, CardItem will not display a variant badge.
-      variant: selectedCardData.tcgplayer?.prices?.normal ? 'normal' : undefined, 
+      variant: cardVariant, 
       condition: values.condition,
       imageUrl: selectedCardData.images.large,
-      value: getDefaultMarketPrice(selectedCardData), // Use default price for manual entry
+      value: cardValue,
     };
 
     try {
@@ -231,7 +240,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
         item => item.name === newCard.name && 
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
-                item.variant === newCard.variant && // Check variant too
+                item.variant === newCard.variant && 
                 item.condition === newCard.condition
       );
 
@@ -359,7 +368,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                     <p><strong>Set:</strong> {selectedCardData.set.name}</p>
                     <p><strong>Rarity:</strong> {selectedCardData.rarity || "N/A"}</p>
                     {selectedCardData.tcgplayer?.prices && (
-                        <p><strong>Est. Value:</strong> ${getDefaultMarketPrice(selectedCardData).toFixed(2)}</p>
+                        <p><strong>Est. Value:</strong> ${getDefaultMarketPrice(selectedCardData).value.toFixed(2)}</p>
                     )}
                   </div>
                 </div>

@@ -37,7 +37,12 @@ const BrowseSetsPage: NextPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate");
+        const headers: HeadersInit = {};
+        if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
+          headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
+        }
+
+        const response = await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate", { headers });
         if (!response.ok) {
           throw new Error(`Failed to fetch sets: ${response.statusText}`);
         }

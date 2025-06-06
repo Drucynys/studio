@@ -66,7 +66,12 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
     setIsLoading(true);
     setError(null);
     try {
-      const setDetailsResponse = await fetch(`https://api.pokemontcg.io/v2/sets/${setId}`);
+      const headers: HeadersInit = {};
+      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
+        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
+      }
+
+      const setDetailsResponse = await fetch(`https://api.pokemontcg.io/v2/sets/${setId}`, { headers });
       if (!setDetailsResponse.ok) {
         throw new Error(`Failed to fetch set details: ${setDetailsResponse.statusText}`);
       }
@@ -79,7 +84,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       let hasMore = true;
       
       while(hasMore) {
-        const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250&orderBy=number`);
+        const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250&orderBy=number`, { headers });
         if (!response.ok) {
           throw new Error(`Failed to fetch cards for set ${setId}: ${response.statusText}`);
         }
@@ -150,7 +155,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
         item => item.name === newCard.name && 
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
-                item.variant === newCard.variant && // Check variant too
+                item.variant === newCard.variant && 
                 item.condition === newCard.condition
       );
 
