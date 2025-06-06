@@ -34,7 +34,7 @@ export function FullScreenCardView({
 
   const currentCard = currentIndex !== null ? cards[currentIndex] : null;
 
- useEffect(() => {
+  useEffect(() => {
     if (!isOpen) {
       // Reset states only when dialog is closed
       setCardDimensions({ width: 1, height: 1 });
@@ -67,14 +67,13 @@ export function FullScreenCardView({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !isOpen) {
-      if (isHovering) setIsHovering(false); // Ensure hover state is off if conditions not met
+      if (isHovering) setIsHovering(false); 
       return;
     }
 
     const currentWidth = cardRef.current.offsetWidth;
     const currentHeight = cardRef.current.offsetHeight;
 
-    // Update dimensions only if they are valid and different from current
     if (currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT && 
         currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT &&
         (cardDimensions.width !== currentWidth || cardDimensions.height !== currentHeight)) {
@@ -199,7 +198,7 @@ export function FullScreenCardView({
                 alt="" 
                 layout="fill"
                 objectFit="cover" 
-                className="transform scale-110 filter blur-lg opacity-10"
+                className="transform scale-110 filter blur-lg opacity-50"
                 priority={false} 
               />
             </div>
