@@ -154,7 +154,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
     if (!selectedApiCard) return;
 
     const newCard: CollectionPokemonCard = {
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID(), // This ID is for the specific instance in collection.
       name: selectedApiCard.name,
       set: selectedApiCard.set.name, 
       cardNumber: selectedApiCard.number,
@@ -179,17 +179,18 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       );
 
       if (existingCardIndex > -1) {
+         // Add the new quantity to the existing card's quantity
          currentStoredCards[existingCardIndex].quantity += newCard.quantity;
          toast({
           title: "Card Quantity Updated!",
-          description: `Quantity for ${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) increased in your collection.`,
+          description: `Quantity for ${newCard.name} ${newCard.variant ? '('+formatVariantKey(newCard.variant)+')' : ''} (${newCard.condition}) increased in your collection.`,
           className: "bg-secondary text-secondary-foreground"
         });
       } else {
-        currentStoredCards = [newCard, ...currentStoredCards];
+        currentStoredCards = [newCard, ...currentStoredCards]; // Add as new card with specified quantity
          toast({
           title: "Card Added!",
-          description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) from ${newCard.set} has been added.`,
+          description: `${newCard.name} ${newCard.variant ? '('+formatVariantKey(newCard.variant)+')' : ''} (${newCard.condition}) x${newCard.quantity} from ${newCard.set} has been added.`,
           className: "bg-secondary text-secondary-foreground"
         });
       }
@@ -262,6 +263,15 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
       </div>
     );
   }
+
+  // Helper to format variant keys for display
+  const formatVariantKey = (key: string): string => {
+    if (!key) return "N/A";
+    return key
+      .replace(/([A-Z0-9])/g, " $1")
+      .replace(/^./, (str) => str.toUpperCase())
+      .trim();
+  };
 
 
   return (
@@ -378,3 +388,4 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
 };
 
 export default SetDetailsPage;
+

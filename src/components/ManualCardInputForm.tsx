@@ -20,9 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input"; // Added Input
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { PokemonCard } from "@/types";
-import { FilePlus, Loader2 } from "lucide-react"; // Changed icon
+import { FilePlus, Loader2, Layers } from "lucide-react"; // Changed icon, added Layers
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -32,6 +33,7 @@ const formSchema = z.object({
   selectedSetId: z.string().min(1, "Set is required"),
   selectedCardId: z.string().min(1, "Card is required"),
   condition: z.string().min(1, "Condition is required"),
+  quantity: z.coerce.number().min(1, "Quantity must be at least 1"), // Added quantity
 });
 
 type ManualCardInputFormProps = {
@@ -120,6 +122,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       selectedSetId: "",
       selectedCardId: "",
       condition: "",
+      quantity: 1, // Default quantity
     },
   });
 
@@ -221,7 +224,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     const { value: cardValue, variant: cardVariant } = getDefaultMarketPrice(selectedCardData);
 
     const newCard: PokemonCard = {
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID(), // This ID is temporary for local additions, will be different in MyCollectionPage
       set: selectedSet.name,
       cardNumber: selectedCardData.number,
       name: selectedCardData.name,
@@ -230,29 +233,29 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       condition: values.condition,
       imageUrl: selectedCardData.images.large,
       value: cardValue,
-      quantity: 1, // Default quantity to 1
+      quantity: values.quantity, // Use quantity from form
     };
     
-    onAddCard(newCard); // This will be handled by the new /add-card page's logic
+    onAddCard(newCard); 
 
-    form.reset();
+    // Reset specific fields, keep set selected for convenience
+    form.reset({
+        selectedSetId: values.selectedSetId, // Keep set selected
+        selectedCardId: "",
+        condition: "",
+        quantity: 1, // Reset quantity to 1
+    });
     setSelectedCardData(null); 
-    // Don't reset cardsInSelectedSet or selectedSetId here, so user can add multiple cards from same set
-    // form.setValue("selectedSetId", ""); 
-    // setCardsInSelectedSet([]); 
-    form.setValue("selectedCardId", "");
-    form.setValue("condition", "");
-    
   }
 
   return (
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline text-2xl flex items-center gap-2">
-          <FilePlus className="h-6 w-6 text-primary" /> {/* Changed icon */}
+          <FilePlus className="h-6 w-6 text-primary" />
           Manual Card Entry
         </CardTitle>
-        <CardDescription>Select Set, Card, and Condition.</CardDescription>
+        <CardDescription>Select Set, Card, Condition, and Quantity.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -367,10 +370,30 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="quantity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-1"><Layers className="h-4 w-4 text-purple-500"/>Quantity</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      min="1" 
+                      {...field} 
+                      disabled={!selectedCardData}
+                      onChange={event => field.onChange(parseInt(event.target.value, 10) || 1)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <Button 
               type="submit" 
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" // Changed style
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
               disabled={form.formState.isSubmitting || isLoadingSets || isLoadingCards || !form.formState.isValid}
             >
               {(form.formState.isSubmitting || isLoadingSets || isLoadingCards) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -382,3 +405,4 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     </Card>
   );
 }
+

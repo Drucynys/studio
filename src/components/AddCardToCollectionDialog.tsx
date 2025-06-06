@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input"; // Added Input
 import type { ApiPokemonCard as PokemonTcgApiCard } from "@/app/sets/[setId]/page";
-import { Tag, Gem, DollarSign } from "lucide-react";
+import { Tag, Gem, DollarSign, Layers } from "lucide-react"; // Added Layers
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +51,7 @@ type AddCardToCollectionDialogProps = {
   initialCardImageUrl?: string | null;
   availableConditions: string[];
   pokemonTcgApiCard: PokemonTcgApiCard | null;
-  onAddCard: (condition: string, value: number, variant?: string, quantity?: number) => void; // Added quantity
+  onAddCard: (condition: string, value: number, variant?: string, quantity: number) => void; // Updated quantity type
 };
 
 export function AddCardToCollectionDialog({
@@ -63,6 +64,7 @@ export function AddCardToCollectionDialog({
   onAddCard,
 }: AddCardToCollectionDialogProps) {
   const [selectedCondition, setSelectedCondition] = useState<string>("");
+  const [quantityInput, setQuantityInput] = useState<number>(1); // Added quantity state
   const [finalDisplayImageUrl, setFinalDisplayImageUrl] = useState<string>("https://placehold.co/200x280.png");
   const [displayPrices, setDisplayPrices] = useState<DisplayPriceInfo[]>([]);
   const [cardRarity, setCardRarity] = useState<string | null>(null);
@@ -74,6 +76,7 @@ export function AddCardToCollectionDialog({
   useEffect(() => {
     if (!isOpen) {
       setSelectedCondition("");
+      setQuantityInput(1); // Reset quantity
       setDisplayPrices([]);
       setCardRarity(null);
       setFinalDisplayImageUrl("https://placehold.co/200x280.png");
@@ -133,6 +136,7 @@ export function AddCardToCollectionDialog({
     
     setFinalDisplayImageUrl(imageUrlToSet);
     setDisplayPrices(newPrices);
+    setQuantityInput(1); // Ensure quantity is reset when dialog opens or card changes
 
   }, [isOpen, pokemonTcgApiCard, initialCardImageUrl]);
 
@@ -144,7 +148,7 @@ export function AddCardToCollectionDialog({
 
   const handleSubmit = () => {
     if (selectedCondition && (currentAvailableVariants.length === 0 || selectedVariant)) {
-       onAddCard(selectedCondition, marketPriceForSelectedVariant, currentAvailableVariants.length > 0 ? selectedVariant : undefined, 1); // Add quantity 1
+       onAddCard(selectedCondition, marketPriceForSelectedVariant, currentAvailableVariants.length > 0 ? selectedVariant : undefined, quantityInput); // Pass quantityInput
       onClose();
     }
   };
@@ -153,7 +157,7 @@ export function AddCardToCollectionDialog({
     setFinalDisplayImageUrl("https://placehold.co/200x280.png/CCCCCC/333333?text=Image+Error");
   };
   
-  const isAddButtonDisabled = !selectedCondition || (currentAvailableVariants.length > 0 && !selectedVariant);
+  const isAddButtonDisabled = !selectedCondition || (currentAvailableVariants.length > 0 && !selectedVariant) || quantityInput < 1;
   const formattedSelectedVariantName = useMemo(() => selectedVariant ? formatVariantKey(selectedVariant) : undefined, [selectedVariant]);
 
   return (
@@ -223,6 +227,21 @@ export function AddCardToCollectionDialog({
                   </Select>
                 </div>
 
+                 <div className="grid grid-cols-4 items-center gap-x-4 gap-y-2">
+                  <Label htmlFor="quantity" className="text-right col-span-1 flex items-center gap-1">
+                    <Layers className="h-3.5 w-3.5 text-purple-500"/>Quantity
+                  </Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    value={quantityInput}
+                    onChange={(e) => setQuantityInput(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    min="1"
+                    className="col-span-3"
+                  />
+                </div>
+
+
                 {selectedVariant && marketPriceForSelectedVariant > 0 && (
                     <p className="text-sm text-center text-foreground flex items-center justify-center gap-1">
                         <DollarSign className="h-4 w-4 text-green-500"/> Selected Value: <strong>${marketPriceForSelectedVariant.toFixed(2)}</strong>
@@ -282,3 +301,4 @@ export function AddCardToCollectionDialog({
     </Dialog>
   );
 }
+
