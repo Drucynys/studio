@@ -17,8 +17,8 @@ interface FullScreenCardViewProps {
   onNavigate: (newIndex: number) => void;
 }
 
-const MAX_ROTATION = 10; // Max rotation in degrees
-const MIN_DIMENSION_FOR_TILT_EFFECT = 50; // Minimum width/height in pixels for the effect to apply
+const MAX_ROTATION = 10; 
+const MIN_DIMENSION_FOR_TILT_EFFECT = 50; 
 
 export function FullScreenCardView({
   isOpen,
@@ -30,21 +30,18 @@ export function FullScreenCardView({
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  // Initialize with 1,1 to ensure MIN_DIMENSION_FOR_TILT_EFFECT guard works before first valid measurement
   const [cardDimensions, setCardDimensions] = useState({ width: 1, height: 1 });
 
   const currentCard = currentIndex !== null ? cards[currentIndex] : null;
 
-  // Effect to reset states when the dialog is closed
   useEffect(() => {
     if (!isOpen) {
-      setCardDimensions({ width: 1, height: 1 }); // Reset to initial non-effect-triggering values
+      setCardDimensions({ width: 1, height: 1 }); 
       setIsHovering(false);
       setMousePosition({ x: 0, y: 0 });
     }
-  }, [isOpen]); // Only depend on isOpen for this reset logic
+  }, [isOpen]); 
 
-  // Keyboard navigation effect
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isOpen || currentIndex === null) return;
@@ -76,9 +73,6 @@ export function FullScreenCardView({
     const currentWidth = cardRef.current.offsetWidth;
     const currentHeight = cardRef.current.offsetHeight;
 
-    // Update dimensions if they are different from stored,
-    // OR if stored dimensions are still the initial/invalid ones.
-    // Only commit the update if the newly measured dimensions are valid.
     if (cardDimensions.width !== currentWidth || 
         cardDimensions.height !== currentHeight || 
         cardDimensions.width <= MIN_DIMENSION_FOR_TILT_EFFECT ||
@@ -122,7 +116,7 @@ export function FullScreenCardView({
 
   if (
     isHovering &&
-    cardRef.current && // Ensure ref is current for calculations
+    cardRef.current && 
     cardDimensions.width > MIN_DIMENSION_FOR_TILT_EFFECT &&
     cardDimensions.height > MIN_DIMENSION_FOR_TILT_EFFECT
   ) {
@@ -156,8 +150,9 @@ export function FullScreenCardView({
     opacity: shineOpacity,
     mixBlendMode: "color-dodge",
     pointerEvents: "none",
-    zIndex: 1,
+    zIndex: 10, // Ensure shine is on top of the main card image
     transition: "opacity 0.05s linear", 
+    borderRadius: 'inherit', // Match parent's border radius
   };
   
   const tiltContainerStyle: React.CSSProperties = {
@@ -167,11 +162,10 @@ export function FullScreenCardView({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-none rounded-none sm:rounded-none">
-        <DialogHeader className="p-2 flex-row items-center justify-between border-b border-border/20 absolute top-0 left-0 right-0 z-20 bg-transparent">
+        <DialogHeader className="p-2 flex-row items-center justify-end border-b border-border/20 absolute top-0 left-0 right-0 z-20 bg-transparent">
            <DialogTitle className="sr-only">
              Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}
           </DialogTitle>
-           {/* Default DialogContent close button (X) is part of DialogContent and will be on the right */}
         </DialogHeader>
 
         <div 
@@ -192,7 +186,6 @@ export function FullScreenCardView({
             </Button>
           )}
 
-          {/* Keying this div ensures it remounts with a fresh ref and state context when currentCard changes, crucial for subsequent cards */}
           <div
             ref={cardRef}
             key={currentCard.id} 
@@ -200,16 +193,39 @@ export function FullScreenCardView({
             className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl shadow-2xl overflow-hidden"
             data-ai-hint="pokemon card front large interactive"
           >
-            <Image
-              key={`${currentCard.id}-image`} 
-              src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
-              alt={currentCard.name || "Pokémon Card"}
-              layout="fill"
-              objectFit="contain"
-              priority 
-              className="relative z-0" 
-            />
-            <div style={shineStyle} className="rounded-xl" />
+            {/* Ambilight Background Image Layer */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              overflow: 'hidden',
+              borderRadius: 'inherit', 
+              transform: 'translateZ(-50px) scale(1.15)', // Push back and scale up
+            }}>
+              <Image
+                key={`${currentCard.id}-ambilight`}
+                src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
+                alt="" 
+                layout="fill"
+                objectFit="cover" 
+                className="opacity-60 filter blur-2xl brightness-75" 
+                priority={false} // Ambilight doesn't need to be high priority
+              />
+            </div>
+            
+            {/* Main Card Image Layer */}
+            <div style={{ position: 'relative', width: '100%', height: '100%', zIndex: 1 }}>
+              <Image
+                key={`${currentCard.id}-image`} 
+                src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
+                alt={currentCard.name || "Pokémon Card"}
+                layout="fill"
+                objectFit="contain"
+                priority 
+              />
+            </div>
+
+            {/* Shine Overlay Layer */}
+            <div style={shineStyle} />
           </div>
 
           {currentIndex !== null && currentIndex < cards.length - 1 && (
@@ -225,7 +241,7 @@ export function FullScreenCardView({
           )}
         </div>
         
-        <div className="p-4 border-t border-border/20 text-center flex flex-col items-center absolute bottom-0 left-0 right-0 z-20 bg-background/30 backdrop-blur-sm">
+        <div className="p-4 border-t border-border/20 text-center flex flex-col items-center absolute bottom-0 left-0 right-0 z-20 bg-background/50 backdrop-blur-sm">
            <p className="text-xl font-semibold text-foreground mb-1">
             {currentCard.name || `Card #${currentCard.cardNumber}`}
           </p>
@@ -246,4 +262,3 @@ export function FullScreenCardView({
     </Dialog>
   );
 }
-
