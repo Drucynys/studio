@@ -134,20 +134,29 @@ export default function MyCollectionPage() {
 
   const uniqueRarities = useMemo(() => {
     if (!isClient) return [];
-    const rarities = new Set(allCards.map(card => card.rarity).filter(r => r && r.trim() !== ""));
-    return Array.from(rarities).sort();
+    const mappedValues = allCards.map(card => card.rarity);
+    const stringValues = mappedValues.filter(r => typeof r === 'string');
+    const nonEmptyValues = stringValues.filter(rStr => rStr.trim() !== '');
+    const finalSet = new Set(nonEmptyValues);
+    return Array.from(finalSet).sort();
   }, [allCards, isClient]);
 
   const uniqueSets = useMemo(() => {
     if (!isClient) return [];
-    const sets = new Set(allCards.map(card => card.set).filter(s => s && s.trim() !== ""));
-    return Array.from(sets).sort();
+    const mappedValues = allCards.map(card => card.set);
+    const stringValues = mappedValues.filter(s => typeof s === 'string');
+    const nonEmptyValues = stringValues.filter(sStr => sStr.trim() !== '');
+    const finalSet = new Set(nonEmptyValues);
+    return Array.from(finalSet).sort();
   }, [allCards, isClient]);
 
   const uniqueConditions = useMemo(() => {
     if (!isClient) return [];
-    const conditions = new Set(allCards.map(card => card.condition).filter(c => c && c.trim() !== ""));
-    return Array.from(conditions).sort();
+    const mappedValues = allCards.map(card => card.condition);
+    const stringValues = mappedValues.filter(c => typeof c === 'string');
+    const nonEmptyValues = stringValues.filter(cStr => cStr.trim() !== '');
+    const finalSet = new Set(nonEmptyValues);
+    return Array.from(finalSet).sort();
   }, [allCards, isClient]);
 
 
@@ -356,7 +365,6 @@ export default function MyCollectionPage() {
     </div>
   );
 }
-
     
-
+    
     
