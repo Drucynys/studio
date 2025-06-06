@@ -134,19 +134,19 @@ export default function MyCollectionPage() {
 
   const uniqueRarities = useMemo(() => {
     if (!isClient) return [];
-    const rarities = new Set(allCards.map(card => card.rarity));
+    const rarities = new Set(allCards.map(card => card.rarity).filter(r => r && r.trim() !== ""));
     return Array.from(rarities).sort();
   }, [allCards, isClient]);
 
   const uniqueSets = useMemo(() => {
     if (!isClient) return [];
-    const sets = new Set(allCards.map(card => card.set));
+    const sets = new Set(allCards.map(card => card.set).filter(s => s && s.trim() !== ""));
     return Array.from(sets).sort();
   }, [allCards, isClient]);
 
   const uniqueConditions = useMemo(() => {
     if (!isClient) return [];
-    const conditions = new Set(allCards.map(card => card.condition));
+    const conditions = new Set(allCards.map(card => card.condition).filter(c => c && c.trim() !== ""));
     return Array.from(conditions).sort();
   }, [allCards, isClient]);
 
