@@ -26,10 +26,17 @@ export async function GET() {
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch Cardmarket price guide: ${response.statusText} (status: ${response.status})`);
+      throw new Error(`Failed to fetch Cardmarket price guide from S3: ${response.statusText} (status: ${response.status})`);
     }
 
-    const rawData: any[] = await response.json();
+    const responseData = await response.json();
+
+    if (!Array.isArray(responseData)) {
+      console.error("Cardmarket price guide data from S3 is not an array. Received:", JSON.stringify(responseData, null, 2));
+      throw new Error('Cardmarket price guide data format is not an array. The fetched data from S3 was not a JSON array as expected.');
+    }
+    
+    const rawData: any[] = responseData;
     
     // Transform raw data to match our CardmarketProduct structure
     // The actual JSON has keys like "Product ID", "Product", "Expansion", "Low Price", etc.
@@ -55,7 +62,7 @@ export async function GET() {
 
     return NextResponse.json(cachedData);
   } catch (error) {
-    console.error("Error fetching or processing Cardmarket price guide:", error);
+    console.error("Error in /api/cardmarket-prices route:", error);
     // Optionally, return stale cache if available during an error
     if (cachedData) {
       // Log that stale data is being served
@@ -63,7 +70,7 @@ export async function GET() {
       return NextResponse.json(cachedData);
     }
     return NextResponse.json(
-      { message: 'Error fetching Cardmarket price guide', error: (error instanceof Error ? error.message : String(error)) },
+      { message: 'Error fetching or processing Cardmarket price guide', error: (error instanceof Error ? error.message : String(error)) },
       { status: 500 }
     );
   }
