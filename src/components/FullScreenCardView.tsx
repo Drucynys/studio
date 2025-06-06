@@ -88,6 +88,7 @@ export function FullScreenCardView({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-4xl w-[90vw] h-[95vh] p-0 flex flex-col bg-transparent backdrop-blur-md border-border/30 rounded-lg">
         <DialogHeader className="p-2 flex-row items-center justify-between border-b border-border/20">
+           {/* Accessible DialogTitle (visually hidden) */}
           <DialogTitle className="sr-only">
             Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}
           </DialogTitle>
@@ -100,7 +101,8 @@ export function FullScreenCardView({
           </DialogClose>
         </DialogHeader>
 
-        <div className="flex-grow flex items-center justify-center p-4 relative overflow-hidden">
+        {/* This div centers the card image and takes up available space */}
+        <div className="flex-grow flex items-center justify-center relative overflow-hidden">
           {/* Navigation Buttons */}
           {currentIndex !== null && currentIndex > 0 && (
             <Button
@@ -114,23 +116,26 @@ export function FullScreenCardView({
             </Button>
           )}
 
+          {/* Tilt Container - ensures the card within it is centered */}
           <div 
-            className="tilt-container" 
+            className="tilt-container h-full w-full flex items-center justify-center" 
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             style={{ perspective: "2000px" }} 
           >
+            {/* Card Image Container - this is what gets tilted and scaled */}
             <div
               ref={cardRef}
               style={{
-                transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(1.15)`, // Increased scale
+                transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(1.2)`, 
                 transition: 'transform 0.05s linear', 
               }}
-              className="relative aspect-[2.5/3.5] w-auto h-full max-h-[95%] rounded-xl shadow-2xl overflow-hidden" // Max height increased
+              className="relative aspect-[2.5/3.5] w-auto h-full rounded-xl shadow-2xl overflow-hidden"
               data-ai-hint="pokemon card front large interactive"
             >
               <Image
-                src={currentCard.imageUrl || "https://placehold.co/500x700.png"} // Larger placeholder
+                key={currentCard.imageUrl} 
+                src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
                 alt={currentCard.name || "Pokémon Card"}
                 layout="fill"
                 objectFit="contain"
