@@ -22,7 +22,6 @@ export async function GET() {
   try {
     const response = await fetch(CARDMARKET_PRICE_GUIDE_URL, {
       // next: { revalidate: CACHE_DURATION_MS / 1000 } // Revalidate every hour
-      // Using simple time-based cache for broader compatibility, revalidate can be used too.
     });
 
     if (!response.ok) {
@@ -43,8 +42,16 @@ export async function GET() {
         actualArrayData = responseData.products;
       } else if (Array.isArray(responseData.items)) {
         actualArrayData = responseData.items;
+      } else {
+        // Last resort: try to find any top-level property that is an array
+        for (const key in responseData) {
+          if (Object.prototype.hasOwnProperty.call(responseData, key) && Array.isArray(responseData[key])) {
+            console.warn(`Cardmarket API: Found array in unexpected property '${key}'. Using this array.`);
+            actualArrayData = responseData[key];
+            break; // Use the first one found
+          }
+        }
       }
-      // Add other potential property names here if needed based on observed S3 responses
     }
 
     if (!actualArrayData) {
@@ -55,23 +62,36 @@ export async function GET() {
     const rawData: any[] = actualArrayData;
     
     // Transform raw data to match our CardmarketProduct structure
-    // The actual JSON has keys like "Product ID", "Product", "Expansion", "Low Price", etc.
-    const processedData: CardmarketPriceGuide = rawData.map(item => ({
-      idProduct: item["Product ID"],
-      Name: item["Product"],
-      Expansion: item["Expansion"],
-      Number: item["Number"], // Assuming 'Number' key exists
-      Rarity: item["Rarity"], // Assuming 'Rarity' key exists
-      "Low Price": item["Low Price"],
-      "Trend Price": item["Trend Price"],
-      "Average Sell Price": item["Average Sell Price"],
-      "7-days Average Price": item["7-days Average Price"],
-      "30-days Average Price": item["30-days Average Price"],
-      "Trend Price Foil": item["Trend Price Foil"],
-      "Average Sell Price Foil": item["Average Sell Price Foil"],
-      "7-days Average Price Foil": item["7-days Average Price Foil"],
-      "30-days Average Price Foil": item["30-days Average Price Foil"],
-    })).filter(p => p.Name && p.Expansion); // Ensure essential fields are present
+    const processedData: CardmarketPriceGuide = rawData.map(item => {
+      if (typeof item !== 'object' || item === null) {
+        console.warn("Cardmarket API: Skipping non-object item in price data:", item);
+        return null; // Will be filtered out later
+      }
+      return {
+        idProduct: item["Product ID"],
+        Name: item["Product"],
+        Expansion: item["Expansion"],
+        Number: item["Number"], 
+        Rarity: item["Rarity"],
+        "Low Price": item["Low Price"],
+        "Trend Price": item["Trend Price"],
+        "Average Sell Price": item["Average Sell Price"],
+        "7-days Average Price": item["7-days Average Price"],
+        "30-days Average Price": item["30-days Average Price"],
+        "Trend Price Foil": item["Trend Price Foil"],
+        "Average Sell Price Foil": item["Average Sell Price Foil"],
+        "7-days Average Price Foil": item["7-days Average Price Foil"],
+        "30-days Average Price Foil": item["30-days Average Price Foil"],
+      };
+    }).filter(p => {
+        if (!p) return false; // Filter out nulls from skipped non-object items
+        if (!(p.Name && p.Expansion)) {
+            // console.warn("Cardmarket API: Skipping product due to missing Name or Expansion:", p);
+            return false;
+        }
+        return true;
+    });
+
 
     cachedData = processedData;
     lastFetchTimestamp = now;
@@ -79,9 +99,7 @@ export async function GET() {
     return NextResponse.json(cachedData);
   } catch (error) {
     console.error("Error in /api/cardmarket-prices route:", error);
-    // Optionally, return stale cache if available during an error
     if (cachedData) {
-      // Log that stale data is being served
       console.warn("Serving stale Cardmarket price guide due to fetch error.");
       return NextResponse.json(cachedData);
     }
