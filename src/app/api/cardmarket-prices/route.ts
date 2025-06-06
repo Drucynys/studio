@@ -30,13 +30,29 @@ export async function GET() {
     }
 
     const responseData = await response.json();
+    
+    let actualArrayData: any[] | null = null;
 
-    if (!Array.isArray(responseData)) {
-      console.error("Cardmarket price guide data from S3 is not an array. Received:", JSON.stringify(responseData, null, 2));
-      throw new Error('Cardmarket price guide data format is not an array. The fetched data from S3 was not a JSON array as expected.');
+    if (Array.isArray(responseData)) {
+      actualArrayData = responseData;
+    } else if (typeof responseData === 'object' && responseData !== null) {
+      // Check for common wrapper object patterns
+      if (Array.isArray(responseData.data)) {
+        actualArrayData = responseData.data;
+      } else if (Array.isArray(responseData.products)) {
+        actualArrayData = responseData.products;
+      } else if (Array.isArray(responseData.items)) {
+        actualArrayData = responseData.items;
+      }
+      // Add other potential property names here if needed based on observed S3 responses
+    }
+
+    if (!actualArrayData) {
+      console.error("Cardmarket price guide data from S3 is not in a recognized array format. Received:", JSON.stringify(responseData, null, 2));
+      throw new Error('Cardmarket price guide data format is not an array or a recognized wrapped array. The fetched data from S3 was not in the expected format.');
     }
     
-    const rawData: any[] = responseData;
+    const rawData: any[] = actualArrayData;
     
     // Transform raw data to match our CardmarketProduct structure
     // The actual JSON has keys like "Product ID", "Product", "Expansion", "Low Price", etc.
