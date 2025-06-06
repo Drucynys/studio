@@ -4,7 +4,7 @@
 import type { PokemonCard } from "@/types";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogClose, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -87,17 +87,12 @@ export function FullScreenCardView({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-border/30 rounded-none sm:rounded-none">
-        <DialogHeader className="p-2 flex-row items-center justify-between border-b border-border/20 absolute top-0 left-0 right-0 z-20 bg-transparent">
+        <DialogHeader className="p-2 flex-row items-center justify-end border-b border-border/20 absolute top-0 left-0 right-0 z-20 bg-transparent">
+           {/* The DialogTitle is required for accessibility but hidden visually */}
           <DialogTitle className="sr-only">
             Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}
           </DialogTitle>
-          <div className="flex-grow"></div>
-          <DialogClose asChild>
-            <Button variant="ghost" size="icon" onClick={onClose} className="text-muted-foreground hover:text-foreground">
-              <X className="h-6 w-6" />
-              <span className="sr-only">Close</span>
-            </Button>
-          </DialogClose>
+          {/* The default DialogContent close button will be used. No need for an explicit DialogClose here. */}
         </DialogHeader>
 
         <div className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28"> {/* Added pt for header and pb for footer */}
@@ -122,16 +117,14 @@ export function FullScreenCardView({
             <div
               ref={cardRef}
               style={{
-                transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(1.0)`, // Reduced scale
+                transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(1.0)`, 
                 transition: 'transform 0.05s linear', 
               }}
-              // Adjust height here for card size, e.g., h-[70vh], h-[80%], etc.
-              // The aspect-[2.5/3.5] will maintain card proportions based on height.
               className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl shadow-2xl overflow-hidden" 
               data-ai-hint="pokemon card front large interactive"
             >
               <Image
-                key={currentCard.id + (currentCard.imageUrl || '')} // More robust key
+                key={currentCard.id + (currentCard.imageUrl || '')} 
                 src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
                 alt={currentCard.name || "Pokémon Card"}
                 layout="fill"
