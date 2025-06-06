@@ -292,7 +292,7 @@ export default function MyCollectionPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Rarities</SelectItem>
-                {uniqueRarities.map(rarity => <SelectItem key={rarity} value={rarity}>{rarity}</SelectItem>)}
+                {uniqueRarities.filter(rarity => rarity.trim() !== "").map(rarity => <SelectItem key={rarity} value={rarity}>{rarity}</SelectItem>)}
               </SelectContent>
             </Select>
 
@@ -302,7 +302,7 @@ export default function MyCollectionPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Sets</SelectItem>
-                {uniqueSets.map(setName => <SelectItem key={setName} value={setName}>{setName}</SelectItem>)}
+                {uniqueSets.filter(setName => setName.trim() !== "").map(setName => <SelectItem key={setName} value={setName}>{setName}</SelectItem>)}
               </SelectContent>
             </Select>
             
@@ -312,7 +312,7 @@ export default function MyCollectionPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Conditions</SelectItem>
-                {uniqueConditions.map(condition => <SelectItem key={condition} value={condition}>{condition}</SelectItem>)}
+                {uniqueConditions.filter(condition => condition.trim() !== "").map(condition => <SelectItem key={condition} value={condition}>{condition}</SelectItem>)}
               </SelectContent>
             </Select>
 
@@ -374,3 +374,4 @@ export default function MyCollectionPage() {
     
     
     
+
