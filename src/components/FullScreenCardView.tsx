@@ -86,13 +86,12 @@ export function FullScreenCardView({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-4xl w-[90vw] h-[95vh] p-0 flex flex-col bg-transparent backdrop-blur-md border-border/30 rounded-lg">
-        <DialogHeader className="p-2 flex-row items-center justify-between border-b border-border/20">
-           {/* Accessible DialogTitle (visually hidden) */}
+      <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-border/30 rounded-none sm:rounded-none">
+        <DialogHeader className="p-2 flex-row items-center justify-between border-b border-border/20 absolute top-0 left-0 right-0 z-20 bg-transparent">
           <DialogTitle className="sr-only">
             Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}
           </DialogTitle>
-          <div className="flex-grow"></div> {/* Spacer to push close button to the right */}
+          <div className="flex-grow"></div>
           <DialogClose asChild>
             <Button variant="ghost" size="icon" onClick={onClose} className="text-muted-foreground hover:text-foreground">
               <X className="h-6 w-6" />
@@ -101,14 +100,12 @@ export function FullScreenCardView({
           </DialogClose>
         </DialogHeader>
 
-        {/* This div centers the card image and takes up available space */}
-        <div className="flex-grow flex items-center justify-center relative overflow-hidden">
-          {/* Navigation Buttons */}
+        <div className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28"> {/* Added pt for header and pb for footer */}
           {currentIndex !== null && currentIndex > 0 && (
             <Button
               variant="ghost" 
               size="icon"
-              className="absolute left-1 md:left-2 top-1/2 -translate-y-1/2 z-10 bg-black/10 hover:bg-black/20 text-white rounded-full h-10 w-10 md:h-12 md:w-12"
+              className="absolute left-1 md:left-4 top-1/2 -translate-y-1/2 z-10 bg-black/10 hover:bg-black/20 text-white rounded-full h-10 w-10 md:h-12 md:w-12"
               onClick={() => onNavigate(currentIndex - 1)}
             >
               <ChevronLeft className="h-7 w-7 md:h-8 md:w-8" />
@@ -116,25 +113,25 @@ export function FullScreenCardView({
             </Button>
           )}
 
-          {/* Tilt Container - ensures the card within it is centered */}
           <div 
             className="tilt-container h-full w-full flex items-center justify-center" 
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             style={{ perspective: "2000px" }} 
           >
-            {/* Card Image Container - this is what gets tilted and scaled */}
             <div
               ref={cardRef}
               style={{
-                transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(1.2)`, 
+                transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(1.0)`, // Reduced scale
                 transition: 'transform 0.05s linear', 
               }}
-              className="relative aspect-[2.5/3.5] w-auto h-full rounded-xl shadow-2xl overflow-hidden"
+              // Adjust height here for card size, e.g., h-[70vh], h-[80%], etc.
+              // The aspect-[2.5/3.5] will maintain card proportions based on height.
+              className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl shadow-2xl overflow-hidden" 
               data-ai-hint="pokemon card front large interactive"
             >
               <Image
-                key={currentCard.imageUrl} 
+                key={currentCard.id + (currentCard.imageUrl || '')} // More robust key
                 src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
                 alt={currentCard.name || "Pokémon Card"}
                 layout="fill"
@@ -148,7 +145,7 @@ export function FullScreenCardView({
             <Button
               variant="ghost" 
               size="icon"
-              className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 z-10 bg-black/10 hover:bg-black/20 text-white rounded-full h-10 w-10 md:h-12 md:w-12"
+              className="absolute right-1 md:right-4 top-1/2 -translate-y-1/2 z-10 bg-black/10 hover:bg-black/20 text-white rounded-full h-10 w-10 md:h-12 md:w-12"
               onClick={() => onNavigate(currentIndex + 1)}
             >
               <ChevronRight className="h-7 w-7 md:h-8 md:w-8" />
@@ -157,7 +154,7 @@ export function FullScreenCardView({
           )}
         </div>
         
-        <div className="p-4 border-t border-border/20 text-center flex flex-col items-center">
+        <div className="p-4 border-t border-border/20 text-center flex flex-col items-center absolute bottom-0 left-0 right-0 z-20 bg-transparent">
            <p className="text-xl font-semibold text-foreground mb-1">
             {currentCard.name || `Card #${currentCard.cardNumber}`}
           </p>
