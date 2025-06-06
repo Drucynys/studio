@@ -4,7 +4,7 @@
 import type { PokemonCard } from "@/types";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogClose, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -87,8 +87,11 @@ export function FullScreenCardView({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-4xl w-[90vw] h-[95vh] p-0 flex flex-col bg-transparent backdrop-blur-md border-border/30 rounded-lg">
-        <DialogHeader className="p-2 flex-row items-center justify-end border-b border-border/20">
-          {/* DialogTitle removed from here */}
+        <DialogHeader className="p-2 flex-row items-center justify-between border-b border-border/20">
+          <DialogTitle className="sr-only">
+            Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}
+          </DialogTitle>
+          <div className="flex-grow"></div> {/* Spacer to push close button to the right */}
           <DialogClose asChild>
             <Button variant="ghost" size="icon" onClick={onClose} className="text-muted-foreground hover:text-foreground">
               <X className="h-6 w-6" />
@@ -101,12 +104,13 @@ export function FullScreenCardView({
           {/* Navigation Buttons */}
           {currentIndex !== null && currentIndex > 0 && (
             <Button
-              variant="ghost" // Changed to ghost for less visual clutter
+              variant="ghost" 
               size="icon"
               className="absolute left-1 md:left-2 top-1/2 -translate-y-1/2 z-10 bg-black/10 hover:bg-black/20 text-white rounded-full h-10 w-10 md:h-12 md:w-12"
               onClick={() => onNavigate(currentIndex - 1)}
             >
               <ChevronLeft className="h-7 w-7 md:h-8 md:w-8" />
+               <span className="sr-only">Previous Card</span>
             </Button>
           )}
 
@@ -114,19 +118,19 @@ export function FullScreenCardView({
             className="tilt-container" 
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
-            style={{ perspective: "2000px" }} // Added perspective here for better 3D effect
+            style={{ perspective: "2000px" }} 
           >
             <div
               ref={cardRef}
               style={{
-                transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(1.05)`, // Added scale
+                transform: `rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale(1.15)`, // Increased scale
                 transition: 'transform 0.05s linear', 
               }}
-              className="relative aspect-[2.5/3.5] w-auto h-full max-h-[90%] rounded-xl shadow-2xl overflow-hidden" // Adjusted size and rounding
+              className="relative aspect-[2.5/3.5] w-auto h-full max-h-[95%] rounded-xl shadow-2xl overflow-hidden" // Max height increased
               data-ai-hint="pokemon card front large interactive"
             >
               <Image
-                src={currentCard.imageUrl || "https://placehold.co/400x560.png"} // Slightly larger placeholder
+                src={currentCard.imageUrl || "https://placehold.co/500x700.png"} // Larger placeholder
                 alt={currentCard.name || "Pokémon Card"}
                 layout="fill"
                 objectFit="contain"
@@ -137,12 +141,13 @@ export function FullScreenCardView({
 
           {currentIndex !== null && currentIndex < cards.length - 1 && (
             <Button
-              variant="ghost" // Changed to ghost
+              variant="ghost" 
               size="icon"
               className="absolute right-1 md:right-2 top-1/2 -translate-y-1/2 z-10 bg-black/10 hover:bg-black/20 text-white rounded-full h-10 w-10 md:h-12 md:w-12"
               onClick={() => onNavigate(currentIndex + 1)}
             >
               <ChevronRight className="h-7 w-7 md:h-8 md:w-8" />
+              <span className="sr-only">Next Card</span>
             </Button>
           )}
         </div>
