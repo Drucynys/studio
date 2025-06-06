@@ -53,7 +53,24 @@ export default function MyCollectionPage() {
       try {
         const response = await fetch('/api/cardmarket-prices');
         if (!response.ok) {
-          throw new Error('Failed to fetch Cardmarket prices');
+          let errorMessage = 'Failed to fetch Cardmarket prices';
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.message) {
+              errorMessage = `API Error: ${errorData.message}`;
+              if (errorData.error) {
+                 errorMessage += ` Details: ${errorData.error}`;
+              }
+            } else if (response.statusText) {
+              errorMessage = `Failed to fetch Cardmarket prices: ${response.statusText} (status: ${response.status})`;
+            }
+          } catch (e) {
+            // Failed to parse JSON from error response, use statusText from original response
+            if (response.statusText) {
+               errorMessage = `Failed to fetch Cardmarket prices: ${response.statusText} (status: ${response.status})`;
+            }
+          }
+          throw new Error(errorMessage);
         }
         const data: CardmarketPriceGuide = await response.json();
         setCardmarketPriceGuide(data);
@@ -62,7 +79,7 @@ export default function MyCollectionPage() {
         toast({
           variant: "destructive",
           title: "Cardmarket Price Error",
-          description: "Could not load Cardmarket price data.",
+          description: error instanceof Error ? error.message : "Could not load Cardmarket price data.",
         });
       } finally {
         setIsLoadingCmPrices(false);
