@@ -36,20 +36,18 @@ export function FullScreenCardView({
 
   useEffect(() => {
     if (isOpen && cardRef.current) {
+      // Set dimensions when the dialog is open and the ref is available
       setCardDimensions({
         width: cardRef.current.offsetWidth,
         height: cardRef.current.offsetHeight,
       });
-      // Reset hover state ensures that if mouse is already over the card
-      // when it appears/changes, the hover effect re-initializes cleanly
-      // *after* dimensions are likely updated from this effect's pass.
-      setIsHovering(false); 
+      // DO NOT reset isHovering here when opening. Let mouse events handle it.
     } else if (!isOpen) {
-        // Reset dimensions and hover state when closed
-        setCardDimensions({ width: 1, height: 1 });
-        setIsHovering(false);
+      // Reset dimensions and hover state only when the dialog is explicitly closed
+      setCardDimensions({ width: 1, height: 1 });
+      setIsHovering(false); 
     }
-  }, [isOpen, currentCard, currentIndex]); // Recalculate if card or dialog visibility changes
+  }, [isOpen, currentCard, currentIndex]); 
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -75,7 +73,7 @@ export function FullScreenCardView({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !isOpen) {
-      if (isHovering) setIsHovering(false); // Ensure hover is off if conditions not met
+      if (isHovering) setIsHovering(false); 
       return;
     }
     if (!isHovering) setIsHovering(true);
@@ -134,7 +132,7 @@ export function FullScreenCardView({
   const cardStyle: React.CSSProperties = {
     transform: dynamicCardTransform,
     transformStyle: "preserve-3d",
-    transition: "transform 0.1s linear", // Smooth transform for tilt
+    transition: "transform 0.1s linear", 
   };
 
   const shineStyle: React.CSSProperties = {
@@ -145,11 +143,11 @@ export function FullScreenCardView({
     mixBlendMode: "color-dodge",
     pointerEvents: "none",
     zIndex: 1,
-    transition: "opacity 0.1s linear", // Smooth transition for shine
+    transition: "opacity 0.1s linear", 
   };
   
   const tiltContainerStyle: React.CSSProperties = {
-    perspective: "1500px", // Apply perspective to the container
+    perspective: "1500px", 
   };
 
   return (
@@ -159,11 +157,11 @@ export function FullScreenCardView({
            <DialogTitle className="sr-only">
              Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}
           </DialogTitle>
-           {/* Default DialogContent close button (X) is part of DialogContent */}
+           {/* Default DialogContent close button (X) is part of DialogContent and will be on the right */}
         </DialogHeader>
 
         <div 
-            className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28" // pt for header, pb for footer
+            className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28" 
             style={tiltContainerStyle}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -182,19 +180,18 @@ export function FullScreenCardView({
 
           <div
             ref={cardRef}
-            key={currentCard.id} // KEY CHANGE: Forces re-initialization on card change
+            key={currentCard.id} 
             style={cardStyle}
-            // Card sizing: 75% of viewport height, max 700px. Scale is applied via transform.
             className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl shadow-2xl overflow-hidden"
             data-ai-hint="pokemon card front large interactive"
           >
             <Image
-              key={currentCard.id + '-image'} // Ensure image also re-renders if ID or URL changes.
+              key={currentCard.id + '-image'} 
               src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
               alt={currentCard.name || "Pokémon Card"}
               layout="fill"
               objectFit="contain"
-              priority // Prioritize loading the visible card image
+              priority 
               className="relative z-0" 
             />
             <div style={shineStyle} className="rounded-xl" />
