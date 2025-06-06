@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { CardList } from "@/components/CardList";
 import type { PokemonCard } from "@/types";
@@ -28,9 +28,6 @@ export default function MyCollectionPage() {
   const [filteredCards, setFilteredCards] = useState<PokemonCard[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("dateAddedDesc"); // Default sort: newest first
-  const [rarityFilter, setRarityFilter] = useState("");
-  const [setFilter, setSetFilter] = useState("");
-  const [conditionFilter, setConditionFilter] = useState("");
   const [isClient, setIsClient] = useState(false);
   const [cardToEdit, setCardToEdit] = useState<PokemonCard | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -78,22 +75,6 @@ export default function MyCollectionPage() {
       );
     }
 
-    // Filter by rarity
-    if (rarityFilter) {
-      tempCards = tempCards.filter((card) => card.rarity === rarityFilter);
-    }
-    
-    // Filter by set
-    if (setFilter) {
-      tempCards = tempCards.filter((card) => card.set === setFilter);
-    }
-
-    // Filter by condition
-    if (conditionFilter) {
-      tempCards = tempCards.filter((card) => card.condition === conditionFilter);
-    }
-
-
     // Sort cards
     switch (sortOption) {
       case "nameAsc":
@@ -111,15 +92,11 @@ export default function MyCollectionPage() {
       case "setAsc":
         tempCards.sort((a, b) => a.set.localeCompare(b.set) || (a.name || "").localeCompare(b.name || ""));
         break;
-      // Default: dateAddedDesc (implicitly handled by how cards are added/loaded if ID is timestamp-based or array order)
-      // If IDs are not time-based, this would need an actual 'dateAdded' field.
-      // For now, it means reverse of current `allCards` order which is newest first.
       case "dateAddedDesc":
       default:
-        // Assuming allCards is already in dateAddedDesc order due to unshift on add
         break; 
       case "dateAddedAsc":
-        tempCards.reverse(); // if allCards is newest first, reverse for oldest first
+        tempCards.reverse(); 
         break;
       case "quantityDesc":
         tempCards.sort((a, b) => b.quantity - a.quantity);
@@ -130,40 +107,7 @@ export default function MyCollectionPage() {
     }
 
     setFilteredCards(tempCards);
-  }, [allCards, searchTerm, sortOption, rarityFilter, setFilter, conditionFilter]);
-
-  const uniqueRarities = useMemo(() => {
-    if (!isClient) return [];
-    const rarities = new Set<string>();
-    allCards.forEach(card => {
-      if (card && typeof card.rarity === 'string' && card.rarity.trim() !== '') {
-        rarities.add(card.rarity);
-      }
-    });
-    return Array.from(rarities).sort();
-  }, [allCards, isClient]);
-
-  const uniqueSets = useMemo(() => {
-    if (!isClient) return [];
-    const sets = new Set<string>();
-    allCards.forEach(card => {
-      if (card && typeof card.set === 'string' && card.set.trim() !== '') {
-        sets.add(card.set);
-      }
-    });
-    return Array.from(sets).sort();
-  }, [allCards, isClient]);
-
-  const uniqueConditions = useMemo(() => {
-    if (!isClient) return [];
-    const conditions = new Set<string>();
-    allCards.forEach(card => {
-      if (card && typeof card.condition === 'string' && card.condition.trim() !== '') {
-        conditions.add(card.condition);
-      }
-    });
-    return Array.from(conditions).sort();
-  }, [allCards, isClient]);
+  }, [allCards, searchTerm, sortOption]);
 
 
   const handleRemoveCard = (cardId: string) => {
@@ -179,7 +123,7 @@ export default function MyCollectionPage() {
     try {
       const updatedCards = allCards.filter((card) => card.id !== cardToDelete.id);
       localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
-      setAllCards(updatedCards); // Update state to re-trigger filtering/sorting
+      setAllCards(updatedCards); 
        toast({
         title: "Card Removed",
         description: `${cardToDelete.name || cardToDelete.cardNumber} has been removed from your collection.`,
@@ -226,9 +170,6 @@ export default function MyCollectionPage() {
   const resetFilters = () => {
     setSearchTerm("");
     setSortOption("dateAddedDesc");
-    setRarityFilter("");
-    setSetFilter("");
-    setConditionFilter("");
   };
 
   if (!isClient) {
@@ -257,7 +198,7 @@ export default function MyCollectionPage() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -285,37 +226,6 @@ export default function MyCollectionPage() {
                 <SelectItem value="quantityAsc">Quantity (Low-High)</SelectItem>
               </SelectContent>
             </Select>
-
-            <Select value={rarityFilter} onValueChange={setRarityFilter} disabled={uniqueRarities.length === 0}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Filter by Rarity" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Rarities</SelectItem>
-                {uniqueRarities.filter(rarity => rarity.trim() !== "").map(rarity => <SelectItem key={rarity} value={rarity}>{rarity}</SelectItem>)}
-              </SelectContent>
-            </Select>
-
-            <Select value={setFilter} onValueChange={setSetFilter} disabled={uniqueSets.length === 0}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Filter by Set" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Sets</SelectItem>
-                {uniqueSets.filter(setName => setName.trim() !== "").map(setName => <SelectItem key={setName} value={setName}>{setName}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            
-            <Select value={conditionFilter} onValueChange={setConditionFilter} disabled={uniqueConditions.length === 0}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Filter by Condition" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Conditions</SelectItem>
-                {uniqueConditions.filter(condition => condition.trim() !== "").map(condition => <SelectItem key={condition} value={condition}>{condition}</SelectItem>)}
-              </SelectContent>
-            </Select>
-
           </div>
            <Button onClick={resetFilters} variant="ghost" size="sm" className="mt-4 text-sm text-muted-foreground hover:text-primary">
               <ListRestart className="mr-2 h-4 w-4"/> Reset Filters
@@ -374,4 +284,3 @@ export default function MyCollectionPage() {
     
     
     
-
