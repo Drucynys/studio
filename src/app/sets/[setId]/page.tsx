@@ -11,9 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
-import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info } from "lucide-react";
+import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input"; 
+import { Progress } from "@/components/ui/progress";
 
 export interface ApiPokemonCard {
   id: string;
@@ -58,8 +59,25 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
+  const [isClient, setIsClient] = useState(false);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    setIsClient(true);
+    const storedCards = localStorage.getItem("pokemonCards");
+    if (storedCards) {
+      try {
+        const parsedCards = JSON.parse(storedCards) as CollectionPokemonCard[];
+        if (Array.isArray(parsedCards)) {
+          setCollectionCards(parsedCards);
+        }
+      } catch (e) {
+        console.error("Failed to parse collection from localStorage", e);
+      }
+    }
+  }, []);
 
   const fetchSetDetails = useCallback(async () => {
     if (!setId) return;
@@ -138,7 +156,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
       name: selectedApiCard.name,
-      set: selectedApiCard.set.name,
+      set: selectedApiCard.set.name, // Use the set name from the API card for consistency
       cardNumber: selectedApiCard.number,
       rarity: selectedApiCard.rarity || "N/A",
       variant: variant,
@@ -148,10 +166,11 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
     };
 
     try {
-      const storedCardsRaw = localStorage.getItem("pokemonCards");
-      const storedCards: CollectionPokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
+      // Re-fetch from localStorage to ensure it's the latest
+      const currentStoredCardsRaw = localStorage.getItem("pokemonCards");
+      const currentStoredCards: CollectionPokemonCard[] = currentStoredCardsRaw ? JSON.parse(currentStoredCardsRaw) : [];
       
-      const isDuplicate = storedCards.some(
+      const isDuplicate = currentStoredCards.some(
         item => item.name === newCard.name && 
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
@@ -169,8 +188,9 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
         return;
       }
       
-      const updatedCards = [newCard, ...storedCards];
+      const updatedCards = [newCard, ...currentStoredCards];
       localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
+      setCollectionCards(updatedCards); // Update local state for immediate UI update
       toast({
         title: "Card Added!",
         description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) from ${newCard.set} has been added.`,
@@ -191,6 +211,27 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
     setSelectedApiCard(card);
     setIsDialogOpen(true);
   };
+  
+  const setCompletion = (() => {
+    if (!isClient || !setName || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
+    const collectedInThisSet = collectionCards.filter(card => card.set === setName).length;
+    const totalInThisSet = cardsInSet.length;
+    const percentage = totalInThisSet > 0 ? (collectedInThisSet / totalInThisSet) * 100 : 0;
+    return { collected: collectedInThisSet, total: totalInThisSet, percentage };
+  })();
+
+  if (!isClient && isLoading) { // Show simplified loading for SSR/initial load
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <AppHeader />
+        <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+           <p className="ml-4 text-lg text-muted-foreground">Loading set details...</p>
+        </main>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -204,7 +245,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
 
         <Card className="shadow-xl">
           <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
                 <div>
                     {setLogo && (
                         <Image src={setLogo} alt={`${setName} logo`} width={100} height={40} style={{objectFit:"contain"}} className="mb-2" data-ai-hint="pokemon set logo"/>
@@ -223,7 +264,19 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
                     />
                 </div>
             </div>
-            <CardDescription className="mt-2 text-xs italic text-muted-foreground flex items-center gap-1">
+            {!isLoading && cardsInSet.length > 0 && (
+                 <div className="mt-4">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-sm font-medium text-muted-foreground">Set Completion</span>
+                        <span className="text-sm font-semibold text-foreground">
+                            {setCompletion.collected} / {setCompletion.total} cards
+                            {setCompletion.percentage === 100 && <CheckCircle className="inline-block ml-1 h-4 w-4 text-green-500" />}
+                        </span>
+                    </div>
+                    <Progress value={setCompletion.percentage} className="h-2 [&>div]:bg-primary" />
+                </div>
+            )}
+            <CardDescription className="mt-3 text-xs italic text-muted-foreground flex items-center gap-1">
                 <Info size={14}/> Card values are market estimates from TCGPlayer via Pokémon TCG API and may vary.
             </CardDescription>
           </CardHeader>
@@ -242,7 +295,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
               </div>
             )}
             {!isLoading && !error && (
-              <ScrollArea className="h-[calc(100vh-26rem)] md:h-[calc(100vh-30rem)]"> 
+              <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]"> 
                 {filteredCards.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                     {filteredCards.map((card) => (
@@ -294,3 +347,5 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
 };
 
 export default SetDetailsPage;
+
+    

@@ -9,8 +9,10 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, ServerCrash, Search } from "lucide-react";
+import { Loader2, ServerCrash, Search, CheckCircle } from "lucide-react";
 import Image from "next/image";
+import { Progress } from "@/components/ui/progress";
+import type { PokemonCard as CollectionPokemonCard } from "@/types";
 
 interface ApiSet {
   id: string;
@@ -28,9 +30,27 @@ interface ApiSet {
 const BrowseSetsPage: NextPage = () => {
   const [sets, setSets] = useState<ApiSet[]>([]);
   const [filteredSets, setFilteredSets] = useState<ApiSet[]>([]);
+  const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    const storedCards = localStorage.getItem("pokemonCards");
+    if (storedCards) {
+      try {
+        const parsedCards = JSON.parse(storedCards) as CollectionPokemonCard[];
+        if (Array.isArray(parsedCards)) {
+          setCollectionCards(parsedCards);
+        }
+      } catch (error) {
+        console.error("Failed to parse collection cards from localStorage", error);
+      }
+    }
+  }, []);
+
 
   useEffect(() => {
     const fetchSets = async () => {
@@ -70,6 +90,26 @@ const BrowseSetsPage: NextPage = () => {
     setFilteredSets(filteredData);
   }, [searchTerm, sets]);
 
+  const getSetCompletion = (apiSet: ApiSet) => {
+    if (!isClient) return { collected: 0, total: apiSet.total, percentage: 0 };
+    const collectedInSet = collectionCards.filter(card => card.set === apiSet.name).length;
+    const totalInSet = apiSet.total > 0 ? apiSet.total : apiSet.printedTotal; // Prefer 'total' if available
+    const percentage = totalInSet > 0 ? (collectedInSet / totalInSet) * 100 : 0;
+    return { collected: collectedInSet, total: totalInSet, percentage };
+  };
+
+  if (!isClient) {
+     return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <AppHeader />
+        <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+           <p className="ml-4 text-lg text-muted-foreground">Loading sets...</p>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
@@ -107,7 +147,9 @@ const BrowseSetsPage: NextPage = () => {
               <ScrollArea className="h-[calc(100vh-20rem)] md:h-[calc(100vh-25rem)]">
                 {filteredSets.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {filteredSets.map((set) => (
+                    {filteredSets.map((set) => {
+                      const completion = getSetCompletion(set);
+                      return (
                         <Link key={set.id} href={`/sets/${set.id}`} passHref legacyBehavior>
                         <a className="block group">
                             <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
@@ -123,12 +165,21 @@ const BrowseSetsPage: NextPage = () => {
                             <p className="font-semibold text-card-foreground group-hover:text-primary">{set.name}</p>
                             <p className="text-xs text-muted-foreground">{set.series} Series</p>
                             <p className="text-xs text-muted-foreground">{new Date(set.releaseDate).toLocaleDateString()}</p>
-                            <p className="text-xs text-muted-foreground">{set.total} cards</p>
+                            
+                            <div className="w-full mt-2 mb-3 px-2">
+                                <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {completion.collected} / {completion.total} cards
+                                  {completion.percentage === 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}
+                                </p>
+                            </div>
+                            
                             <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Set</Button>
                             </Card>
                         </a>
                         </Link>
-                    ))}
+                      );
+                    })}
                     </div>
                 ) : (
                     <div className="text-center py-10 text-muted-foreground">
@@ -149,3 +200,5 @@ const BrowseSetsPage: NextPage = () => {
 };
 
 export default BrowseSetsPage;
+
+    
