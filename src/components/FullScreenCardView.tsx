@@ -34,13 +34,14 @@ export function FullScreenCardView({
 
   const currentCard = currentIndex !== null ? cards[currentIndex] : null;
 
-  useEffect(() => {
+ useEffect(() => {
     if (!isOpen) {
-      setCardDimensions({ width: 1, height: 1 }); 
+      // Reset states only when dialog is closed
+      setCardDimensions({ width: 1, height: 1 });
       setIsHovering(false);
       setMousePosition({ x: 0, y: 0 });
     }
-  }, [isOpen]); 
+  }, [isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -66,23 +67,20 @@ export function FullScreenCardView({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !isOpen) {
-      if (isHovering) setIsHovering(false);
+      if (isHovering) setIsHovering(false); // Ensure hover state is off if conditions not met
       return;
     }
 
     const currentWidth = cardRef.current.offsetWidth;
     const currentHeight = cardRef.current.offsetHeight;
 
-    if (cardDimensions.width !== currentWidth || 
-        cardDimensions.height !== currentHeight || 
-        cardDimensions.width <= MIN_DIMENSION_FOR_TILT_EFFECT ||
-        cardDimensions.height <= MIN_DIMENSION_FOR_TILT_EFFECT) {
-      
-      if (currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT && currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT) {
-        setCardDimensions({ width: currentWidth, height: currentHeight });
-      }
+    // Update dimensions only if they are valid and different from current
+    if (currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT && 
+        currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT &&
+        (cardDimensions.width !== currentWidth || cardDimensions.height !== currentHeight)) {
+      setCardDimensions({ width: currentWidth, height: currentHeight });
     }
-
+    
     if (!isHovering) setIsHovering(true);
 
     const rect = cardRef.current.getBoundingClientRect();
@@ -150,9 +148,9 @@ export function FullScreenCardView({
     opacity: shineOpacity,
     mixBlendMode: "color-dodge",
     pointerEvents: "none",
-    zIndex: 10, // Ensure shine is on top of the main card image
+    zIndex: 10, 
     transition: "opacity 0.05s linear", 
-    borderRadius: 'inherit', // Match parent's border radius
+    borderRadius: 'inherit', 
   };
   
   const tiltContainerStyle: React.CSSProperties = {
@@ -190,30 +188,24 @@ export function FullScreenCardView({
             ref={cardRef}
             key={currentCard.id} 
             style={cardStyle}
-            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl shadow-2xl overflow-hidden"
+            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl overflow-hidden"
             data-ai-hint="pokemon card front large interactive"
           >
-            {/* Ambilight Background Image Layer */}
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              overflow: 'hidden',
-              borderRadius: 'inherit', 
-              transform: 'translateZ(-50px) scale(1.15)', // Push back and scale up
-            }}>
+            {/* Background Glow Layer */}
+            <div className="absolute inset-0 z-0">
               <Image
-                key={`${currentCard.id}-ambilight`}
+                key={`${currentCard.id}-glow`}
                 src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
                 alt="" 
                 layout="fill"
                 objectFit="cover" 
-                className="opacity-60 filter blur-2xl brightness-75" 
-                priority={false} // Ambilight doesn't need to be high priority
+                className="transform scale-110 filter blur-lg opacity-10"
+                priority={false} 
               />
             </div>
             
             {/* Main Card Image Layer */}
-            <div style={{ position: 'relative', width: '100%', height: '100%', zIndex: 1 }}>
+            <div className="relative w-full h-full z-[1]">
               <Image
                 key={`${currentCard.id}-image`} 
                 src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
