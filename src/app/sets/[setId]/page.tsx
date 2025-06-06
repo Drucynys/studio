@@ -150,27 +150,27 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   }, [searchTerm, cardsInSet]);
 
 
-  const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string) => {
+  const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string, quantity: number = 1) => {
     if (!selectedApiCard) return;
 
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(),
       name: selectedApiCard.name,
-      set: selectedApiCard.set.name, // Use the set name from the API card for consistency
+      set: selectedApiCard.set.name, 
       cardNumber: selectedApiCard.number,
       rarity: selectedApiCard.rarity || "N/A",
       variant: variant,
       condition: condition,
       value: valueForCollection,
       imageUrl: selectedApiCard.images.large,
+      quantity: quantity,
     };
 
     try {
-      // Re-fetch from localStorage to ensure it's the latest
       const currentStoredCardsRaw = localStorage.getItem("pokemonCards");
-      const currentStoredCards: CollectionPokemonCard[] = currentStoredCardsRaw ? JSON.parse(currentStoredCardsRaw) : [];
+      let currentStoredCards: CollectionPokemonCard[] = currentStoredCardsRaw ? JSON.parse(currentStoredCardsRaw) : [];
       
-      const isDuplicate = currentStoredCards.some(
+      const existingCardIndex = currentStoredCards.findIndex(
         item => item.name === newCard.name && 
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
@@ -178,24 +178,26 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
                 item.condition === newCard.condition
       );
 
-      if (isDuplicate) {
-        toast({
-          variant: "destructive",
-          title: "Duplicate Card",
-          description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) is already in your collection.`,
+      if (existingCardIndex > -1) {
+         currentStoredCards[existingCardIndex].quantity += newCard.quantity;
+         toast({
+          title: "Card Quantity Updated!",
+          description: `Quantity for ${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) increased in your collection.`,
+          className: "bg-secondary text-secondary-foreground"
         });
-        setIsDialogOpen(false);
-        return;
+      } else {
+        currentStoredCards = [newCard, ...currentStoredCards];
+         toast({
+          title: "Card Added!",
+          description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) from ${newCard.set} has been added.`,
+          className: "bg-secondary text-secondary-foreground"
+        });
       }
       
-      const updatedCards = [newCard, ...currentStoredCards];
-      localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
-      setCollectionCards(updatedCards); // Update local state for immediate UI update
-      toast({
-        title: "Card Added!",
-        description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) from ${newCard.set} has been added.`,
-        className: "bg-secondary text-secondary-foreground"
-      });
+      localStorage.setItem("pokemonCards", JSON.stringify(currentStoredCards));
+      setCollectionCards(currentStoredCards); 
+      window.dispatchEvent(new StorageEvent('storage', { key: 'pokemonCards', newValue: localStorage.getItem("pokemonCards") }));
+
     } catch (e) {
       console.error("Failed to save card to localStorage", e);
       toast({
@@ -214,13 +216,42 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
   
   const setCompletion = (() => {
     if (!isClient || !setName || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
-    const collectedInThisSet = collectionCards.filter(card => card.set === setName).length;
-    const totalInThisSet = cardsInSet.length;
-    const percentage = totalInThisSet > 0 ? (collectedInThisSet / totalInThisSet) * 100 : 0;
-    return { collected: collectedInThisSet, total: totalInThisSet, percentage };
+    // Calculate unique cards collected for this set
+    const collectedCardIdentifiersInSet = new Set<string>();
+    collectionCards.forEach(card => {
+        if (card.set === setName) {
+            // Create a unique identifier for a card (name + cardNumber, ignoring variant/condition for set completion)
+            collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
+        }
+    });
+    const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
+    const totalInThisSet = cardsInSet.length; // Total unique cards available in the set
+    const percentage = totalInThisSet > 0 ? (uniqueCollectedCount / totalInThisSet) * 100 : 0;
+    return { collected: uniqueCollectedCount, total: totalInThisSet, percentage };
   })();
 
-  if (!isClient && isLoading) { // Show simplified loading for SSR/initial load
+
+  // Listener for localStorage changes from other tabs/pages
+  useEffect(() => {
+    if (!isClient) return;
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "pokemonCards" && event.newValue) {
+        try {
+          const updatedCards = JSON.parse(event.newValue) as CollectionPokemonCard[];
+           if (Array.isArray(updatedCards)) {
+             setCollectionCards(updatedCards);
+           }
+        } catch (error) {
+          console.error("Error processing storage update:", error);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isClient]);
+
+
+  if (!isClient && isLoading) { 
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -267,7 +298,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
             {!isLoading && cardsInSet.length > 0 && (
                  <div className="mt-4">
                     <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-muted-foreground">Set Completion</span>
+                        <span className="text-sm font-medium text-muted-foreground">Set Completion (Unique Cards)</span>
                         <span className="text-sm font-semibold text-foreground">
                             {setCompletion.collected} / {setCompletion.total} cards
                             {setCompletion.percentage === 100 && <CheckCircle className="inline-block ml-1 h-4 w-4 text-green-500" />}
@@ -347,5 +378,3 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
 };
 
 export default SetDetailsPage;
-
-    

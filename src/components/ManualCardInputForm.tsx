@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { PokemonCard } from "@/types";
-import { PlusCircle, Loader2 } from "lucide-react";
+import { FilePlus, Loader2 } from "lucide-react"; // Changed icon
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -230,59 +230,29 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       condition: values.condition,
       imageUrl: selectedCardData.images.large,
       value: cardValue,
+      quantity: 1, // Default quantity to 1
     };
+    
+    onAddCard(newCard); // This will be handled by the new /add-card page's logic
 
-    try {
-      const storedCardsRaw = localStorage.getItem("pokemonCards");
-      const storedCards: PokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
-      
-      const isDuplicate = storedCards.some(
-        item => item.name === newCard.name && 
-                item.set === newCard.set && 
-                item.cardNumber === newCard.cardNumber &&
-                item.variant === newCard.variant && 
-                item.condition === newCard.condition
-      );
-
-      if (isDuplicate) {
-        toast({
-          variant: "destructive",
-          title: "Duplicate Card",
-          description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) is already in your collection.`,
-        });
-        return; 
-      }
-      
-      onAddCard(newCard); 
-      toast({
-        title: "Card Added!",
-        description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) from ${newCard.set} has been added.`,
-        className: "bg-secondary text-secondary-foreground"
-      });
-
-      form.reset();
-      setSelectedCardData(null); 
-      setCardsInSelectedSet([]); 
-      form.setValue("selectedSetId", ""); 
-      
-    } catch (e) {
-      console.error("Failed to save card to localStorage", e);
-      toast({
-        variant: "destructive",
-        title: "Storage Error",
-        description: "Could not save card to your collection.",
-      });
-    }
+    form.reset();
+    setSelectedCardData(null); 
+    // Don't reset cardsInSelectedSet or selectedSetId here, so user can add multiple cards from same set
+    // form.setValue("selectedSetId", ""); 
+    // setCardsInSelectedSet([]); 
+    form.setValue("selectedCardId", "");
+    form.setValue("condition", "");
+    
   }
 
   return (
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="font-headline text-2xl flex items-center gap-2">
-          <PlusCircle className="h-6 w-6 text-accent" />
-          Add New Card
+          <FilePlus className="h-6 w-6 text-primary" /> {/* Changed icon */}
+          Manual Card Entry
         </CardTitle>
-        <CardDescription>Select Set, Card, and Condition to add to your collection.</CardDescription>
+        <CardDescription>Select Set, Card, and Condition.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -400,11 +370,11 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
             
             <Button 
               type="submit" 
-              className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" // Changed style
               disabled={form.formState.isSubmitting || isLoadingSets || isLoadingCards || !form.formState.isValid}
             >
               {(form.formState.isSubmitting || isLoadingSets || isLoadingCards) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Add Card to Collection
+              Add Card
             </Button>
           </form>
         </Form>

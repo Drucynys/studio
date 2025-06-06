@@ -50,7 +50,7 @@ type AddCardToCollectionDialogProps = {
   initialCardImageUrl?: string | null;
   availableConditions: string[];
   pokemonTcgApiCard: PokemonTcgApiCard | null;
-  onAddCard: (condition: string, value: number, variant?: string) => void;
+  onAddCard: (condition: string, value: number, variant?: string, quantity?: number) => void; // Added quantity
 };
 
 export function AddCardToCollectionDialog({
@@ -144,7 +144,7 @@ export function AddCardToCollectionDialog({
 
   const handleSubmit = () => {
     if (selectedCondition && (currentAvailableVariants.length === 0 || selectedVariant)) {
-       onAddCard(selectedCondition, marketPriceForSelectedVariant, currentAvailableVariants.length > 0 ? selectedVariant : undefined);
+       onAddCard(selectedCondition, marketPriceForSelectedVariant, currentAvailableVariants.length > 0 ? selectedVariant : undefined, 1); // Add quantity 1
       onClose();
     }
   };
@@ -158,7 +158,7 @@ export function AddCardToCollectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl"> {/* Increased max width for chart */}
+      <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Add "{cardName}" to Collection</DialogTitle>
           {cardRarity && <DialogDescription>Rarity: <Badge variant="secondary">{cardRarity}</Badge></DialogDescription>}
@@ -282,4 +282,3 @@ export function AddCardToCollectionDialog({
     </Dialog>
   );
 }
-

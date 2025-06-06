@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/AppHeader";
@@ -36,8 +36,8 @@ const BrowseSetsPage: NextPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isClient, setIsClient] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true);
+  const loadCollectionCards = useCallback(() => {
+    if (typeof window === "undefined") return;
     const storedCards = localStorage.getItem("pokemonCards");
     if (storedCards) {
       try {
@@ -50,6 +50,23 @@ const BrowseSetsPage: NextPage = () => {
       }
     }
   }, []);
+
+  useEffect(() => {
+    setIsClient(true);
+    loadCollectionCards();
+  }, [loadCollectionCards]);
+
+  // Listener for localStorage changes from other tabs/pages
+  useEffect(() => {
+    if (!isClient) return;
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "pokemonCards") {
+        loadCollectionCards(); // Reload collection when it changes
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isClient, loadCollectionCards]);
 
 
   useEffect(() => {
@@ -92,10 +109,20 @@ const BrowseSetsPage: NextPage = () => {
 
   const getSetCompletion = (apiSet: ApiSet) => {
     if (!isClient) return { collected: 0, total: apiSet.total, percentage: 0 };
-    const collectedInSet = collectionCards.filter(card => card.set === apiSet.name).length;
-    const totalInSet = apiSet.total > 0 ? apiSet.total : apiSet.printedTotal; // Prefer 'total' if available
-    const percentage = totalInSet > 0 ? (collectedInSet / totalInSet) * 100 : 0;
-    return { collected: collectedInSet, total: totalInSet, percentage };
+    
+    // Count unique cards collected for this set
+    const collectedCardIdentifiersInSet = new Set<string>();
+    collectionCards.forEach(card => {
+        if (card.set === apiSet.name) {
+            // Create a unique identifier for a card (name + cardNumber, ignoring variant/condition for set completion)
+            collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
+        }
+    });
+    const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
+    const totalInSet = apiSet.total > 0 ? apiSet.total : apiSet.printedTotal; // Prefer 'total' if available, as it's usually the count of unique cards.
+    const percentage = totalInSet > 0 ? (uniqueCollectedCount / totalInSet) * 100 : 0;
+    
+    return { collected: uniqueCollectedCount, total: totalInSet, percentage };
   };
 
   if (!isClient) {
@@ -169,8 +196,8 @@ const BrowseSetsPage: NextPage = () => {
                             <div className="w-full mt-2 mb-3 px-2">
                                 <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {completion.collected} / {completion.total} cards
-                                  {completion.percentage === 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}
+                                  {completion.collected} / {completion.total} unique cards
+                                  {completion.percentage >= 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}
                                 </p>
                             </div>
                             
@@ -200,5 +227,3 @@ const BrowseSetsPage: NextPage = () => {
 };
 
 export default BrowseSetsPage;
-
-    
