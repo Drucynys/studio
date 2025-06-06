@@ -53,10 +53,12 @@ export function EditCardDialog({
   const [valueInput, setValueInput] = useState<string>("0.00");
 
   useEffect(() => {
-    if (card) {
+    if (card && isOpen) {
       setEditableCard({ ...card });
-      setQuantityInput(card.quantity);
-      setValueInput(card.value.toFixed(2));
+      // Ensure quantityInput is always a number, default to 1 if card.quantity is not a valid number
+      setQuantityInput(typeof card.quantity === 'number' && !isNaN(card.quantity) ? card.quantity : 1);
+      // Ensure valueInput is always a string representation of a number, default to "0.00"
+      setValueInput(typeof card.value === 'number' && !isNaN(card.value) ? card.value.toFixed(2) : "0.00");
     } else {
       setEditableCard(null);
       setQuantityInput(1);
@@ -95,28 +97,32 @@ export function EditCardDialog({
     }
   };
 
-  if (!editableCard) return null;
+  if (!editableCard && !isOpen) return null; // Don't render if no card and not open
+  if (!isOpen) return null; // Ensure dialog content isn't rendered when closed, prevents issues with initial editableCard state
 
-  const displayVariant = formatDisplayVariant(editableCard.variant);
+  const currentCardToDisplay = editableCard || card; // Use card prop if editableCard is null (e.g. initial open)
+  const displayVariant = formatDisplayVariant(currentCardToDisplay?.variant);
+
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Card: {editableCard.name || editableCard.cardNumber}</DialogTitle>
+          <DialogTitle>Edit Card: {currentCardToDisplay?.name || currentCardToDisplay?.cardNumber}</DialogTitle>
           <DialogDescription>
-            {editableCard.set} - #{editableCard.cardNumber} {displayVariant ? `(${displayVariant})` : ""}
+            {currentCardToDisplay?.set} - #{currentCardToDisplay?.cardNumber} {displayVariant ? `(${displayVariant})` : ""}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex justify-center mb-4">
             <div className="relative w-40 h-56 rounded-md overflow-hidden shadow-md" data-ai-hint="pokemon card front">
               <Image
-                src={editableCard.imageUrl || "https://placehold.co/200x280.png"}
-                alt={editableCard.name || "Card image"}
+                src={currentCardToDisplay?.imageUrl || "https://placehold.co/200x280.png"}
+                alt={currentCardToDisplay?.name || "Card image"}
                 layout="fill"
                 objectFit="contain"
                 onError={handleImageError}
+                key={currentCardToDisplay?.imageUrl || 'placeholder'}
               />
             </div>
           </div>
@@ -140,7 +146,7 @@ export function EditCardDialog({
               <ShieldCheck className="inline-block mr-1 h-4 w-4 text-green-500"/>Condition
             </Label>
             <Select
-              value={editableCard.condition}
+              value={currentCardToDisplay?.condition || ""}
               onValueChange={(value) => handleInputChange("condition", value)}
             >
               <SelectTrigger id="condition" className="col-span-3">
@@ -156,10 +162,6 @@ export function EditCardDialog({
             </Select>
           </div>
           
-          {/* Variant is generally tied to API data and how it was added, not typically user-editable after the fact
-              unless we allow choosing from known variants of THAT specific card from API.
-              For simplicity, we'll make it non-editable here for now. If variant implies different pricing, this might need rework.
-          */}
           {displayVariant && (
              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="variant" className="text-right col-span-1">
@@ -176,7 +178,7 @@ export function EditCardDialog({
             </Label>
             <Input
               id="value"
-              type="text" // Use text to allow for decimal input more easily
+              type="text" 
               value={valueInput}
               onChange={handleValueChange}
               className="col-span-3"
@@ -186,11 +188,10 @@ export function EditCardDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} className="bg-accent hover:bg-accent/90 text-accent-foreground">Save Changes</Button>
+          <Button onClick={handleSave} disabled={!editableCard} className="bg-accent hover:bg-accent/90 text-accent-foreground">Save Changes</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
     
