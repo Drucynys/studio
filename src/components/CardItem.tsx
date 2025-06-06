@@ -4,13 +4,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info } from "lucide-react";
+import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
 type CardItemProps = {
   card: PokemonCard;
+  cardIndex: number; // Index of the card in the list
   onEdit: () => void;
   onRemove: () => void;
+  onView: (cardIndex: number) => void; // Handler for viewing the card
   cardmarketPriceGuide: CardmarketPriceGuide | null;
 };
 
@@ -26,7 +28,7 @@ const normalizeString = (str: string = ""): string => {
   return str.toLowerCase().replace(/[^a-z0-9]/gi, ''); 
 };
 
-export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardItemProps) {
+export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarketPriceGuide }: CardItemProps) {
   const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant) : ''}&view=grid`;
   const displayVariant = formatDisplayVariant(card.variant);
 
@@ -34,8 +36,8 @@ export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardI
   const [cmStatus, setCmStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    setCmPrices(null); // Reset on card change
-    setCmStatus(null); // Reset status
+    setCmPrices(null); 
+    setCmStatus(null); 
 
     if (cardmarketPriceGuide && card.name && card.set) {
       const normalizedCardName = normalizeString(card.name);
@@ -55,17 +57,13 @@ export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardI
           setCmStatus("(CM: Matched, no price data)");
         }
       } else {
-        // Only set status if guide is loaded but no match found for this specific card
-        // Avoids clutter if the whole guide failed to load (which would be handled by MyCollectionPage's error toast)
         if (cardmarketPriceGuide.length > 0) { 
             setCmStatus("(CM: No match in guide)");
         }
       }
     } else if (cardmarketPriceGuide === null) {
-      // Guide is not loaded yet or failed to load (MyCollectionPage shows global error/loading)
       setCmStatus(null); 
     } else if (cardmarketPriceGuide && cardmarketPriceGuide.length === 0){
-      // Guide is loaded but empty
       setCmStatus("(CM: Price guide empty)");
     }
 
@@ -82,15 +80,22 @@ export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardI
         {card.name && <CardDescription className="text-xs">{card.set} #{card.cardNumber}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-2 flex-grow pb-3">
-        {card.imageUrl ? (
-            <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner">
-                 <Image src={card.imageUrl} alt={card.name || card.cardNumber} width={250} height={350} className="object-contain w-full h-full" data-ai-hint="pokemon card front"/>
-            </div>
-        ) : (
-            <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 bg-muted flex items-center justify-center" data-ai-hint="pokemon card blank">
-                 <Sparkles className="h-16 w-16 text-muted-foreground opacity-50" />
-            </div>
-        )}
+        <div 
+          className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner cursor-pointer group"
+          onClick={() => onView(cardIndex)} // Make image clickable
+        >
+          <Image 
+            src={card.imageUrl || "https://placehold.co/250x350.png"} 
+            alt={card.name || card.cardNumber} 
+            width={250} 
+            height={350} 
+            className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-200" 
+            data-ai-hint="pokemon card front"
+          />
+          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+            <Eye className="h-8 w-8 text-white" />
+          </div>
+        </div>
         <div className="flex items-center gap-2 text-xs">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <strong>Rarity:</strong> <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{card.rarity}</Badge>
@@ -146,7 +151,6 @@ export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardI
             }
           </div>
         )}
-        {/* Subtle status message for Cardmarket data */}
         {cmStatus && !hasDisplayableCmPrices && (
              <p className="text-xs text-muted-foreground italic flex items-center gap-1 mt-1">
                 <Info size={12}/> {cmStatus}

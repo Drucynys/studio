@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { CardList } from "@/components/CardList";
 import type { PokemonCard, CardmarketPriceGuide } from "@/types";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { EditCardDialog } from "@/components/EditCardDialog"; 
+import { FullScreenCardView } from "@/components/FullScreenCardView"; // Import FullScreenCardView
 import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2 } from "lucide-react";
 import {
   AlertDialog,
@@ -35,6 +36,9 @@ export default function MyCollectionPage() {
 
   const [cardmarketPriceGuide, setCardmarketPriceGuide] = useState<CardmarketPriceGuide | null>(null);
   const [isLoadingCmPrices, setIsLoadingCmPrices] = useState(false);
+
+  const [isFullScreenViewOpen, setIsFullScreenViewOpen] = useState(false);
+  const [currentFullScreenCardIndex, setCurrentFullScreenCardIndex] = useState<number | null>(null);
 
   const { toast } = useToast();
 
@@ -65,7 +69,6 @@ export default function MyCollectionPage() {
               errorMessage = `Failed to fetch Cardmarket prices: ${response.statusText} (status: ${response.status})`;
             }
           } catch (e) {
-            // Failed to parse JSON from error response, use statusText from original response
             if (response.statusText) {
                errorMessage = `Failed to fetch Cardmarket prices: ${response.statusText} (status: ${response.status})`;
             }
@@ -89,7 +92,6 @@ export default function MyCollectionPage() {
   }, [loadCards, toast]);
 
 
-  // Listen for storage changes from other tabs (e.g., after adding a card)
   useEffect(() => {
     if (!isClient) return;
     const handleStorageChange = (event: StorageEvent) => {
@@ -105,7 +107,6 @@ export default function MyCollectionPage() {
   useEffect(() => {
     let tempCards = [...allCards];
 
-    // Filter by search term (name, set, card number)
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       tempCards = tempCards.filter(
@@ -116,7 +117,6 @@ export default function MyCollectionPage() {
       );
     }
 
-    // Sort cards
     switch (sortOption) {
       case "nameAsc":
         tempCards.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -124,10 +124,10 @@ export default function MyCollectionPage() {
       case "nameDesc":
         tempCards.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
         break;
-      case "valueDesc": // TCGPlayer value
+      case "valueDesc":
         tempCards.sort((a, b) => b.value - a.value);
         break;
-      case "valueAsc": // TCGPlayer value
+      case "valueAsc":
         tempCards.sort((a, b) => a.value - b.value);
         break;
       case "setAsc":
@@ -135,7 +135,6 @@ export default function MyCollectionPage() {
         break;
       case "dateAddedDesc":
       default:
-        // Already sorted by reverse chronological on load typically
         break; 
       case "dateAddedAsc":
         tempCards.reverse(); 
@@ -214,6 +213,23 @@ export default function MyCollectionPage() {
     setSortOption("dateAddedDesc");
   };
 
+  const openFullScreenView = (cardIndex: number) => {
+    setCurrentFullScreenCardIndex(cardIndex);
+    setIsFullScreenViewOpen(true);
+  };
+
+  const closeFullScreenView = () => {
+    setIsFullScreenViewOpen(false);
+    setCurrentFullScreenCardIndex(null);
+  };
+
+  const navigateFullScreen = (newIndex: number) => {
+    if (newIndex >= 0 && newIndex < filteredCards.length) {
+      setCurrentFullScreenCardIndex(newIndex);
+    }
+  };
+
+
   if (!isClient) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
@@ -284,6 +300,7 @@ export default function MyCollectionPage() {
             cards={filteredCards} 
             onEditCard={handleEditCard} 
             onRemoveCard={handleRemoveCard} 
+            onViewCard={openFullScreenView} // Pass handler to CardList
             cardmarketPriceGuide={cardmarketPriceGuide}
         />
         
@@ -294,6 +311,16 @@ export default function MyCollectionPage() {
           </div>
         )}
       </main>
+
+      {isFullScreenViewOpen && currentFullScreenCardIndex !== null && (
+        <FullScreenCardView
+          isOpen={isFullScreenViewOpen}
+          onClose={closeFullScreenView}
+          cards={filteredCards}
+          currentIndex={currentFullScreenCardIndex}
+          onNavigate={navigateFullScreen}
+        />
+      )}
 
       {cardToEdit && (
         <EditCardDialog

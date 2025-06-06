@@ -11,10 +11,11 @@ type CardListProps = {
   cards: PokemonCard[];
   onEditCard: (card: PokemonCard) => void;
   onRemoveCard: (cardId: string) => void;
+  onViewCard: (cardIndex: number) => void; // New prop for viewing card
   cardmarketPriceGuide: CardmarketPriceGuide | null;
 };
 
-export function CardList({ cards, onEditCard, onRemoveCard, cardmarketPriceGuide }: CardListProps) {
+export function CardList({ cards, onEditCard, onRemoveCard, onViewCard, cardmarketPriceGuide }: CardListProps) {
   if (cards.length === 0) {
     return (
       <Card className="shadow-lg">
@@ -44,15 +45,16 @@ export function CardList({ cards, onEditCard, onRemoveCard, cardmarketPriceGuide
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-grow p-0">
-        {/* Adjusted height: consider new filter section heights and potential cm loading text */}
         <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-24rem)] p-4 md:p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-            {cards.map((card) => (
+            {cards.map((card, index) => ( // Added index here
               <CardItem 
                 key={card.id} 
                 card={card} 
+                cardIndex={index} // Pass index to CardItem
                 onEdit={() => onEditCard(card)} 
                 onRemove={() => onRemoveCard(card.id)}
+                onView={onViewCard} // Pass onViewCard handler
                 cardmarketPriceGuide={cardmarketPriceGuide}
               />
             ))}
