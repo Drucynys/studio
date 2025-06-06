@@ -23,16 +23,13 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
-      { // Added for TCGPlayer
-        protocol: 'https',
-        hostname: 'product-images.tcgplayer.com',
-        port: '',
-        pathname: '/**',
-      },
     ],
   },
   // Add the Firebase Studio preview origin to allowedDevOrigins
-  allowedDevOrigins: ['https://6000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev'],
+  allowedDevOrigins: [
+ 'https://6000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
+ 'https://9003-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev'
+ ],
 };
 
 export default nextConfig;
