@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart } from "lucide-react"; // Added ShoppingCart for CM
+import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
 type CardItemProps = {
@@ -22,9 +22,8 @@ const formatDisplayVariant = (variantKey?: string): string | null => {
     .trim();
 };
 
-// Basic normalization for matching
 const normalizeString = (str: string = ""): string => {
-  return str.toLowerCase().replace(/[^a-z0-9]/gi, ''); // Keep only alphanumeric
+  return str.toLowerCase().replace(/[^a-z0-9]/gi, ''); 
 };
 
 export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardItemProps) {
@@ -32,33 +31,47 @@ export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardI
   const displayVariant = formatDisplayVariant(card.variant);
 
   const [cmPrices, setCmPrices] = useState<CardmarketProduct | null>(null);
+  const [cmStatus, setCmStatus] = useState<string | null>(null);
 
   useEffect(() => {
+    setCmPrices(null); // Reset on card change
+    setCmStatus(null); // Reset status
+
     if (cardmarketPriceGuide && card.name && card.set) {
       const normalizedCardName = normalizeString(card.name);
       const normalizedCardSet = normalizeString(card.set);
-      // Attempt to find a match. This logic can be quite complex due to name/set variations.
-      // For now, a simple includes match for name and exact (normalized) for set.
-      // Cardmarket's "Expansion" often includes series info, e.g., "Sword & Shield: Rebel Clash"
-      // PokemonTCG.io set name might be "Rebel Clash".
-      // We might need a more robust mapping or smarter normalization.
       
       const foundProduct = cardmarketPriceGuide.find(cmProduct => {
         const normalizedCmName = normalizeString(cmProduct.Name);
         const normalizedCmSet = normalizeString(cmProduct.Expansion);
         
-        // Check if PokemonTCG set name is part of Cardmarket expansion name
-        // and PokemonTCG card name is part of Cardmarket card name.
-        // This is a common pattern.
         return normalizedCmName.includes(normalizedCardName) && 
                normalizedCmSet.includes(normalizedCardSet);
       });
 
-      setCmPrices(foundProduct || null);
-    } else {
-      setCmPrices(null);
+      if (foundProduct) {
+        setCmPrices(foundProduct);
+        if (!(foundProduct["Low Price"] || foundProduct["Trend Price"] || foundProduct["Average Sell Price"])) {
+          setCmStatus("(CM: Matched, no price data)");
+        }
+      } else {
+        // Only set status if guide is loaded but no match found for this specific card
+        // Avoids clutter if the whole guide failed to load (which would be handled by MyCollectionPage's error toast)
+        if (cardmarketPriceGuide.length > 0) { 
+            setCmStatus("(CM: No match in guide)");
+        }
+      }
+    } else if (cardmarketPriceGuide === null) {
+      // Guide is not loaded yet or failed to load (MyCollectionPage shows global error/loading)
+      setCmStatus(null); 
+    } else if (cardmarketPriceGuide && cardmarketPriceGuide.length === 0){
+      // Guide is loaded but empty
+      setCmStatus("(CM: Price guide empty)");
     }
+
   }, [card, cardmarketPriceGuide]);
+
+  const hasDisplayableCmPrices = cmPrices && (typeof cmPrices["Low Price"] === 'number' || typeof cmPrices["Trend Price"] === 'number' || typeof cmPrices["Average Sell Price"] === 'number');
 
   return (
     <Card className="shadow-lg hover:shadow-primary/20 transition-shadow duration-300 flex flex-col bg-card">
@@ -113,7 +126,7 @@ export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardI
           </a>
         )}
 
-        {cmPrices && (cmPrices["Low Price"] || cmPrices["Trend Price"] || cmPrices["Average Sell Price"]) && (
+        {hasDisplayableCmPrices && cmPrices && (
           <div className="mt-1 pt-1 border-t border-border/30 w-full">
             <p className="text-xs font-semibold text-blue-600 flex items-center gap-1 my-1">
               <ShoppingCart size={12}/> Cardmarket (EUR):
@@ -132,6 +145,12 @@ export function CardItem({ card, onEdit, onRemove, cardmarketPriceGuide }: CardI
                 </a>
             }
           </div>
+        )}
+        {/* Subtle status message for Cardmarket data */}
+        {cmStatus && !hasDisplayableCmPrices && (
+             <p className="text-xs text-muted-foreground italic flex items-center gap-1 mt-1">
+                <Info size={12}/> {cmStatus}
+            </p>
         )}
         
         <div className="flex gap-2 w-full mt-2">
