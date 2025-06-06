@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { PokemonCard } from "@/types";
+import type { PokemonCard, CardmarketPriceGuide } from "@/types";
 import { CardItem } from "./CardItem";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,9 +11,10 @@ type CardListProps = {
   cards: PokemonCard[];
   onEditCard: (card: PokemonCard) => void;
   onRemoveCard: (cardId: string) => void;
+  cardmarketPriceGuide: CardmarketPriceGuide | null;
 };
 
-export function CardList({ cards, onEditCard, onRemoveCard }: CardListProps) {
+export function CardList({ cards, onEditCard, onRemoveCard, cardmarketPriceGuide }: CardListProps) {
   if (cards.length === 0) {
     return (
       <Card className="shadow-lg">
@@ -43,14 +44,16 @@ export function CardList({ cards, onEditCard, onRemoveCard }: CardListProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-grow p-0">
-        <ScrollArea className="h-[calc(100vh-26rem)] md:h-[calc(100vh-22rem)] p-4 md:p-6"> {/* Adjusted height based on new controls */}
+        {/* Adjusted height: consider new filter section heights and potential cm loading text */}
+        <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-24rem)] p-4 md:p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {cards.map((card) => (
               <CardItem 
                 key={card.id} 
                 card={card} 
                 onEdit={() => onEditCard(card)} 
-                onRemove={() => onRemoveCard(card.id)} 
+                onRemove={() => onRemoveCard(card.id)}
+                cardmarketPriceGuide={cardmarketPriceGuide}
               />
             ))}
           </div>
@@ -59,5 +62,3 @@ export function CardList({ cards, onEditCard, onRemoveCard }: CardListProps) {
     </Card>
   );
 }
-
-    

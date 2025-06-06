@@ -4,13 +4,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { CardList } from "@/components/CardList";
-import type { PokemonCard } from "@/types";
+import type { PokemonCard, CardmarketPriceGuide } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { EditCardDialog } from "@/components/EditCardDialog"; 
-import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2 } from "lucide-react";
+import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +20,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
 export default function MyCollectionPage() {
@@ -34,6 +33,8 @@ export default function MyCollectionPage() {
   const [cardToDelete, setCardToDelete] = useState<PokemonCard | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  const [cardmarketPriceGuide, setCardmarketPriceGuide] = useState<CardmarketPriceGuide | null>(null);
+  const [isLoadingCmPrices, setIsLoadingCmPrices] = useState(false);
 
   const { toast } = useToast();
 
@@ -46,7 +47,30 @@ export default function MyCollectionPage() {
   useEffect(() => {
     setIsClient(true);
     loadCards();
-  }, [loadCards]);
+
+    const fetchCmPrices = async () => {
+      setIsLoadingCmPrices(true);
+      try {
+        const response = await fetch('/api/cardmarket-prices');
+        if (!response.ok) {
+          throw new Error('Failed to fetch Cardmarket prices');
+        }
+        const data: CardmarketPriceGuide = await response.json();
+        setCardmarketPriceGuide(data);
+      } catch (error) {
+        console.error("Error fetching Cardmarket prices:", error);
+        toast({
+          variant: "destructive",
+          title: "Cardmarket Price Error",
+          description: "Could not load Cardmarket price data.",
+        });
+      } finally {
+        setIsLoadingCmPrices(false);
+      }
+    };
+    fetchCmPrices();
+  }, [loadCards, toast]);
+
 
   // Listen for storage changes from other tabs (e.g., after adding a card)
   useEffect(() => {
@@ -83,10 +107,10 @@ export default function MyCollectionPage() {
       case "nameDesc":
         tempCards.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
         break;
-      case "valueDesc":
+      case "valueDesc": // TCGPlayer value
         tempCards.sort((a, b) => b.value - a.value);
         break;
-      case "valueAsc":
+      case "valueAsc": // TCGPlayer value
         tempCards.sort((a, b) => a.value - b.value);
         break;
       case "setAsc":
@@ -94,6 +118,7 @@ export default function MyCollectionPage() {
         break;
       case "dateAddedDesc":
       default:
+        // Already sorted by reverse chronological on load typically
         break; 
       case "dateAddedAsc":
         tempCards.reverse(); 
@@ -177,7 +202,8 @@ export default function MyCollectionPage() {
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
         <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
-          <p className="text-xl text-muted-foreground animate-pulse">Loading your collection...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-3 text-xl text-muted-foreground">Loading your collection...</p>
         </main>
       </div>
     );
@@ -226,13 +252,23 @@ export default function MyCollectionPage() {
                 <SelectItem value="quantityAsc">Quantity (Low-High)</SelectItem>
               </SelectContent>
             </Select>
+            {isLoadingCmPrices && (
+              <div className="flex items-center justify-center text-muted-foreground text-sm">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading CM Prices...
+              </div>
+            )}
           </div>
            <Button onClick={resetFilters} variant="ghost" size="sm" className="mt-4 text-sm text-muted-foreground hover:text-primary">
               <ListRestart className="mr-2 h-4 w-4"/> Reset Filters
             </Button>
         </section>
 
-        <CardList cards={filteredCards} onEditCard={handleEditCard} onRemoveCard={handleRemoveCard} />
+        <CardList 
+            cards={filteredCards} 
+            onEditCard={handleEditCard} 
+            onRemoveCard={handleRemoveCard} 
+            cardmarketPriceGuide={cardmarketPriceGuide}
+        />
         
         {filteredCards.length === 0 && searchTerm && (
           <div className="text-center py-10 text-muted-foreground">
@@ -274,13 +310,9 @@ export default function MyCollectionPage() {
         </AlertDialog>
       )}
 
-
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
         Pokédex Tracker &copy; {new Date().getFullYear()}
       </footer>
     </div>
   );
 }
-    
-    
-    
