@@ -25,7 +25,7 @@ const formatDisplayVariant = (variantKey?: string): string | null => {
 };
 
 const normalizeString = (str: string = ""): string => {
-  return str.toLowerCase().replace(/[^a-z0-9]/gi, ''); 
+  return str.toLowerCase().replace(/[^a-z0-9]/gi, '');
 };
 
 export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarketPriceGuide }: CardItemProps) {
@@ -36,8 +36,8 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
   const [cmStatus, setCmStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    setCmPrices(null); 
-    setCmStatus(null); 
+    setCmPrices(null);
+    setCmStatus(null);
 
     if (cardmarketPriceGuide && card.name && card.set && card.language === 'English') { // Only fetch CM for English cards
       const normalizedCardName = normalizeString(card.name);
@@ -47,7 +47,7 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
         const normalizedCmName = normalizeString(cmProduct.Name);
         const normalizedCmSet = normalizeString(cmProduct.Expansion);
         
-        return normalizedCmName.includes(normalizedCardName) && 
+        return normalizedCmName.includes(normalizedCardName) &&
                normalizedCmSet.includes(normalizedCardSet);
       });
 
@@ -57,14 +57,14 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
           setCmStatus("(CM: Matched, no price data)");
         }
       } else {
-        if (cardmarketPriceGuide.length > 0) { 
+        if (cardmarketPriceGuide.length > 0) {
             setCmStatus("(CM: No match in guide)");
         }
       }
     } else if (card.language === 'Japanese') {
       setCmStatus("(Cardmarket prices N/A for Japanese cards)");
     } else if (cardmarketPriceGuide === null) {
-      setCmStatus(null); 
+      setCmStatus(null);
     } else if (cardmarketPriceGuide && cardmarketPriceGuide.length === 0){
       setCmStatus("(CM: Price guide empty)");
     }
@@ -74,7 +74,7 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
   const hasDisplayableCmPrices = cmPrices && (typeof cmPrices["Low Price"] === 'number' || typeof cmPrices["Trend Price"] === 'number' || typeof cmPrices["Average Sell Price"] === 'number');
 
   return (
-    <Card className="shadow-lg hover:shadow-primary/20 transition-shadow duration-300 flex flex-col bg-card">
+    <Card className="shadow-lg hover:shadow-primary/20 transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col bg-card">
       <CardHeader className="pb-3">
         <CardTitle className="font-headline text-lg leading-tight">
           {card.name || `${card.set} #${card.cardNumber}`}
@@ -82,16 +82,16 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
         {card.name && <CardDescription className="text-xs">{card.set} #{card.cardNumber}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-2 flex-grow pb-3">
-        <div 
+        <div
           className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner cursor-pointer group"
           onClick={() => onView(cardIndex)} // Make image clickable
         >
-          <Image 
-            src={card.imageUrl || "https://placehold.co/250x350.png"} 
-            alt={card.name || card.cardNumber} 
-            width={250} 
-            height={350} 
-            className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-200" 
+          <Image
+            src={card.imageUrl || "https://placehold.co/250x350.png"}
+            alt={card.name || card.cardNumber}
+            width={250}
+            height={350}
+            className="object-contain w-full h-full transition-transform duration-200"
             data-ai-hint="pokemon card front"
           />
           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
@@ -109,15 +109,15 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
           </div>
         )}
          <div className="flex items-center gap-2 text-xs">
-          <Languages className="h-3.5 w-3.5 text-indigo-500" /> 
+          <Languages className="h-3.5 w-3.5 text-indigo-500" />
           <strong>Language:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-indigo-500/50 text-indigo-600">{card.language}</Badge>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <ShieldCheck className="h-3.5 w-3.5 text-green-500" /> 
+          <ShieldCheck className="h-3.5 w-3.5 text-green-500" />
           <strong>Condition:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5">{card.condition}</Badge>
         </div>
          <div className="flex items-center gap-2 text-xs">
-          <Layers className="h-3.5 w-3.5 text-purple-500" /> 
+          <Layers className="h-3.5 w-3.5 text-purple-500" />
           <strong>Quantity:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-purple-500/50 text-purple-600">{card.quantity}</Badge>
         </div>
       </CardContent>
@@ -149,8 +149,8 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
             {typeof cmPrices["Average Sell Price"] === 'number' && <p className="text-xs">Avg Sell: €{cmPrices["Average Sell Price"].toFixed(2)}</p>}
             {typeof cmPrices["Trend Price"] === 'number' && <p className="text-xs">Trend: €{cmPrices["Trend Price"].toFixed(2)}</p>}
             {typeof cmPrices["Low Price"] === 'number' && <p className="text-xs">Low: €{cmPrices["Low Price"].toFixed(2)}</p>}
-            {cmPrices.idProduct && 
-                <a 
+            {cmPrices.idProduct &&
+                <a
                     href={`https://www.cardmarket.com/en/Pokemon/Products/Singles/${cmPrices.Expansion}/${cmPrices.Name}?idProduct=${cmPrices.idProduct}`}
                     target="_blank"
                     rel="noopener noreferrer"
