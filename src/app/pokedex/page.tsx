@@ -15,6 +15,7 @@ import { Loader2, Search, ListChecks, MapPin, Hash, Trophy } from "lucide-react"
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 
 const PokedexPage: NextPage = () => {
   console.log("Attempting to re-render PokedexPage to refresh build artifacts. Adding a log to test.");
@@ -207,13 +208,16 @@ const PokedexPage: NextPage = () => {
           <CardContent>
             <ScrollArea className="h-[calc(100vh-20.1rem-3.5rem)] md:h-[calc(100vh-24.1rem-3.5rem)]"> {/* Adjusted height for stats bar */}
               {filteredPokemon.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                   {filteredPokemon.map((pokemon) => {
                     const isCollected = collectedPokemonNames.has(pokemon.name.toLowerCase());
                     return (
                       <Link key={pokemon.id} href={`/pokedex/${encodeURIComponent(pokemon.name.toLowerCase())}`} passHref legacyBehavior>
                         <a className="block group">
-                          <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-3 text-center h-full">
+                          <Card className={cn(
+                              "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-3 text-center h-full",
+                              "group-hover:z-10 relative"
+                            )}>
                             <div className={`relative w-24 h-24 mb-2 bg-muted/30 rounded-full overflow-hidden flex items-center justify-center ${!isCollected ? 'grayscale' : ''}`} data-ai-hint="pokemon sprite icon">
                               <Image src={pokemon.spriteUrl} alt={pokemon.name} width={96} height={96} objectFit="contain" />
                             </div>
@@ -248,5 +252,7 @@ const PokedexPage: NextPage = () => {
 
 export default PokedexPage;
 
+
+    
 
     
