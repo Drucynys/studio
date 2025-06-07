@@ -43,6 +43,7 @@ export function FullScreenCardView({
     }
   }, [isOpen]);
 
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isOpen || currentIndex === null) return;
@@ -187,7 +188,7 @@ export function FullScreenCardView({
             ref={cardRef}
             key={currentCard.id} 
             style={cardStyle}
-            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl overflow-hidden"
+            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl shadow-2xl overflow-hidden"
             data-ai-hint="pokemon card front large interactive"
           >
             {/* Background Glow Layer */}
