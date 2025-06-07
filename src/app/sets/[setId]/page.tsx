@@ -338,7 +338,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
             {!isLoading && !error && (
               <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]">
                 {filteredCards.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-24">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-24 px-4">
                     {filteredCards.map((card) => {
                         const isCollected = collectionCards.some(
                             (collected) =>
@@ -350,7 +350,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                             <Card
                                 key={card.id}
                                 onClick={() => openDialogForCard(card)}
-                                className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transform transition-all duration-200 ease-out hover:scale-105 hover:-translate-y-1 group flex flex-col group-hover:z-10 relative"
+                                className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transform transition-all duration-200 ease-out hover:scale-105 hover:-translate-y-1 group flex flex-col group-hover:z-10 relative bg-card"
                             >
                             <div className={cn(
                                 "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 group-hover:grayscale-0",
