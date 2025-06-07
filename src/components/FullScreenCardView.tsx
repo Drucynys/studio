@@ -36,7 +36,6 @@ export function FullScreenCardView({
 
   useEffect(() => {
     if (!isOpen) {
-      // Only reset when dialog is explicitly closed
       setCardDimensions({ width: 1, height: 1 });
       setIsHovering(false);
       setMousePosition({ x: 0, y: 0 });
@@ -115,8 +114,8 @@ export function FullScreenCardView({
   const displayVariant = formatDisplayVariant(currentCard.variant);
 
   let dynamicCardTransform = "scale(1.0) translateY(-10px)";
-  let shineBackground = "transparent";
-  let shineOpacity = 0;
+  // let shineBackground = "transparent"; // Shine disabled for now
+  // let shineOpacity = 0; // Shine disabled for now
 
   if (
     isHovering &&
@@ -134,11 +133,11 @@ export function FullScreenCardView({
 
     dynamicCardTransform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px) translateY(-10px)`;
 
-    const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
-    const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
+    // const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
+    // const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
 
-    shineBackground = `radial-gradient(circle farthest-corner at ${shineXPercent}% ${shineYPercent}%, rgba(255,255,255,0.6), rgba(255,255,255,0) 60%)`;
-    shineOpacity = 0.7;
+    // shineBackground = `radial-gradient(circle farthest-corner at ${shineXPercent}% ${shineYPercent}%, rgba(255,255,255,0.6), rgba(255,255,255,0) 60%)`;
+    // shineOpacity = 0.7;
   }
 
   const cardStyle: React.CSSProperties = {
@@ -147,17 +146,17 @@ export function FullScreenCardView({
     transition: "transform 0.05s linear",
   };
 
-  const shineStyle: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    background: shineBackground,
-    opacity: shineOpacity,
-    mixBlendMode: "color-dodge",
-    pointerEvents: "none",
-    zIndex: 10,
-    transition: "opacity 0.05s linear",
-    borderRadius: 'inherit', // Ensures shine respects outer container's rounding
-  };
+  // const shineStyle: React.CSSProperties = { // Shine disabled for now
+  //   position: "absolute",
+  //   inset: 0,
+  //   background: shineBackground,
+  //   opacity: shineOpacity,
+  //   mixBlendMode: "color-dodge",
+  //   pointerEvents: "none",
+  //   zIndex: 10,
+  //   transition: "opacity 0.05s linear",
+  //   borderRadius: 'inherit',
+  // };
 
   const tiltContainerStyle: React.CSSProperties = {
     perspective: "1500px",
@@ -199,8 +198,7 @@ export function FullScreenCardView({
           >
             {/* Main Card Image Layer */}
             <div 
-              className="relative w-full h-full z-[1]"
-              style={{ clipPath: 'inset(0 round 1rem)' }}
+              className="relative w-full h-full z-[1] rounded-xl overflow-hidden"
             >
               <Image
                 key={`${currentCard.id}-image`}
@@ -209,11 +207,13 @@ export function FullScreenCardView({
                 layout="fill"
                 objectFit="contain"
                 priority
+                className="rounded-xl"
               />
             </div>
 
-            {/* Shine Overlay Layer */}
+            {/* Shine Overlay Layer - Temporarily Commented Out
             <div style={shineStyle} />
+            */}
           </div>
 
           {currentIndex !== null && currentIndex < cards.length - 1 && (
@@ -250,4 +250,3 @@ export function FullScreenCardView({
     </Dialog>
   );
 }
-
