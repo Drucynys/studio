@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Search, ListChecks, MapPin, Hash } from "lucide-react";
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
+import type { PokemonCard as CollectionPokemonCard } from "@/types"; // Import collection card type
 
 const PokedexPage: NextPage = () => {
   console.log("Attempting to re-render PokedexPage to refresh build artifacts.");
@@ -22,18 +23,63 @@ const PokedexPage: NextPage = () => {
   
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState<string>("all"); // 'all' or region name
+  const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [isClient, setIsClient] = useState(false);
+
+  const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
+
+  const loadCollectionCards = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const storedCards = localStorage.getItem("pokemonCards");
+    if (storedCards) {
+      try {
+        const parsedCards = JSON.parse(storedCards) as CollectionPokemonCard[];
+        if (Array.isArray(parsedCards)) {
+          setCollectionCards(parsedCards);
+        }
+      } catch (error) {
+        console.error("Failed to parse collection cards from localStorage", error);
+        setCollectionCards([]);
+      }
+    } else {
+      setCollectionCards([]);
+    }
+  }, []);
 
   useEffect(() => {
     setIsClient(true);
+    loadCollectionCards();
     // Simulate loading data
     setTimeout(() => {
       setPokemonList(allPokemonData);
       setRegions(pokedexRegions);
       setIsLoading(false);
-    }, 500); // Simulate a short delay
-  }, []);
+    }, 500);
+  }, [loadCollectionCards]);
+
+  // Listener for localStorage changes from other tabs/pages
+  useEffect(() => {
+    if (!isClient) return;
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "pokemonCards") {
+        loadCollectionCards(); 
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isClient, loadCollectionCards]);
+
+
+  const collectedPokemonNames = useMemo(() => {
+    if (!isClient) return new Set<string>();
+    const names = new Set<string>();
+    collectionCards.forEach(card => {
+      if (card.name) {
+        names.add(card.name.toLowerCase());
+      }
+    });
+    return names;
+  }, [collectionCards, isClient]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -53,7 +99,6 @@ const PokedexPage: NextPage = () => {
       );
     }
     
-    // Sort by Pokedex ID
     tempPokemon.sort((a,b) => a.id - b.id);
 
     setFilteredPokemon(tempPokemon);
@@ -82,7 +127,7 @@ const PokedexPage: NextPage = () => {
                 <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
                   <ListChecks className="h-8 w-8 text-primary" /> Pokédex
                 </CardTitle>
-                <CardDescription>Browse Pokémon by name, number, or region.</CardDescription>
+                <CardDescription>Browse Pokémon. Colored sprites indicate a card of that Pokémon is in your collection.</CardDescription>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                 <div className="relative flex-grow md:flex-grow-0 md:w-64">
@@ -112,26 +157,29 @@ const PokedexPage: NextPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-20.1rem)] md:h-[calc(100vh-24.1rem)]"> {/* Slightly changed height */}
+            <ScrollArea className="h-[calc(100vh-20.1rem)] md:h-[calc(100vh-24.1rem)]">
               {filteredPokemon.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {filteredPokemon.map((pokemon) => (
-                    <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} passHref legacyBehavior>
-                      <a className="block group">
-                        <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-3 text-center h-full">
-                          <div className="relative w-24 h-24 mb-2 bg-muted/30 rounded-full overflow-hidden flex items-center justify-center" data-ai-hint="pokemon sprite icon">
-                            <Image src={pokemon.spriteUrl} alt={pokemon.name} width={96} height={96} objectFit="contain" />
-                          </div>
-                          <p className="font-semibold text-card-foreground group-hover:text-primary text-sm md:text-base">{pokemon.name}</p>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1"><Hash size={12}/> #{pokemon.id.toString().padStart(3, '0')}</p>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin size={12}/> {pokemon.region}</p>
-                          <Button variant="outline" size="sm" className="mt-3 w-full text-xs group-hover:bg-primary group-hover:text-primary-foreground">
-                            View Details
-                          </Button>
-                        </Card>
-                      </a>
-                    </Link>
-                  ))}
+                  {filteredPokemon.map((pokemon) => {
+                    const isCollected = collectedPokemonNames.has(pokemon.name.toLowerCase());
+                    return (
+                      <Link key={pokemon.id} href={`/pokedex/${encodeURIComponent(pokemon.name.toLowerCase())}`} passHref legacyBehavior>
+                        <a className="block group">
+                          <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-3 text-center h-full">
+                            <div className={`relative w-24 h-24 mb-2 bg-muted/30 rounded-full overflow-hidden flex items-center justify-center ${!isCollected ? 'grayscale' : ''}`} data-ai-hint="pokemon sprite icon">
+                              <Image src={pokemon.spriteUrl} alt={pokemon.name} width={96} height={96} objectFit="contain" />
+                            </div>
+                            <p className="font-semibold text-card-foreground group-hover:text-primary text-sm md:text-base">{pokemon.name}</p>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1"><Hash size={12}/> #{pokemon.id.toString().padStart(3, '0')}</p>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin size={12}/> {pokemon.region}</p>
+                            <Button variant="outline" size="sm" className="mt-3 w-full text-xs group-hover:bg-primary group-hover:text-primary-foreground">
+                              View Details
+                            </Button>
+                          </Card>
+                        </a>
+                      </Link>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-10 text-muted-foreground">
