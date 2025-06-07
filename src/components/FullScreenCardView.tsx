@@ -36,7 +36,6 @@ export function FullScreenCardView({
 
   useEffect(() => {
     if (!isOpen) {
-      // Reset states only when dialog is closed
       setCardDimensions({ width: 1, height: 1 });
       setIsHovering(false);
       setMousePosition({ x: 0, y: 0 });
@@ -75,7 +74,6 @@ export function FullScreenCardView({
     const currentWidth = cardRef.current.offsetWidth;
     const currentHeight = cardRef.current.offsetHeight;
   
-    // Only update dimensions if they are valid and different from current
     if (
       currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT &&
       currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT &&
@@ -191,7 +189,7 @@ export function FullScreenCardView({
             ref={cardRef}
             key={currentCard.id} 
             style={cardStyle}
-            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl overflow-hidden shadow-2xl"
+            className="relative aspect-[2.5/3.5] h-[70vh] max-h-[650px] w-auto rounded-xl overflow-hidden shadow-2xl"
             data-ai-hint="pokemon card front large interactive"
           >
             {/* Main Card Image Layer */}
