@@ -36,6 +36,7 @@ export function FullScreenCardView({
 
   useEffect(() => {
     if (!isOpen) {
+      // Only reset when dialog is explicitly closed
       setCardDimensions({ width: 1, height: 1 });
       setIsHovering(false);
       setMousePosition({ x: 0, y: 0 });
@@ -67,7 +68,7 @@ export function FullScreenCardView({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !isOpen) {
-      if (isHovering) setIsHovering(false);
+       if (isHovering) setIsHovering(false); // Ensure isHovering is false if conditions not met
       return;
     }
   
@@ -76,10 +77,15 @@ export function FullScreenCardView({
   
     if (
       currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT &&
-      currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT &&
-      (cardDimensions.width !== currentWidth || cardDimensions.height !== currentHeight)
+      currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT
     ) {
-      setCardDimensions({ width: currentWidth, height: currentHeight });
+      if (cardDimensions.width !== currentWidth || cardDimensions.height !== currentHeight) {
+        setCardDimensions({ width: currentWidth, height: currentHeight });
+      }
+    } else {
+      // If dimensions are too small, don't enable hover/tilt.
+      if (isHovering) setIsHovering(false);
+      return;
     }
     
     if (!isHovering) setIsHovering(true);
@@ -109,7 +115,7 @@ export function FullScreenCardView({
   
   const displayVariant = formatDisplayVariant(currentCard.variant);
 
-  let dynamicCardTransform = "scale(1.0)";
+  let dynamicCardTransform = "scale(1.0) translateY(-100px)";
   let shineBackground = "transparent";
   let shineOpacity = 0;
 
@@ -127,7 +133,7 @@ export function FullScreenCardView({
     const rotateY = (mouseXFromCenter / centerX) * MAX_ROTATION;
     const rotateX = (mouseYFromCenter / centerY) * -MAX_ROTATION;
 
-    dynamicCardTransform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px)`;
+    dynamicCardTransform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px) translateY(-100px)`;
 
     const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
     const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
