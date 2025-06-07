@@ -137,7 +137,7 @@ export function MarketPriceHistoryChart({ variantName, variantMarketPrice }: Mar
       <CardContent>
         <div className="h-[300px] w-full mb-4">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 15, left: 25, bottom: 5 }}>
+            <LineChart data={chartData} margin={{ top: 5, right: 15, left: 45, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border)/0.5)" />
               <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
               <YAxis 
