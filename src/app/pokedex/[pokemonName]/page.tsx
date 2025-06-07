@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
