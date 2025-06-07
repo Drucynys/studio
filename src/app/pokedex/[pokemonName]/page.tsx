@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { allPokemonData, type PokemonPokedexEntry } from "../pokedexData";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { cn } from "@/lib/utils";
-import { TiltableCard } from "@/components/TiltableCard"; // Import the new component
+
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
@@ -340,18 +340,18 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
                             collected.cardNumber === card.number
                         );
                         return (
-                            <TiltableCard
+                            <Card
                                 key={card.id}
                                 onClick={() => openDialogForCard(card)}
                                 className={cn(
-                                  "p-2 cursor-pointer group flex flex-col relative bg-card", // Base classes
-                                  "transform transition-all duration-200 ease-out", // Base for transition
-                                  "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:border-primary group-hover:z-10" // Hover effects
+                                  "p-2 cursor-pointer group flex flex-col relative bg-card",
+                                  "transform transition-all duration-200 ease-out",
+                                  "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:border-primary group-hover:z-10"
                                 )}
                             >
                             <div className={cn(
                                 "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner",
-                                "group-hover:grayscale-0", // Apply to group for TiltableCard
+                                "group-hover:grayscale-0", 
                                 !isCollected && "grayscale"
                             )}>
                                 <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
@@ -361,7 +361,7 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
                                 <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
                                 <p className="text-xs text-muted-foreground">{card.set.name}</p>
                             </div>
-                            </TiltableCard>
+                            </Card>
                         );
                     })}
                     </div>

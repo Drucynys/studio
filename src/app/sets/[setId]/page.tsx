@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { TiltableCard } from "@/components/TiltableCard"; // Import the new component
+
 
 export interface ApiPokemonCard {
   id: string;
@@ -342,13 +342,13 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                             collected.cardNumber === card.number
                         );
                         return (
-                            <TiltableCard
+                            <Card
                                 key={card.id}
                                 onClick={() => openDialogForCard(card)}
                                 className={cn(
                                     "p-2 cursor-pointer group flex flex-col relative bg-card",
-                                    "transform transition-all duration-200 ease-out", // Base for transition
-                                    "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:border-primary group-hover:z-10" // Hover effects
+                                    "transform transition-all duration-200 ease-out",
+                                    "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:border-primary group-hover:z-10"
                                 )}
                             >
                               <div className={cn(
@@ -361,11 +361,11 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                                   <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
                                   <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
                               </div>
-                            </TiltableCard>
+                            </Card>
                         );
                     })}
                     </div>
-                ): (
+                {(!isLoading && !error && filteredCards.length === 0) && (
                     <div className="text-center py-10 text-muted-foreground">
                         <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
                         <p className="text-lg">{searchTerm ? "No cards found matching your search." : "No cards found in this set, or the API returned no data."}</p>
