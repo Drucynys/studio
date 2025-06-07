@@ -76,7 +76,7 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
 
   return (
     <Card className={cn(
-      "relative shadow-lg hover:shadow-primary/20 transition-all duration-300 ease-in-out transform hover:scale-105 hover:z-10 flex flex-col bg-card"
+      "relative shadow-lg hover:shadow-primary/20 transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-1 hover:z-10 flex flex-col bg-card"
     )}>
       <CardHeader className="pb-3">
         <CardTitle className="font-headline text-lg leading-tight">
