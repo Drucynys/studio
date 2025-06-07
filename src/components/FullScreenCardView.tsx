@@ -194,7 +194,7 @@ export function FullScreenCardView({
             ref={cardRef}
             key={currentCard.id} 
             style={cardStyle}
-            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl overflow-hidden shadow-2xl"
+            className="relative aspect-[2.5/3.5] h-[72vh] max-h-[680px] w-auto rounded-xl overflow-hidden shadow-2xl"
             data-ai-hint="pokemon card front large interactive"
           >
             {/* Main Card Image Layer */}
