@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye, Languages } from "lucide-react";
 import React, { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
 
 type CardItemProps = {
   card: PokemonCard;
@@ -74,7 +75,9 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
   const hasDisplayableCmPrices = cmPrices && (typeof cmPrices["Low Price"] === 'number' || typeof cmPrices["Trend Price"] === 'number' || typeof cmPrices["Average Sell Price"] === 'number');
 
   return (
-    <Card className="shadow-lg hover:shadow-primary/20 transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col bg-card">
+    <Card className={cn(
+      "relative shadow-lg hover:shadow-primary/20 transition-all duration-300 ease-in-out transform hover:scale-105 hover:z-10 flex flex-col bg-card"
+    )}>
       <CardHeader className="pb-3">
         <CardTitle className="font-headline text-lg leading-tight">
           {card.name || `${card.set} #${card.cardNumber}`}
