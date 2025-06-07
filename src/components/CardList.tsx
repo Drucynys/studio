@@ -46,7 +46,7 @@ export function CardList({ cards, onEditCard, onRemoveCard, onViewCard, cardmark
       </CardHeader>
       <CardContent className="flex-grow p-0">
         <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-24rem)] p-4 md:p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 relative">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             {cards.map((card, index) => ( // Added index here
               <CardItem 
                 key={card.id} 
