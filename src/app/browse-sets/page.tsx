@@ -30,7 +30,7 @@ interface ApiSet {
   };
 }
 
-// For api.tcgdex.net/v2/jp/sets
+// For api.tcgdex.net/v2/jp/sets or api.tcgdex.dev/v2/jp/sets
 interface TcgDexApiSet {
   id: string;
   name: string;
@@ -124,7 +124,8 @@ const BrowseSetsPage: NextPage = () => {
           language: 'English',
         }));
       } else { // Japanese
-        const response = await fetch("https://api.tcgdex.net/v2/jp/sets");
+        // Updated to use api.tcgdex.dev based on user hint
+        const response = await fetch("https://api.tcgdex.dev/v2/jp/sets");
         if (!response.ok) {
           throw new Error(`Failed to fetch Japanese sets: ${response.statusText || 'Server responded with an error'} (status: ${response.status})`);
         }
@@ -149,7 +150,7 @@ const BrowseSetsPage: NextPage = () => {
       console.error(`Error fetching ${selectedLanguage} sets:`, err);
       let detailedError = err instanceof Error ? err.message : "An unknown error occurred";
       if (err instanceof Error && err.message.includes("(status: 404)") && selectedLanguage === 'Japanese') {
-        detailedError = "The data source for Japanese sets (TCGdex API) returned a 'Not Found' error. This might be a temporary issue with the API. Please try again later or select English sets.";
+        detailedError = "The data source for Japanese sets (TCGdex API) returned a 'Not Found' error. This might be a temporary issue with the API or the endpoint may have changed. Please try again later or select English sets.";
       }
       setError(detailedError);
     } finally {
@@ -307,6 +308,8 @@ const BrowseSetsPage: NextPage = () => {
 };
 
 export default BrowseSetsPage;
+    
+
     
 
     
