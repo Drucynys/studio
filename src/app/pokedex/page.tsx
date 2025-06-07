@@ -15,7 +15,7 @@ import { Loader2, Search, ListChecks, MapPin, Hash } from "lucide-react";
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
 
 const PokedexPage: NextPage = () => {
-  console.log("Attempting to re-render PokedexPage to refresh build artifacts."); // Added console.log
+  console.log("Attempting to re-render PokedexPage to refresh build artifacts.");
   const [pokemonList, setPokemonList] = useState<PokemonPokedexEntry[]>([]);
   const [filteredPokemon, setFilteredPokemon] = useState<PokemonPokedexEntry[]>([]);
   const [regions, setRegions] = useState<PokedexRegion[]>([]);
@@ -112,7 +112,7 @@ const PokedexPage: NextPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-20rem)] md:h-[calc(100vh-24rem)]">
+            <ScrollArea className="h-[calc(100vh-20.1rem)] md:h-[calc(100vh-24.1rem)]"> {/* Slightly changed height */}
               {filteredPokemon.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                   {filteredPokemon.map((pokemon) => (
