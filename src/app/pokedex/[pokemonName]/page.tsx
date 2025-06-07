@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, use } from "react"; // Added 'use'
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -21,7 +21,8 @@ const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Pla
 
 
 const PokemonDetailPage: NextPage<{ params: { pokemonName: string } }> = ({ params }) => {
-  const { pokemonName: rawPokemonName } = params;
+  const resolvedParams = use(params); // Unwrap params
+  const { pokemonName: rawPokemonName } = resolvedParams;
   const pokemonName = decodeURIComponent(rawPokemonName).toLowerCase();
 
   const [pokemonDetails, setPokemonDetails] = useState<PokemonPokedexEntry | null>(null);
@@ -345,5 +346,4 @@ const PokemonDetailPage: NextPage<{ params: { pokemonName: string } }> = ({ para
 };
 
 export default PokemonDetailPage;
-
     
