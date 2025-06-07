@@ -15,6 +15,7 @@ import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle } fr
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input"; 
 import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 
 export interface ApiPokemonCard {
   id: string;
@@ -339,21 +340,32 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
               <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]"> 
                 {filteredCards.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {filteredCards.map((card) => (
-                        <Card 
-                            key={card.id} 
-                            onClick={() => openDialogForCard(card)}
-                            className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transition-all group flex flex-col"
-                        >
-                        <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2">
-                            <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
-                        </div>
-                        <div className="text-center mt-auto">
-                            <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
-                            <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
-                        </div>
-                        </Card>
-                    ))}
+                    {filteredCards.map((card) => {
+                        const isCollected = collectionCards.some(
+                            (collected) =>
+                            collected.name === card.name &&
+                            collected.set === card.set.name &&
+                            collected.cardNumber === card.number
+                        );
+                        return (
+                            <Card 
+                                key={card.id} 
+                                onClick={() => openDialogForCard(card)}
+                                className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transition-all group flex flex-col"
+                            >
+                            <div className={cn(
+                                "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2",
+                                !isCollected && "grayscale"
+                            )}>
+                                <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                            </div>
+                            <div className="text-center mt-auto">
+                                <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
+                                <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
+                            </div>
+                            </Card>
+                        );
+                    })}
                     </div>
                 ): (
                     <div className="text-center py-10 text-muted-foreground">

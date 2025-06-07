@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback, use } from "react"; // Added 'use'
+import { useEffect, useState, useCallback, use } from "react"; 
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -15,6 +15,7 @@ import { Loader2, ArrowLeft, ShieldAlert, Images, ServerCrash, Info } from "luci
 import { useToast } from "@/hooks/use-toast";
 import { allPokemonData, type PokemonPokedexEntry } from "../pokedexData";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+import { cn } from "@/lib/utils";
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
@@ -23,8 +24,8 @@ interface PokemonDetailPageProps {
 }
 
 const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
-  const resolvedParams = use(params); // Unwrap params using React.use()
-  const rawPokemonNameFromParams = resolvedParams.pokemonName; // Access pokemonName from resolvedParams
+  const resolvedParams = use(params); 
+  const rawPokemonNameFromParams = resolvedParams.pokemonName; 
 
   const [pokemonName, setPokemonName] = useState<string>("");
   const [initializationError, setInitializationError] = useState<string | null>(null);
@@ -332,22 +333,33 @@ const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
               <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]">
                 {pokemonTcgCards.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                    {pokemonTcgCards.map((card) => (
-                        <Card
-                            key={card.id}
-                            onClick={() => openDialogForCard(card)}
-                            className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transition-all group flex flex-col bg-card"
-                        >
-                        <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner">
-                            <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
-                        </div>
-                        <div className="text-center mt-auto">
-                            <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
-                            <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
-                            <p className="text-xs text-muted-foreground">{card.set.name}</p>
-                        </div>
-                        </Card>
-                    ))}
+                    {pokemonTcgCards.map((card) => {
+                        const isCollected = collectionCards.some(
+                            (collected) =>
+                            collected.name === card.name &&
+                            collected.set === card.set.name &&
+                            collected.cardNumber === card.number
+                        );
+                        return (
+                            <Card
+                                key={card.id}
+                                onClick={() => openDialogForCard(card)}
+                                className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transition-all group flex flex-col bg-card"
+                            >
+                            <div className={cn(
+                                "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner",
+                                !isCollected && "grayscale"
+                            )}>
+                                <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                            </div>
+                            <div className="text-center mt-auto">
+                                <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
+                                <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
+                                <p className="text-xs text-muted-foreground">{card.set.name}</p>
+                            </div>
+                            </Card>
+                        );
+                    })}
                     </div>
                 ): (
                     <div className="text-center py-10 text-muted-foreground">
