@@ -21,7 +21,7 @@ export const pokedexRegions: PokedexRegion[] = [
   { name: "Kalos", generation: 6, pokemonCount: 72 },
   { name: "Alola", generation: 7, pokemonCount: 88 },
   { name: "Galar", generation: 8, pokemonCount: 96 }, // Reflects main Galar dex + IoA/CT additions often grouped
-  { name: "Paldea", generation: 9, pokemonCount: 100 }, // Placeholder count, adjust as more data comes
+  { name: "Paldea", generation: 9, pokemonCount: 120 }, // Updated count for Paldea based on 1025 max ID
 ];
 
 const getRegionForId = (id: number): string => {
@@ -32,8 +32,8 @@ const getRegionForId = (id: number): string => {
   if (id <= 649) return "Unova";
   if (id <= 721) return "Kalos";
   if (id <= 809) return "Alola";
-  if (id <= 905) return "Galar"; // Includes Isle of Armor and Crown Tundra often
-  if (id <= 1025) return "Paldea"; // Current known max for Paldea sprites
+  if (id <= 905) return "Galar"; 
+  if (id <= 1025) return "Paldea"; 
   return "Unknown";
 };
 
@@ -44,165 +44,23 @@ const createPokemonEntry = (id: number, name: string): PokemonPokedexEntry => ({
   spriteUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`,
 });
 
-export const allPokemonData: PokemonPokedexEntry[] = [
-  // Kanto (Gen 1)
-  createPokemonEntry(1, "Bulbasaur"),
-  createPokemonEntry(2, "Ivysaur"),
-  createPokemonEntry(3, "Venusaur"),
-  createPokemonEntry(4, "Charmander"),
-  createPokemonEntry(5, "Charmeleon"),
-  createPokemonEntry(6, "Charizard"),
-  createPokemonEntry(7, "Squirtle"),
-  createPokemonEntry(8, "Wartortle"),
-  createPokemonEntry(9, "Blastoise"),
-  createPokemonEntry(10, "Caterpie"),
-  createPokemonEntry(11, "Metapod"),
-  createPokemonEntry(12, "Butterfree"),
-  createPokemonEntry(13, "Weedle"),
-  createPokemonEntry(14, "Kakuna"),
-  createPokemonEntry(15, "Beedrill"),
-  createPokemonEntry(16, "Pidgey"),
-  createPokemonEntry(17, "Pidgeotto"),
-  createPokemonEntry(18, "Pidgeot"),
-  createPokemonEntry(19, "Rattata"),
-  createPokemonEntry(20, "Raticate"),
-  createPokemonEntry(21, "Spearow"),
-  createPokemonEntry(22, "Fearow"),
-  createPokemonEntry(23, "Ekans"),
-  createPokemonEntry(24, "Arbok"),
-  createPokemonEntry(25, "Pikachu"),
-  createPokemonEntry(26, "Raichu"),
-  createPokemonEntry(27, "Sandshrew"),
-  createPokemonEntry(28, "Sandslash"),
-  createPokemonEntry(29, "Nidoran♀"),
-  createPokemonEntry(30, "Nidorina"),
-  createPokemonEntry(31, "Nidoqueen"),
-  createPokemonEntry(32, "Nidoran♂"),
-  createPokemonEntry(33, "Nidorino"),
-  createPokemonEntry(34, "Nidoking"),
-  createPokemonEntry(35, "Clefairy"),
-  createPokemonEntry(36, "Clefable"),
-  createPokemonEntry(37, "Vulpix"),
-  createPokemonEntry(38, "Ninetales"),
-  createPokemonEntry(39, "Jigglypuff"),
-  createPokemonEntry(40, "Wigglytuff"),
-  createPokemonEntry(50, "Diglett"),
-  createPokemonEntry(51, "Dugtrio"),
-  createPokemonEntry(52, "Meowth"),
-  createPokemonEntry(53, "Persian"),
-  createPokemonEntry(54, "Psyduck"),
-  createPokemonEntry(55, "Golduck"),
-  createPokemonEntry(56, "Mankey"),
-  createPokemonEntry(57, "Primeape"),
-  createPokemonEntry(58, "Growlithe"),
-  createPokemonEntry(59, "Arcanine"),
-  createPokemonEntry(60, "Poliwag"),
-  createPokemonEntry(61, "Poliwhirl"),
-  createPokemonEntry(62, "Poliwrath"),
-  createPokemonEntry(63, "Abra"),
-  createPokemonEntry(64, "Kadabra"),
-  createPokemonEntry(65, "Alakazam"),
-  createPokemonEntry(66, "Machop"),
-  createPokemonEntry(67, "Machoke"),
-  createPokemonEntry(68, "Machamp"),
-  createPokemonEntry(74, "Geodude"),
-  createPokemonEntry(75, "Graveler"),
-  createPokemonEntry(76, "Golem"),
-  createPokemonEntry(77, "Ponyta"),
-  createPokemonEntry(78, "Rapidash"),
-  createPokemonEntry(92, "Gastly"),
-  createPokemonEntry(93, "Haunter"),
-  createPokemonEntry(94, "Gengar"),
-  createPokemonEntry(129, "Magikarp"),
-  createPokemonEntry(130, "Gyarados"),
-  createPokemonEntry(133, "Eevee"),
-  createPokemonEntry(134, "Vaporeon"),
-  createPokemonEntry(135, "Jolteon"),
-  createPokemonEntry(136, "Flareon"),
-  createPokemonEntry(143, "Snorlax"),
-  createPokemonEntry(147, "Dratini"),
-  createPokemonEntry(148, "Dragonair"),
-  createPokemonEntry(149, "Dragonite"),
-  createPokemonEntry(150, "Mewtwo"),
-  createPokemonEntry(151, "Mew"),
+const knownPokemonNames: { [id: number]: string } = {
+  1: "Bulbasaur", 2: "Ivysaur", 3: "Venusaur", 4: "Charmander", 5: "Charmeleon", 6: "Charizard", 7: "Squirtle", 8: "Wartortle", 9: "Blastoise", 10: "Caterpie", 11: "Metapod", 12: "Butterfree", 13: "Weedle", 14: "Kakuna", 15: "Beedrill", 16: "Pidgey", 17: "Pidgeotto", 18: "Pidgeot", 19: "Rattata", 20: "Raticate", 21: "Spearow", 22: "Fearow", 23: "Ekans", 24: "Arbok", 25: "Pikachu", 26: "Raichu", 27: "Sandshrew", 28: "Sandslash", 29: "Nidoran♀", 30: "Nidorina", 31: "Nidoqueen", 32: "Nidoran♂", 33: "Nidorino", 34: "Nidoking", 35: "Clefairy", 36: "Clefable", 37: "Vulpix", 38: "Ninetales", 39: "Jigglypuff", 40: "Wigglytuff", 50: "Diglett", 51: "Dugtrio", 52: "Meowth", 53: "Persian", 54: "Psyduck", 55: "Golduck", 56: "Mankey", 57: "Primeape", 58: "Growlithe", 59:  "Arcanine",  60:  _x001C_Poliwag_x001D_,  61:  _x001C_Poliwhirl_x001D_,  62:  _x001C_Poliwrath_x001D_,  63:  _x001C_Abra_x001D_,  64:  _x001C_Kadabra_x001D_,  65:  _x001C_Alakazam_x001D_,  66:  _x001C_Machop_x001D_,  67:  _x001C_Machoke_x001D_,  68:  _x001C_Machamp_x001D_,  74:  _x001C_Geodude_x001D_,  75:  _x001C_Graveler_x001D_,  76:  _x001C_Golem_x001D_,  77:  _x001C_Ponyta_x001D_,  78:  _x001C_Rapidash_x001D_,  92:  _x001C_Gastly_x001D_,  93:  _x001C_Haunter_x001D_,  94:  _x001C_Gengar_x001D_,  129: _x001C_Magikarp_x001D_, 130: _x001C_Gyarados_x001D_, 133: _x001C_Eevee_x001D_, 134: _x001C_Vaporeon_x001D_, 135: _x001C_Jolteon_x001D_, 136: _x001C_Flareon_x001D_, 143: _x001C_Snorlax_x001D_, 147: _x001C_Dratini_x001D_, 148: _x001C_Dragonair_x001D_, 149: _x001C_Dragonite_x001D_, 150: "Mewtwo", 151: "Mew",
+  152: "Chikorita", 153: "Bayleef", 154: "Meganium", 155: "Cyndaquil", 156: "Quilava", 157: "Typhlosion", 158: "Totodile", 159: "Croconaw", 160: "Feraligatr", 172: "Pichu", 175: "Togepi", 176: "Togetic", 196: "Espeon", 197: "Umbreon", 243: "Raikou", 244: "Entei", 245: "Suicune", 249: "Lugia", 250: "Ho-Oh", 251: "Celebi",
+  252: "Treecko", 253: "Grovyle", 254: "Sceptile", 255: "Torchic", 256: "Combusken", 257: "Blaziken", 258: "Mudkip", 259: "Marshtomp", 260: "Swampert", 280: "Ralts", 281: "Kirlia", 282: "Gardevoir", 382: "Kyogre", 383: "Groudon", 384: "Rayquaza",
+  387: "Turtwig", 388: "Grotle", 389: "Torterra", 390: "Chimchar", 391: "Monferno", 392: "Infernape", 393: "Piplup", 394: "Prinplup", 395: "Empoleon", 447: "Riolu", 448: "Lucario", 483: "Dialga", 484: "Palkia", 493: "Arceus",
+  495: "Snivy", 498: "Tepig", 501: "Oshawott",
+  650: "Chespin", 653: "Fennekin", 656: "Froakie",
+  722: "Rowlet", 725: "Litten", 728: "Popplio",
+  810: "Grookey", 813: "Scorbunny", 816: "Sobble",
+  906: "Sprigatito", 909: "Fuecoco", 912: "Quaxly",
+};
 
-  // Johto (Gen 2)
-  createPokemonEntry(152, "Chikorita"),
-  createPokemonEntry(153, "Bayleef"),
-  createPokemonEntry(154, "Meganium"),
-  createPokemonEntry(155, "Cyndaquil"),
-  createPokemonEntry(156, "Quilava"),
-  createPokemonEntry(157, "Typhlosion"),
-  createPokemonEntry(158, "Totodile"),
-  createPokemonEntry(159, "Croconaw"),
-  createPokemonEntry(160, "Feraligatr"),
-  createPokemonEntry(172, "Pichu"),
-  createPokemonEntry(175, "Togepi"),
-  createPokemonEntry(176, "Togetic"),
-  createPokemonEntry(196, "Espeon"),
-  createPokemonEntry(197, "Umbreon"),
-  createPokemonEntry(243, "Raikou"),
-  createPokemonEntry(244, "Entei"),
-  createPokemonEntry(245, "Suicune"),
-  createPokemonEntry(249, "Lugia"),
-  createPokemonEntry(250, "Ho-Oh"),
-  createPokemonEntry(251, "Celebi"),
-  
-  // Hoenn (Gen 3)
-  createPokemonEntry(252, "Treecko"),
-  createPokemonEntry(253, "Grovyle"),
-  createPokemonEntry(254, "Sceptile"),
-  createPokemonEntry(255, "Torchic"),
-  createPokemonEntry(256, "Combusken"),
-  createPokemonEntry(257, "Blaziken"),
-  createPokemonEntry(258, "Mudkip"),
-  createPokemonEntry(259, "Marshtomp"),
-  createPokemonEntry(260, "Swampert"),
-  createPokemonEntry(280, "Ralts"),
-  createPokemonEntry(281, "Kirlia"),
-  createPokemonEntry(282, "Gardevoir"),
-  createPokemonEntry(382, "Kyogre"),
-  createPokemonEntry(383, "Groudon"),
-  createPokemonEntry(384, "Rayquaza"),
+const generatedPokemonData: PokemonPokedexEntry[] = [];
+for (let id = 1; id <= 1025; id++) {
+  const name = knownPokemonNames[id] || `Pokémon #${id}`;
+  generatedPokemonData.push(createPokemonEntry(id, name));
+}
 
-  // Sinnoh (Gen 4)
-  createPokemonEntry(387, "Turtwig"),
-  createPokemonEntry(388, "Grotle"),
-  createPokemonEntry(389, "Torterra"),
-  createPokemonEntry(390, "Chimchar"),
-  createPokemonEntry(391, "Monferno"),
-  createPokemonEntry(392, "Infernape"),
-  createPokemonEntry(393, "Piplup"),
-  createPokemonEntry(394, "Prinplup"),
-  createPokemonEntry(395, "Empoleon"),
-  createPokemonEntry(447, "Riolu"),
-  createPokemonEntry(448, "Lucario"),
-  createPokemonEntry(483, "Dialga"),
-  createPokemonEntry(484, "Palkia"),
-  createPokemonEntry(493, "Arceus"),
+export const allPokemonData: PokemonPokedexEntry[] = generatedPokemonData;
 
-  // Unova (Gen 5) - Starters
-  createPokemonEntry(495, "Snivy"),
-  createPokemonEntry(498, "Tepig"),
-  createPokemonEntry(501, "Oshawott"),
-
-  // Kalos (Gen 6) - Starters
-  createPokemonEntry(650, "Chespin"),
-  createPokemonEntry(653, "Fennekin"),
-  createPokemonEntry(656, "Froakie"),
-
-  // Alola (Gen 7) - Starters
-  createPokemonEntry(722, "Rowlet"),
-  createPokemonEntry(725, "Litten"),
-  createPokemonEntry(728, "Popplio"),
-
-  // Galar (Gen 8) - Starters
-  createPokemonEntry(810, "Grookey"),
-  createPokemonEntry(813, "Scorbunny"),
-  createPokemonEntry(816, "Sobble"),
-
-  // Paldea (Gen 9) - Starters
-  createPokemonEntry(906, "Sprigatito"),
-  createPokemonEntry(909, "Fuecoco"),
-  createPokemonEntry(912, "Quaxly"),
-];
