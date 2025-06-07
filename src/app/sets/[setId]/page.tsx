@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
-import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle, DollarSign, TrendingUp, CalendarDays, Hash } from "lucide-react";
+import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle, DollarSign, TrendingUp, CalendarDays, Hash, Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -81,7 +81,7 @@ interface SetDetails {
   name: string;
   logoUrl?: string;
   releaseDate: string;
-  totalCards: number;
+  totalCards: number; // This is typically printedTotal from the API
   series: string;
 }
 
@@ -269,7 +269,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     setIsDialogOpen(true);
   };
 
-  const setCompletion = (() => {
+  const setCompletion = useMemo(() => {
     if (!isClient || !setDetails?.name || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
     const collectedCardIdentifiersInSet = new Set<string>();
     collectionCards.forEach(card => {
@@ -278,10 +278,11 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
         }
     });
     const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
-    const totalInThisSet = cardsInSet.length; 
-    const percentage = totalInThisSet > 0 ? (uniqueCollectedCount / totalInThisSet) * 100 : 0;
+    const totalInThisSet = cardsInSet.length; // Based on unique API cards for the set
+    const percentage = totalInThisSet > 0 ? parseFloat(((uniqueCollectedCount / totalInThisSet) * 100).toFixed(1)) : 0;
     return { collected: uniqueCollectedCount, total: totalInThisSet, percentage };
-  })();
+  }, [isClient, setDetails, cardsInSet, collectionCards]);
+
 
   useEffect(() => {
     if (!isClient) return;
@@ -346,9 +347,9 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                     <CardHeader>
                         <CardTitle className="text-lg font-semibold text-primary flex items-center gap-2"><Hash size={20}/>Set Information</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
+                    <CardContent className="space-y-3 text-sm">
                         <div>
-                            <p className="font-medium text-muted-foreground">Number of Cards</p>
+                            <p className="font-medium text-muted-foreground">Printed Cards</p>
                             <p className="font-semibold text-lg">{setDetails.totalCards}</p>
                         </div>
                         <div>
@@ -358,6 +359,19 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                         <div>
                             <p className="font-medium text-muted-foreground">Total Market Value (USD)</p>
                             <p className="font-semibold text-lg">${totalMarketValue.toFixed(2)}</p>
+                        </div>
+                        <div className="pt-1">
+                            <p className="font-medium text-muted-foreground">Set Completion (Unique)</p>
+                             <div className="flex items-center justify-between mt-0.5">
+                                <p className="font-semibold text-base">
+                                    {setCompletion.collected} / {setCompletion.total}
+                                </p>
+                                <p className="font-semibold text-base">
+                                    {setCompletion.percentage}%
+                                    {setCompletion.percentage >= 99.9 && <CheckCircle className="inline-block ml-1 h-4 w-4 text-green-500 align-text-bottom" />}
+                                </p>
+                            </div>
+                            <Progress value={setCompletion.percentage} className="h-2 [&>div]:bg-primary mt-1" />
                         </div>
                     </CardContent>
                 </Card>
@@ -371,7 +385,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                                 <div className="relative w-10 h-14 flex-shrink-0 rounded overflow-hidden shadow-sm" data-ai-hint="pokemon card front small">
                                     <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" />
                                 </div>
-                                <div className="text-sm">
+                                <div className="text-sm overflow-hidden">
                                     <p className="font-semibold truncate leading-tight" title={card.name}>{card.name}</p>
                                     <p className="text-xs text-muted-foreground">${getDefaultMarketPrice(card).value.toFixed(2)}</p>
                                 </div>
@@ -379,12 +393,10 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                         )) : <p className="text-sm text-muted-foreground">No pricing data available.</p>}
                     </CardContent>
                 </Card>
-                 {/* Placeholder for Distribution by Kind - Future Feature */}
                 <Card className="bg-muted/30 border-dashed">
-                    <CardHeader><CardTitle className="text-lg font-semibold text-muted-foreground/70">Distribution by Kind</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-lg font-semibold text-muted-foreground/70 flex items-center gap-2"><Palette size={20}/>Distribution by Kind</CardTitle></CardHeader>
                     <CardContent><p className="text-sm text-muted-foreground/70 text-center py-4">Chart coming soon!</p></CardContent>
                 </Card>
-                {/* Placeholder for Distribution (e.g., by rarity) - Future Feature */}
                 <Card className="bg-muted/30 border-dashed">
                     <CardHeader><CardTitle className="text-lg font-semibold text-muted-foreground/70">Rarity Distribution</CardTitle></CardHeader>
                     <CardContent><p className="text-sm text-muted-foreground/70 text-center py-4">Chart coming soon!</p></CardContent>
@@ -410,10 +422,11 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                     />
                 </div>
             </div>
+            {/* This is the overall set completion for the main card list view, distinct from the one in the stats card */}
             {!isLoading && cardsInSet.length > 0 && (
                  <div className="mt-4">
                     <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-muted-foreground">Set Completion (Unique Cards)</span>
+                        <span className="text-sm font-medium text-muted-foreground">Collection Progress for this Set (Unique Cards)</span>
                         <span className="text-sm font-semibold text-foreground">
                             {setCompletion.collected} / {setCompletion.total} cards
                             {setCompletion.percentage >= 99.9 && <CheckCircle className="inline-block ml-1 h-4 w-4 text-green-500" />}
@@ -508,3 +521,4 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
 };
 
 export default SetDetailsPage;
+
