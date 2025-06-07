@@ -15,6 +15,7 @@ import { Loader2, Search, ListChecks, MapPin, Hash } from "lucide-react";
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
 
 const PokedexPage: NextPage = () => {
+  console.log("Attempting to re-render PokedexPage to refresh build artifacts."); // Added console.log
   const [pokemonList, setPokemonList] = useState<PokemonPokedexEntry[]>([]);
   const [filteredPokemon, setFilteredPokemon] = useState<PokemonPokedexEntry[]>([]);
   const [regions, setRegions] = useState<PokedexRegion[]>([]);
