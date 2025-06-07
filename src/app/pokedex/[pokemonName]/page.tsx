@@ -2,46 +2,209 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, ArrowLeft, ShieldAlert, FileSearch } from "lucide-react";
-import { allPokemonData, type PokemonPokedexEntry } from "../pokedexData"; // Adjust path as needed
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
+import type { PokemonCard as CollectionPokemonCard } from "@/types";
+import { Loader2, ArrowLeft, ShieldAlert, Images, ServerCrash, Info } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { allPokemonData, type PokemonPokedexEntry } from "../pokedexData"; 
+import type { ApiPokemonCard } from "@/app/sets/[setId]/page"; // Re-using type from set details
+
+// Re-using conditionOptions from set details page structure
+const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
+
 
 const PokemonDetailPage: NextPage<{ params: { pokemonName: string } }> = ({ params }) => {
-  // The `use` hook is for resolving client-side dynamic segments if needed,
-  // but for this simple case, we can directly use `params`.
-  // const resolvedParams = use(params); 
-  // const { pokemonName: rawPokemonName } = resolvedParams;
-
   const { pokemonName: rawPokemonName } = params;
-
+  const pokemonName = decodeURIComponent(rawPokemonName).toLowerCase();
 
   const [pokemonDetails, setPokemonDetails] = useState<PokemonPokedexEntry | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(true);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
-  const pokemonName = decodeURIComponent(rawPokemonName).toLowerCase();
+  const [pokemonTcgCards, setPokemonTcgCards] = useState<ApiPokemonCard[]>([]);
+  const [isLoadingCards, setIsLoadingCards] = useState(false);
+  const [errorCards, setErrorCards] = useState<string | null>(null);
+  
+  const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]); // For updating after add
+
+  const [isClient, setIsClient] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
+    const storedCards = localStorage.getItem("pokemonCards");
+    if (storedCards) {
+      try {
+        const parsedCards = JSON.parse(storedCards) as CollectionPokemonCard[];
+        if (Array.isArray(parsedCards)) {
+          setCollectionCards(parsedCards);
+        }
+      } catch (e) {
+        console.error("Failed to parse collection from localStorage", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (pokemonName) {
-      // Simulate fetching details or find from our hardcoded list
+      setIsLoadingDetails(true);
+      setErrorDetails(null);
       const foundPokemon = allPokemonData.find(p => p.name.toLowerCase() === pokemonName);
       if (foundPokemon) {
         setPokemonDetails(foundPokemon);
       } else {
-        setError(`Pokémon "${pokemonName}" not found in our current data.`);
+        setErrorDetails(`Pokémon "${pokemonName}" not found in our Pokédex data.`);
       }
-      setIsLoading(false);
+      setIsLoadingDetails(false);
     }
   }, [pokemonName]);
 
-  if (!isClient || isLoading) {
+  const fetchPokemonTcgCards = useCallback(async () => {
+    if (!pokemonDetails?.name) return; // Only fetch if we have a valid Pokémon name
+    
+    setIsLoadingCards(true);
+    setErrorCards(null);
+    try {
+      const headers: HeadersInit = {};
+      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
+        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
+      }
+      
+      // Query for cards with the exact Pokémon name. Using quotes for exact match.
+      // Order by release date then card number for consistency.
+      const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${pokemonDetails.name}"&orderBy=set.releaseDate,number&pageSize=250`, { headers });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch TCG cards for ${pokemonDetails.name}: ${response.statusText}`);
+      }
+      const data = await response.json();
+      const sortedCards = (data.data as ApiPokemonCard[]).sort((a, b) => {
+        const setDateA = a.set?.releaseDate ? new Date(a.set.releaseDate).getTime() : 0;
+        const setDateB = b.set?.releaseDate ? new Date(b.set.releaseDate).getTime() : 0;
+        if (setDateA !== setDateB) return setDateB - setDateA; // Newest sets first
+
+        const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
+        const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
+        const suffixA = a.number.replace(/\d/g, '');
+        const suffixB = b.number.replace(/\d/g, '');
+        if (numA === numB) return suffixA.localeCompare(suffixB);
+        return numA - numB;
+      });
+
+      setPokemonTcgCards(sortedCards);
+    } catch (err) {
+      console.error(`Error fetching TCG cards for ${pokemonDetails.name}:`, err);
+      setErrorCards(err instanceof Error ? err.message : "An unknown error occurred while fetching cards.");
+    } finally {
+      setIsLoadingCards(false);
+    }
+  }, [pokemonDetails?.name]);
+
+  useEffect(() => {
+    if (pokemonDetails?.name) {
+      fetchPokemonTcgCards();
+    }
+  }, [pokemonDetails, fetchPokemonTcgCards]);
+
+
+  const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string, quantity: number = 1) => {
+    if (!selectedApiCard) return;
+
+    const newCard: CollectionPokemonCard = {
+      id: crypto.randomUUID(),
+      name: selectedApiCard.name,
+      set: selectedApiCard.set.name, 
+      cardNumber: selectedApiCard.number,
+      rarity: selectedApiCard.rarity || "N/A",
+      variant: variant,
+      condition: condition,
+      value: valueForCollection,
+      imageUrl: selectedApiCard.images.large,
+      quantity: quantity,
+    };
+
+    try {
+      const currentStoredCardsRaw = localStorage.getItem("pokemonCards");
+      let currentStoredCards: CollectionPokemonCard[] = currentStoredCardsRaw ? JSON.parse(currentStoredCardsRaw) : [];
+      
+      const existingCardIndex = currentStoredCards.findIndex(
+        item => item.name === newCard.name && 
+                item.set === newCard.set && 
+                item.cardNumber === newCard.cardNumber &&
+                item.variant === newCard.variant && 
+                item.condition === newCard.condition
+      );
+
+      if (existingCardIndex > -1) {
+         currentStoredCards[existingCardIndex].quantity += newCard.quantity;
+         toast({
+          title: "Card Quantity Updated!",
+          description: `Quantity for ${newCard.name} ${newCard.variant ? '('+formatVariantKey(newCard.variant)+')' : ''} (${newCard.condition}) increased.`,
+          className: "bg-secondary text-secondary-foreground"
+        });
+      } else {
+        currentStoredCards = [newCard, ...currentStoredCards];
+         toast({
+          title: "Card Added!",
+          description: `${newCard.name} ${newCard.variant ? '('+formatVariantKey(newCard.variant)+')' : ''} (${newCard.condition}) x${newCard.quantity} from ${newCard.set} has been added.`,
+          className: "bg-secondary text-secondary-foreground"
+        });
+      }
+      
+      localStorage.setItem("pokemonCards", JSON.stringify(currentStoredCards));
+      setCollectionCards(currentStoredCards); 
+      window.dispatchEvent(new StorageEvent('storage', { key: 'pokemonCards', newValue: localStorage.getItem("pokemonCards") }));
+
+    } catch (e) {
+      console.error("Failed to save card to localStorage", e);
+      toast({
+        variant: "destructive",
+        title: "Storage Error",
+        description: "Could not save card to your collection.",
+      });
+    }
+    setIsDialogOpen(false);
+  };
+
+  const openDialogForCard = (card: ApiPokemonCard) => {
+    setSelectedApiCard(card);
+    setIsDialogOpen(true);
+  };
+  
+  // Helper to format variant keys for display (can be moved to utils)
+  const formatVariantKey = (key: string): string => {
+    if (!key) return "N/A";
+    return key.replace(/([A-Z0-9])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
+  };
+
+  useEffect(() => {
+    if (!isClient) return;
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "pokemonCards" && event.newValue) {
+        try {
+          const updatedCards = JSON.parse(event.newValue) as CollectionPokemonCard[];
+           if (Array.isArray(updatedCards)) {
+             setCollectionCards(updatedCards);
+           }
+        } catch (error) {
+          console.error("Error processing storage update:", error);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [isClient]);
+
+
+  if (!isClient || isLoadingDetails) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -65,24 +228,24 @@ const PokemonDetailPage: NextPage<{ params: { pokemonName: string } }> = ({ para
           </Button>
         </Link>
 
-        {error && !pokemonDetails && (
+        {errorDetails && !pokemonDetails && (
           <Card className="shadow-xl border-destructive">
             <CardHeader>
               <CardTitle className="font-headline text-3xl text-destructive flex items-center gap-2">
-                <ShieldAlert className="h-8 w-8" /> Error
+                <ShieldAlert className="h-8 w-8" /> Pokémon Not Found
               </CardTitle>
             </CardHeader>
             <CardContent className="text-center py-8">
-              <p className="text-lg text-destructive mb-2">{error}</p>
+              <p className="text-lg text-destructive mb-2">{errorDetails}</p>
               <p className="text-muted-foreground">
-                This might be a temporary issue or the Pokémon data is not yet available.
+                Please check the name or try again later.
               </p>
             </CardContent>
           </Card>
         )}
 
-        {!error && pokemonDetails && (
-           <Card className="shadow-xl">
+        {pokemonDetails && (
+           <Card className="shadow-xl mb-8">
             <CardHeader>
                  <div className="flex flex-col md:flex-row md:items-center gap-4">
                     {pokemonDetails.spriteUrl && (
@@ -100,22 +263,80 @@ const PokemonDetailPage: NextPage<{ params: { pokemonName: string } }> = ({ para
                     </div>
                  </div>
             </CardHeader>
-            <CardContent className="mt-4">
-              <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center gap-2">
-                <FileSearch className="h-6 w-6"/> Pokémon TCG Cards
-              </h2>
-              <div className="bg-muted/50 p-6 rounded-lg text-center">
-                <p className="text-muted-foreground">
-                  Displaying Pokémon TCG cards for <strong>{displayName}</strong> is a feature coming soon!
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  This section will show all available cards from various sets featuring this Pokémon.
-                </p>
-              </div>
-            </CardContent>
           </Card>
         )}
+
+        {pokemonDetails && (
+          <section id="pokemon-tcg-cards">
+            <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center gap-2">
+              <Images className="h-6 w-6"/> TCG Cards Featuring {displayName}
+            </h2>
+             <CardDescription className="mb-3 text-xs italic text-muted-foreground flex items-center gap-1">
+                <Info size={14}/> Card values are market estimates from TCGPlayer via Pokémon TCG API and may vary. Click a card to add.
+            </CardDescription>
+
+            {isLoadingCards && (
+              <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="ml-3 text-md text-muted-foreground">Loading TCG cards...</p>
+              </div>
+            )}
+            {errorCards && (
+              <div className="flex flex-col items-center justify-center py-10 text-destructive">
+                <ServerCrash className="h-12 w-12 mb-3" />
+                <p className="text-lg font-semibold">Oops! Could not load TCG cards.</p>
+                <p className="text-center text-sm">Error: {errorCards}. Please try again later.</p>
+              </div>
+            )}
+            {!isLoadingCards && !errorCards && (
+              <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]"> 
+                {pokemonTcgCards.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {pokemonTcgCards.map((card) => (
+                        <Card 
+                            key={card.id} 
+                            onClick={() => openDialogForCard(card)}
+                            className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transition-all group flex flex-col bg-card"
+                        >
+                        <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner">
+                            <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                        </div>
+                        <div className="text-center mt-auto">
+                            <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
+                            <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
+                            <p className="text-xs text-muted-foreground">{card.set.name}</p>
+                        </div>
+                        </Card>
+                    ))}
+                    </div>
+                ): (
+                    <div className="text-center py-10 text-muted-foreground">
+                        <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p className="text-lg">No TCG cards found for {displayName} in the API results.</p>
+                        <p className="text-sm">This Pokémon might not have any cards, or there could be an issue with the API data.</p>
+                    </div>
+                )}
+              </ScrollArea>
+            )}
+          </section>
+        )}
       </main>
+
+      {selectedApiCard && (
+        <AddCardToCollectionDialog
+          isOpen={isDialogOpen}
+          onClose={() => {
+            setIsDialogOpen(false);
+            setSelectedApiCard(null);
+          }}
+          cardName={selectedApiCard.name}
+          initialCardImageUrl={selectedApiCard.images.small}
+          pokemonTcgApiCard={selectedApiCard}
+          availableConditions={conditionOptions}
+          onAddCard={handleAddCardToCollection}
+        />
+      )}
+
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
         Pokédex Tracker &copy; {new Date().getFullYear()}
       </footer>
@@ -124,3 +345,5 @@ const PokemonDetailPage: NextPage<{ params: { pokemonName: string } }> = ({ para
 };
 
 export default PokemonDetailPage;
+
+    
