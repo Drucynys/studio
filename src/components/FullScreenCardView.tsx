@@ -156,7 +156,7 @@ export function FullScreenCardView({
     pointerEvents: "none",
     zIndex: 10,
     transition: "opacity 0.05s linear",
-    borderRadius: 'inherit',
+    borderRadius: 'inherit', // Ensures shine respects outer container's rounding
   };
 
   const tiltContainerStyle: React.CSSProperties = {
@@ -198,7 +198,10 @@ export function FullScreenCardView({
             data-ai-hint="pokemon card front large interactive"
           >
             {/* Main Card Image Layer */}
-            <div className="relative w-full h-full z-[1] rounded-xl overflow-hidden">
+            <div 
+              className="relative w-full h-full z-[1]"
+              style={{ clipPath: 'inset(0 round 1rem)' }}
+            >
               <Image
                 key={`${currentCard.id}-image`}
                 src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
@@ -247,3 +250,4 @@ export function FullScreenCardView({
     </Dialog>
   );
 }
+
