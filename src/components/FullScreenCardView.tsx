@@ -68,13 +68,13 @@ export function FullScreenCardView({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !isOpen) {
-       if (isHovering) setIsHovering(false); 
+       if (isHovering) setIsHovering(false);
       return;
     }
-  
+
     const currentWidth = cardRef.current.offsetWidth;
     const currentHeight = cardRef.current.offsetHeight;
-  
+
     if (
       currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT &&
       currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT
@@ -86,9 +86,9 @@ export function FullScreenCardView({
       if (isHovering) setIsHovering(false);
       return;
     }
-    
+
     if (!isHovering) setIsHovering(true);
-  
+
     const rect = cardRef.current.getBoundingClientRect();
     setMousePosition({
       x: e.clientX - rect.left,
@@ -99,7 +99,7 @@ export function FullScreenCardView({
   const handleMouseLeave = () => {
     setIsHovering(false);
   };
-  
+
   const formatDisplayVariant = (variantKey?: string): string | null => {
     if (!variantKey) return null;
     return variantKey
@@ -111,7 +111,7 @@ export function FullScreenCardView({
   if (!currentCard) {
     return null;
   }
-  
+
   const displayVariant = formatDisplayVariant(currentCard.variant);
 
   let dynamicCardTransform = "scale(1.0) translateY(-10px)";
@@ -120,7 +120,7 @@ export function FullScreenCardView({
 
   if (
     isHovering &&
-    cardRef.current && 
+    cardRef.current &&
     cardDimensions.width > MIN_DIMENSION_FOR_TILT_EFFECT &&
     cardDimensions.height > MIN_DIMENSION_FOR_TILT_EFFECT
   ) {
@@ -136,7 +136,7 @@ export function FullScreenCardView({
 
     const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
     const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
-    
+
     shineBackground = `radial-gradient(circle farthest-corner at ${shineXPercent}% ${shineYPercent}%, rgba(255,255,255,0.6), rgba(255,255,255,0) 60%)`;
     shineOpacity = 0.7;
   }
@@ -144,7 +144,7 @@ export function FullScreenCardView({
   const cardStyle: React.CSSProperties = {
     transform: dynamicCardTransform,
     transformStyle: "preserve-3d",
-    transition: "transform 0.05s linear", 
+    transition: "transform 0.05s linear",
   };
 
   const shineStyle: React.CSSProperties = {
@@ -154,13 +154,13 @@ export function FullScreenCardView({
     opacity: shineOpacity,
     mixBlendMode: "color-dodge",
     pointerEvents: "none",
-    zIndex: 10, 
-    transition: "opacity 0.05s linear", 
-    borderRadius: 'inherit', 
+    zIndex: 10,
+    transition: "opacity 0.05s linear",
+    borderRadius: 'inherit',
   };
-  
+
   const tiltContainerStyle: React.CSSProperties = {
-    perspective: "1500px", 
+    perspective: "1500px",
   };
 
   return (
@@ -172,7 +172,7 @@ export function FullScreenCardView({
           </DialogTitle>
         </DialogHeader>
 
-        <div 
+        <div
             className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28 h-full w-full"
             style={tiltContainerStyle}
             onMouseMove={handleMouseMove}
@@ -180,7 +180,7 @@ export function FullScreenCardView({
         >
           {currentIndex !== null && currentIndex > 0 && (
             <Button
-              variant="ghost" 
+              variant="ghost"
               size="icon"
               className="absolute left-1 md:left-4 top-1/2 -translate-y-1/2 z-30 bg-black/20 hover:bg-black/30 text-white rounded-full h-10 w-10 md:h-12 md:w-12"
               onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex - 1);}}
@@ -192,20 +192,20 @@ export function FullScreenCardView({
 
           <div
             ref={cardRef}
-            key={currentCard.id} 
+            key={currentCard.id}
             style={cardStyle}
             className="relative aspect-[2.5/3.5] h-[72vh] max-h-[680px] w-auto rounded-xl overflow-hidden shadow-2xl"
             data-ai-hint="pokemon card front large interactive"
           >
             {/* Main Card Image Layer */}
-            <div className="relative w-full h-full z-[1]">
+            <div className="relative w-full h-full z-[1] rounded-xl overflow-hidden">
               <Image
-                key={`${currentCard.id}-image`} 
+                key={`${currentCard.id}-image`}
                 src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
                 alt={currentCard.name || "Pokémon Card"}
                 layout="fill"
                 objectFit="contain"
-                priority 
+                priority
               />
             </div>
 
@@ -215,7 +215,7 @@ export function FullScreenCardView({
 
           {currentIndex !== null && currentIndex < cards.length - 1 && (
             <Button
-              variant="ghost" 
+              variant="ghost"
               size="icon"
               className="absolute right-1 md:right-4 top-1/2 -translate-y-1/2 z-30 bg-black/20 hover:bg-black/30 text-white rounded-full h-10 w-10 md:h-12 md:w-12"
               onClick={(e) => { e.stopPropagation(); onNavigate(currentIndex + 1);}}
@@ -225,7 +225,7 @@ export function FullScreenCardView({
             </Button>
           )}
         </div>
-        
+
         <div className="p-4 border-t border-border/20 text-center flex flex-col items-center absolute bottom-0 left-0 right-0 z-20 bg-background/50 backdrop-blur-sm">
            <p className="text-xl font-semibold text-foreground mb-1">
             {currentCard.name || `Card #${currentCard.cardNumber}`}
@@ -247,4 +247,3 @@ export function FullScreenCardView({
     </Dialog>
   );
 }
-
