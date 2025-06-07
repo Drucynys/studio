@@ -74,13 +74,28 @@ const PokedexPage: NextPage = () => {
   const collectedPokemonNames = useMemo(() => {
     if (!isClient) return new Set<string>();
     const names = new Set<string>();
-    collectionCards.forEach(card => {
-      if (card.name) {
-        names.add(card.name.toLowerCase());
+
+    // Get a list of all canonical Pokémon names from pokedexData, in lowercase
+    const canonicalPokedexNamesLower = allPokemonData.map(p => p.name.toLowerCase());
+
+    collectionCards.forEach(cardInCollection => {
+      if (cardInCollection.name) {
+        const collectionCardNameLower = cardInCollection.name.toLowerCase();
+        
+        // Find a canonical Pokédex name that the collected card's name starts with.
+        // This handles cases like "Pikachu VMAX" (card) matching "Pikachu" (Pokédex).
+        const matchedCanonicalName = canonicalPokedexNamesLower.find(
+          canonicalName => collectionCardNameLower.startsWith(canonicalName)
+        );
+        
+        if (matchedCanonicalName) {
+          names.add(matchedCanonicalName); // Add the canonical lowercase name
+        }
       }
     });
     return names;
-  }, [collectionCards, isClient]);
+  }, [collectionCards, isClient, allPokemonData]); // Ensure allPokemonData is a dependency
+
 
   useEffect(() => {
     if (!isClient) return;
@@ -232,3 +247,6 @@ const PokedexPage: NextPage = () => {
 };
 
 export default PokedexPage;
+
+
+    
