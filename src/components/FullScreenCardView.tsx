@@ -68,7 +68,7 @@ export function FullScreenCardView({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !isOpen) {
-       if (isHovering) setIsHovering(false); // Ensure isHovering is false if conditions not met
+       if (isHovering) setIsHovering(false); 
       return;
     }
   
@@ -83,7 +83,6 @@ export function FullScreenCardView({
         setCardDimensions({ width: currentWidth, height: currentHeight });
       }
     } else {
-      // If dimensions are too small, don't enable hover/tilt.
       if (isHovering) setIsHovering(false);
       return;
     }
@@ -115,7 +114,7 @@ export function FullScreenCardView({
   
   const displayVariant = formatDisplayVariant(currentCard.variant);
 
-  let dynamicCardTransform = "scale(1.0) translateY(-100px)";
+  let dynamicCardTransform = "scale(1.0) translateY(-10px)";
   let shineBackground = "transparent";
   let shineOpacity = 0;
 
@@ -133,7 +132,7 @@ export function FullScreenCardView({
     const rotateY = (mouseXFromCenter / centerX) * MAX_ROTATION;
     const rotateX = (mouseYFromCenter / centerY) * -MAX_ROTATION;
 
-    dynamicCardTransform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px) translateY(-100px)`;
+    dynamicCardTransform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px) translateY(-10px)`;
 
     const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
     const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
@@ -195,7 +194,7 @@ export function FullScreenCardView({
             ref={cardRef}
             key={currentCard.id} 
             style={cardStyle}
-            className="relative aspect-[2.5/3.5] h-[70vh] max-h-[650px] w-auto rounded-xl overflow-hidden shadow-2xl"
+            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl overflow-hidden shadow-2xl"
             data-ai-hint="pokemon card front large interactive"
           >
             {/* Main Card Image Layer */}
@@ -248,3 +247,4 @@ export function FullScreenCardView({
     </Dialog>
   );
 }
+
