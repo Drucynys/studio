@@ -350,7 +350,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                             <Card
                                 key={card.id}
                                 onClick={() => openDialogForCard(card)}
-                                className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transform transition-all duration-200 ease-out hover:scale-105 hover:-translate-y-1 group flex flex-col"
+                                className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transform transition-all duration-200 ease-out hover:scale-105 hover:-translate-y-1 group flex flex-col group-hover:z-10 relative"
                             >
                             <div className={cn(
                                 "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 group-hover:grayscale-0",
