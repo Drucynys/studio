@@ -9,16 +9,8 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-interface FullScreenCardViewProps {
-  isOpen: boolean;
-  onClose: () => void;
-  cards: PokemonCard[];
-  currentIndex: number | null;
-  onNavigate: (newIndex: number) => void;
-}
-
-const MAX_ROTATION = 10; 
-const MIN_DIMENSION_FOR_TILT_EFFECT = 50; 
+const MAX_ROTATION = 10;
+const MIN_DIMENSION_FOR_TILT_EFFECT = 50;
 
 export function FullScreenCardView({
   isOpen,
@@ -68,14 +60,14 @@ export function FullScreenCardView({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current || !isOpen) {
-      if (isHovering) setIsHovering(false); 
+      if (isHovering) setIsHovering(false);
       return;
     }
 
     const currentWidth = cardRef.current.offsetWidth;
     const currentHeight = cardRef.current.offsetHeight;
 
-    if (currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT && 
+    if (currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT &&
         currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT &&
         (cardDimensions.width !== currentWidth || cardDimensions.height !== currentHeight)) {
       setCardDimensions({ width: currentWidth, height: currentHeight });
@@ -188,7 +180,7 @@ export function FullScreenCardView({
             ref={cardRef}
             key={currentCard.id} 
             style={cardStyle}
-            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl shadow-2xl overflow-hidden"
+            className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl overflow-hidden shadow-2xl"
             data-ai-hint="pokemon card front large interactive"
           >
             {/* Background Glow Layer */}
@@ -199,7 +191,7 @@ export function FullScreenCardView({
                 alt="" 
                 layout="fill"
                 objectFit="cover" 
-                className="transform scale-110 filter blur-lg opacity-50"
+                className="transform scale-110 filter blur-lg opacity-40" 
                 priority={false} 
               />
             </div>
