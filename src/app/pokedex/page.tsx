@@ -228,9 +228,9 @@ const PokedexPage: NextPage = () => {
             )}
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-20.1rem-3.5rem)] md:h-[calc(100vh-24.1rem-3.5rem)] pt-4 pb-24 px-4">
+            <ScrollArea className="h-[calc(100vh-20.1rem-3.5rem)] md:h-[calc(100vh-24.1rem-3.5rem)]">
               {filteredPokemon.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                   {filteredPokemon.map((pokemon) => {
                     const isCollected = collectedPokemonNames.has(pokemon.name.toLowerCase());
                     return (
