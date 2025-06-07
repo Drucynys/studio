@@ -25,9 +25,9 @@ export interface ApiPokemonCard {
     name: string;
     series: string;
     logo?: string;
-    releaseDate: string; // Added releaseDate to set for easier access
-    printedTotal: number; // Added printedTotal
-    total: number; // Added total for fallback
+    releaseDate: string; 
+    printedTotal: number; 
+    total: number; 
   };
   number: string;
   rarity?: string;
@@ -50,7 +50,6 @@ export interface ApiPokemonCard {
   types?: string[];
 }
 
-// Helper to get a default market price
 const getDefaultMarketPrice = (card: ApiPokemonCard | null): { value: number, variant?: string } => {
   if (!card || !card.tcgplayer?.prices) return { value: 0 };
   const prices = card.tcgplayer.prices;
@@ -61,7 +60,6 @@ const getDefaultMarketPrice = (card: ApiPokemonCard | null): { value: number, va
       return { value: priceDetail.market, variant: variant };
     }
   }
-  // Fallback to any available market price
   for (const key in prices) {
     if (Object.prototype.hasOwnProperty.call(prices, key)) {
       const priceDetail = prices[key as keyof typeof prices];
@@ -81,7 +79,7 @@ interface SetDetails {
   name: string;
   logoUrl?: string;
   releaseDate: string;
-  totalCards: number; // This is typically printedTotal from the API
+  totalCards: number; 
   series: string;
 }
 
@@ -129,7 +127,6 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
         headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
       }
 
-      // Fetch set details
       const setDetailsResponse = await fetch(`https://api.pokemontcg.io/v2/sets/${setId}`, { headers });
       if (!setDetailsResponse.ok) {
         throw new Error(`Failed to fetch set details: ${setDetailsResponse.statusText} (status: ${setDetailsResponse.status})`);
@@ -144,7 +141,6 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
         series: setData.data.series,
       });
       
-      // Fetch all cards for the set (handles pagination)
       let allCards: ApiPokemonCard[] = [];
       let page = 1;
       let hasMore = true;
@@ -159,7 +155,6 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
         hasMore = cardsData.page * cardsData.pageSize < cardsData.totalCount;
       }
 
-      // Sort cards by number (alphanumerically)
       allCards.sort((a, b) => {
         const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
@@ -225,7 +220,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
       value: valueForCollection,
       imageUrl: selectedApiCard.images.large,
       quantity: quantity,
-      language: "English", // Default to English for this page
+      language: "English", 
     };
 
     try {
@@ -273,12 +268,12 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     if (!isClient || !setDetails?.name || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
     const collectedCardIdentifiersInSet = new Set<string>();
     collectionCards.forEach(card => {
-        if (card.set === setDetails.name && card.language === "English") { // Assuming English sets for this page
+        if (card.set === setDetails.name && card.language === "English") { 
             collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
         }
     });
     const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
-    const totalInThisSet = cardsInSet.length; // Based on unique API cards for the set
+    const totalInThisSet = cardsInSet.length; 
     const percentage = totalInThisSet > 0 ? parseFloat(((uniqueCollectedCount / totalInThisSet) * 100).toFixed(1)) : 0;
     return { collected: uniqueCollectedCount, total: totalInThisSet, percentage };
   }, [isClient, setDetails, cardsInSet, collectionCards]);
@@ -329,14 +324,26 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
 
         {setDetails && (
           <header className="mb-8">
-            <div className="flex flex-col md:flex-row md:items-center md:gap-4">
-              {setDetails.logoUrl && (
-                <Image src={setDetails.logoUrl} alt={`${setDetails.name} logo`} width={120} height={50} style={{objectFit:"contain"}} className="mb-2 md:mb-0" data-ai-hint="pokemon set logo"/>
-              )}
-              <div>
-                <h1 className="font-headline text-4xl text-foreground">{setDetails.name}</h1>
-                <p className="text-muted-foreground text-lg">{setDetails.series} Series</p>
-              </div>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-col md:flex-row md:items-center md:gap-4">
+                    {setDetails.logoUrl && (
+                        <Image src={setDetails.logoUrl} alt={`${setDetails.name} logo`} width={120} height={50} style={{objectFit:"contain"}} className="mb-2 md:mb-0 self-center md:self-auto" data-ai-hint="pokemon set logo"/>
+                    )}
+                    <div>
+                        <h1 className="font-headline text-3xl md:text-4xl text-foreground text-center md:text-left">{setDetails.name}</h1>
+                        <p className="text-muted-foreground text-md md:text-lg text-center md:text-left">{setDetails.series} Series</p>
+                    </div>
+                </div>
+                <div className="relative w-full md:w-1/3 lg:w-1/4 mt-4 md:mt-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder="Search cards in set..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 w-full"
+                    />
+                </div>
             </div>
           </header>
         )}
@@ -386,7 +393,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                                 <div className="relative w-10 h-14 flex-shrink-0 rounded overflow-hidden shadow-sm" data-ai-hint="pokemon card front small">
                                 <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" />
                                 </div>
-                                <div className="flex-grow">
+                                <div className="flex-grow min-w-0"> 
                                 <p className="text-xs font-semibold truncate" title={card.name}>{index + 1}. {card.name}</p>
                                 <p className="text-xs text-muted-foreground">${getDefaultMarketPrice(card).value.toFixed(2)}</p>
                                 </div>
@@ -409,41 +416,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
         )}
 
         <Card className="shadow-xl">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
-                <div>
-                    <CardTitle className="font-headline text-2xl text-foreground">Cards in {setDetails?.name || `Set ${setId}`}</CardTitle>
-                    <CardDescription>Browse cards from {setDetails?.name || `set ${setId}`}. Click a card to add it to your collection.</CardDescription>
-                </div>
-                <div className="relative mt-4 md:mt-0 w-full md:w-1/3">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                        type="text"
-                        placeholder="Search cards in set..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                    />
-                </div>
-            </div>
-            {/* This is the overall set completion for the main card list view, distinct from the one in the stats card */}
-            {!isLoading && cardsInSet.length > 0 && (
-                 <div className="mt-4">
-                    <div className="flex justify-between items-center mb-1">
-                        <span className="text-sm font-medium text-muted-foreground">Collection Progress for this Set (Unique Cards)</span>
-                        <span className="text-sm font-semibold text-foreground">
-                            {setCompletion.collected} / {setCompletion.total} cards
-                            {setCompletion.percentage >= 99.9 && <CheckCircle className="inline-block ml-1 h-4 w-4 text-green-500" />}
-                        </span>
-                    </div>
-                    <Progress value={setCompletion.percentage} className="h-2 [&>div]:bg-primary" />
-                </div>
-            )}
-            <CardDescription className="mt-3 text-xs italic text-muted-foreground flex items-center gap-1">
-                <Info size={14}/> Card values are market estimates from TCGPlayer via Pokémon TCG API and may vary. Prices are in USD.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6"> {/* Added pt-6 as CardHeader is removed */}
             {isLoading && (
               <div className="flex justify-center items-center py-10">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -458,7 +431,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
               </div>
             )}
             {!isLoading && !error && (
-              <ScrollArea className="h-[calc(100vh-42rem)] md:h-[calc(100vh-40rem)]">
+              <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-26rem)]"> {/* Adjusted height due to removed header */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                     {filteredCards.map((card) => {
                         const isCollected = collectionCards.some(
@@ -466,7 +439,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                             collected.name === card.name &&
                             collected.set === card.set.name &&
                             collected.cardNumber === card.number &&
-                            collected.language === "English" // Assuming English sets for this page
+                            collected.language === "English" 
                         );
                         return (
                             <Card
@@ -525,6 +498,3 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
 };
 
 export default SetDetailsPage;
-
-
-    
