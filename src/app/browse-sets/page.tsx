@@ -13,6 +13,7 @@ import { Loader2, ServerCrash, Search, CheckCircle } from "lucide-react";
 import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
+import { cn } from "@/lib/utils";
 
 interface ApiSet {
   id: string;
@@ -173,13 +174,16 @@ const BrowseSetsPage: NextPage = () => {
             {!isLoading && !error && (
               <ScrollArea className="h-[calc(100vh-20rem)] md:h-[calc(100vh-25rem)]">
                 {filteredSets.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
                     {filteredSets.map((set) => {
                       const completion = getSetCompletion(set);
                       return (
                         <Link key={set.id} href={`/sets/${set.id}`} passHref legacyBehavior>
                         <a className="block group">
-                            <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
+                            <Card className={cn(
+                                "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full",
+                                "group-hover:z-10 relative"
+                              )}>
                             {set.images.logo ? (
                                 <div className="relative w-32 h-16 mb-3">
                                 <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
@@ -227,3 +231,4 @@ const BrowseSetsPage: NextPage = () => {
 };
 
 export default BrowseSetsPage;
+
