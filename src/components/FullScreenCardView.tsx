@@ -12,6 +12,14 @@ import { Badge } from "@/components/ui/badge";
 const MAX_ROTATION = 10;
 const MIN_DIMENSION_FOR_TILT_EFFECT = 50;
 
+type FullScreenCardViewProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  cards: PokemonCard[];
+  currentIndex: number | null;
+  onNavigate: (newIndex: number) => void;
+};
+
 export function FullScreenCardView({
   isOpen,
   onClose,
@@ -63,18 +71,21 @@ export function FullScreenCardView({
       if (isHovering) setIsHovering(false);
       return;
     }
-
+  
     const currentWidth = cardRef.current.offsetWidth;
     const currentHeight = cardRef.current.offsetHeight;
-
-    if (currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT &&
-        currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT &&
-        (cardDimensions.width !== currentWidth || cardDimensions.height !== currentHeight)) {
+  
+    // Only update dimensions if they are valid and different from current
+    if (
+      currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT &&
+      currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT &&
+      (cardDimensions.width !== currentWidth || cardDimensions.height !== currentHeight)
+    ) {
       setCardDimensions({ width: currentWidth, height: currentHeight });
     }
     
     if (!isHovering) setIsHovering(true);
-
+  
     const rect = cardRef.current.getBoundingClientRect();
     setMousePosition({
       x: e.clientX - rect.left,
@@ -183,19 +194,6 @@ export function FullScreenCardView({
             className="relative aspect-[2.5/3.5] h-[75vh] max-h-[700px] w-auto rounded-xl overflow-hidden shadow-2xl"
             data-ai-hint="pokemon card front large interactive"
           >
-            {/* Background Glow Layer */}
-            <div className="absolute inset-0 z-0">
-              <Image
-                key={`${currentCard.id}-glow`}
-                src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
-                alt="" 
-                layout="fill"
-                objectFit="cover" 
-                className="transform scale-110 filter blur-lg opacity-40" 
-                priority={false} 
-              />
-            </div>
-            
             {/* Main Card Image Layer */}
             <div className="relative w-full h-full z-[1]">
               <Image
