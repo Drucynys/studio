@@ -124,24 +124,27 @@ const BrowseSetsPage: NextPage = () => {
           language: 'English',
         }));
       } else { // Japanese
-        // Updated to use api.tcgdex.dev based on user hint
-        const response = await fetch("https://api.tcgdex.dev/v2/jp/sets");
+        // Fetching through the Next.js API proxy route
+        const response = await fetch("/api/tcgdex/jp/sets");
         if (!response.ok) {
-          throw new Error(`Failed to fetch Japanese sets: ${response.statusText || 'Server responded with an error'} (status: ${response.status})`);
+          let errorMsg = `Failed to fetch Japanese sets via proxy: ${response.statusText || 'Server responded with an error'} (status: ${response.status})`;
+          try {
+            const errorData = await response.json();
+            if (errorData.error) errorMsg += ` - ${errorData.error}`;
+          } catch (e) {/* ignore if error response not json */}
+          throw new Error(errorMsg);
         }
         const data = await response.json();
         fetchedDisplaySets = (data as TcgDexApiSet[]).map(tcgDexSet => ({
           id: tcgDexSet.id,
           name: tcgDexSet.name,
-          // series: undefined, // TCGdex set list doesn't usually have 'series'
           logoUrl: tcgDexSet.logo,
-          releaseDate: tcgDexSet.releaseDate ? tcgDexSet.releaseDate.replace(/\//g, '-') : new Date().toISOString().split('T')[0], // Convert YYYY/MM/DD to YYYY-MM-DD
+          releaseDate: tcgDexSet.releaseDate ? tcgDexSet.releaseDate.replace(/\//g, '-') : new Date().toISOString().split('T')[0],
           totalCards: tcgDexSet.cardCount?.official || tcgDexSet.cardCount?.total || 0,
           language: 'Japanese',
         }));
       }
       
-      // Sort by release date descending
       const sortedSets = fetchedDisplaySets.sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
       setDisplaySets(sortedSets);
       setFilteredDisplaySets(sortedSets);
@@ -182,7 +185,7 @@ const BrowseSetsPage: NextPage = () => {
         }
     });
     const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
-    const totalInSet = set.totalCards > 0 ? set.totalCards : 1; // Avoid division by zero
+    const totalInSet = set.totalCards > 0 ? set.totalCards : 1; 
     const percentage = totalInSet > 0 ? (uniqueCollectedCount / totalInSet) * 100 : 0;
     
     return { collected: uniqueCollectedCount, total: totalInSet, percentage };
