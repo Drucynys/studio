@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react"; 
+import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -12,7 +12,7 @@ import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialo
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Input } from "@/components/ui/input"; 
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
@@ -33,14 +33,14 @@ export interface ApiPokemonCard {
   };
   tcgplayer?: {
     prices?: {
-      [key: string]: { 
+      [key: string]: {
         market?: number | null;
         low?: number | null;
         mid?: number | null;
         high?: number | null;
       };
     };
-    url?: string; 
+    url?: string;
   };
 }
 
@@ -48,7 +48,7 @@ const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Pla
 
 const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string } }) => {
   const resolvedParams = use(paramsFromProps);
-  const { setId } = resolvedParams; 
+  const { setId } = resolvedParams;
 
   const [cardsInSet, setCardsInSet] = useState<ApiPokemonCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
@@ -100,7 +100,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
       let allCards: ApiPokemonCard[] = [];
       let page = 1;
       let hasMore = true;
-      
+
       while(hasMore) {
         const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250&orderBy=number`, { headers });
         if (!response.ok) {
@@ -111,7 +111,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
         page++;
         hasMore = data.page * data.pageSize < data.totalCount;
       }
-      
+
       allCards.sort((a, b) => {
         const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
         const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
@@ -138,7 +138,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
   useEffect(() => {
     fetchSetDetails();
   }, [fetchSetDetails]);
-  
+
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
     const filteredData = cardsInSet.filter(card =>
@@ -156,7 +156,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     const newCard: CollectionPokemonCard = {
       id: crypto.randomUUID(), // This ID is for the specific instance in collection.
       name: selectedApiCard.name,
-      set: selectedApiCard.set.name, 
+      set: selectedApiCard.set.name,
       cardNumber: selectedApiCard.number,
       rarity: selectedApiCard.rarity || "N/A",
       variant: variant,
@@ -169,12 +169,12 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     try {
       const currentStoredCardsRaw = localStorage.getItem("pokemonCards");
       let currentStoredCards: CollectionPokemonCard[] = currentStoredCardsRaw ? JSON.parse(currentStoredCardsRaw) : [];
-      
+
       const existingCardIndex = currentStoredCards.findIndex(
-        item => item.name === newCard.name && 
-                item.set === newCard.set && 
+        item => item.name === newCard.name &&
+                item.set === newCard.set &&
                 item.cardNumber === newCard.cardNumber &&
-                item.variant === newCard.variant && 
+                item.variant === newCard.variant &&
                 item.condition === newCard.condition
       );
 
@@ -194,9 +194,9 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
           className: "bg-secondary text-secondary-foreground"
         });
       }
-      
+
       localStorage.setItem("pokemonCards", JSON.stringify(currentStoredCards));
-      setCollectionCards(currentStoredCards); 
+      setCollectionCards(currentStoredCards);
       window.dispatchEvent(new StorageEvent('storage', { key: 'pokemonCards', newValue: localStorage.getItem("pokemonCards") }));
 
     } catch (e) {
@@ -214,7 +214,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     setSelectedApiCard(card);
     setIsDialogOpen(true);
   };
-  
+
   const setCompletion = (() => {
     if (!isClient || !setName || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
     // Calculate unique cards collected for this set
@@ -252,7 +252,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
   }, [isClient]);
 
 
-  if (!isClient && isLoading) { 
+  if (!isClient && isLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -336,9 +336,9 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
               </div>
             )}
             {!isLoading && !error && (
-              <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]"> 
+              <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]">
                 {filteredCards.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-24">
                     {filteredCards.map((card) => {
                         const isCollected = collectionCards.some(
                             (collected) =>
@@ -347,14 +347,14 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                             collected.cardNumber === card.number
                         );
                         return (
-                            <Card 
-                                key={card.id} 
+                            <Card
+                                key={card.id}
                                 onClick={() => openDialogForCard(card)}
                                 className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transform transition-all duration-200 ease-out hover:scale-105 hover:-translate-y-1 group flex flex-col"
                             >
                             <div className={cn(
-                                "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2",
-                                !isCollected && "grayscale group-hover:grayscale-0"
+                                "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 group-hover:grayscale-0",
+                                !isCollected && "grayscale"
                             )}>
                                 <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
                             </div>
