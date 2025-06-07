@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { NextPage } from "next";
 import { useEffect, useState, useCallback, use } from "react"; 
 import Link from "next/link";
 import Image from "next/image";
@@ -47,7 +46,7 @@ export interface ApiPokemonCard {
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: paramsFromProps }) => {
+const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string } }) => {
   const resolvedParams = use(paramsFromProps);
   const { setId } = resolvedParams; 
 
@@ -355,8 +354,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
                             >
                             <div className={cn(
                                 "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2",
-                                !isCollected && "grayscale",
-                                "group-hover:grayscale-0"
+                                !isCollected && "grayscale group-hover:grayscale-0"
                             )}>
                                 <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
                             </div>

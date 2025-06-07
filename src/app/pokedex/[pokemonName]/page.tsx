@@ -1,7 +1,6 @@
 
 "use client";
 
-import type { NextPage } from "next";
 import { useEffect, useState, useCallback, use } from "react"; 
 import Link from "next/link";
 import Image from "next/image";
@@ -23,7 +22,7 @@ interface PokemonDetailPageProps {
   params: { pokemonName: string };
 }
 
-const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
+const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
   const resolvedParams = use(params); 
   const rawPokemonNameFromParams = resolvedParams.pokemonName; 
 
@@ -348,7 +347,7 @@ const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
                             >
                             <div className={cn(
                                 "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner",
-                                !isCollected && "grayscale"
+                                !isCollected && "grayscale group-hover:grayscale-0"
                             )}>
                                 <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
                             </div>
