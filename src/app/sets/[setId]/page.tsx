@@ -339,7 +339,7 @@ const SetDetailsPage: NextPage<{ params: { setId: string } }> = ({ params: param
             {!isLoading && !error && (
               <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]"> 
                 {filteredCards.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pb-4">
                     {filteredCards.map((card) => {
                         const isCollected = collectionCards.some(
                             (collected) =>
