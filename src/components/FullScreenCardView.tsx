@@ -114,8 +114,8 @@ export function FullScreenCardView({
   const displayVariant = formatDisplayVariant(currentCard.variant);
 
   let dynamicCardTransform = "scale(1.0) translateY(-10px)";
-  // let shineBackground = "transparent"; // Shine disabled for now
-  // let shineOpacity = 0; // Shine disabled for now
+  let shineBackground = "transparent";
+  let shineOpacity = 0;
 
   if (
     isHovering &&
@@ -133,11 +133,11 @@ export function FullScreenCardView({
 
     dynamicCardTransform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px) translateY(-10px)`;
 
-    // const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
-    // const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
+    const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
+    const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
 
-    // shineBackground = `radial-gradient(circle farthest-corner at ${shineXPercent}% ${shineYPercent}%, rgba(255,255,255,0.6), rgba(255,255,255,0) 60%)`;
-    // shineOpacity = 0.7;
+    shineBackground = `radial-gradient(circle farthest-corner at ${shineXPercent}% ${shineYPercent}%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 60%)`;
+    shineOpacity = 0.6;
   }
 
   const cardStyle: React.CSSProperties = {
@@ -146,17 +146,17 @@ export function FullScreenCardView({
     transition: "transform 0.05s linear",
   };
 
-  // const shineStyle: React.CSSProperties = { // Shine disabled for now
-  //   position: "absolute",
-  //   inset: 0,
-  //   background: shineBackground,
-  //   opacity: shineOpacity,
-  //   mixBlendMode: "color-dodge",
-  //   pointerEvents: "none",
-  //   zIndex: 10,
-  //   transition: "opacity 0.05s linear",
-  //   borderRadius: 'inherit',
-  // };
+  const shineStyle: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    background: shineBackground,
+    opacity: shineOpacity,
+    mixBlendMode: "color-dodge",
+    pointerEvents: "none",
+    zIndex: 10,
+    transition: "opacity 0.05s linear",
+    borderRadius: 'inherit',
+  };
 
   const tiltContainerStyle: React.CSSProperties = {
     perspective: "1500px",
@@ -196,7 +196,6 @@ export function FullScreenCardView({
             className="relative aspect-[2.5/3.5] h-[72vh] max-h-[680px] w-auto rounded-xl overflow-hidden shadow-2xl"
             data-ai-hint="pokemon card front large interactive"
           >
-            {/* Main Card Image Layer */}
             <div 
               className="relative w-full h-full z-[1] rounded-xl overflow-hidden"
             >
@@ -210,10 +209,7 @@ export function FullScreenCardView({
                 className="rounded-xl"
               />
             </div>
-
-            {/* Shine Overlay Layer - Temporarily Commented Out
             <div style={shineStyle} />
-            */}
           </div>
 
           {currentIndex !== null && currentIndex < cards.length - 1 && (

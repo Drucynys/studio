@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // Added DialogHeader, DialogTitle
 
 const MAX_ROTATION = 10;
 const MIN_DIMENSION_FOR_TILT_EFFECT = 50;
@@ -76,6 +76,9 @@ export function SingleCardTiltView({
   };
 
   let dynamicCardTransform = "scale(1.0)";
+  let shineBackground = "transparent";
+  let shineOpacity = 0;
+
   if (
     isHovering &&
     cardRef.current &&
@@ -90,6 +93,12 @@ export function SingleCardTiltView({
     const rotateY = (mouseXFromCenter / centerX) * MAX_ROTATION;
     const rotateX = (mouseYFromCenter / centerY) * -MAX_ROTATION;
     dynamicCardTransform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px)`;
+    
+    const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
+    const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
+
+    shineBackground = `radial-gradient(circle farthest-corner at ${shineXPercent}% ${shineYPercent}%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 60%)`;
+    shineOpacity = 0.6;
   }
 
   const cardStyle: React.CSSProperties = {
@@ -97,6 +106,19 @@ export function SingleCardTiltView({
     transformStyle: "preserve-3d",
     transition: "transform 0.05s linear",
   };
+
+  const shineStyle: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    background: shineBackground,
+    opacity: shineOpacity,
+    mixBlendMode: "color-dodge",
+    pointerEvents: "none",
+    zIndex: 10,
+    transition: "opacity 0.05s linear",
+    borderRadius: 'inherit',
+  };
+
 
   const tiltContainerStyle: React.CSSProperties = {
     perspective: "1500px",
@@ -109,6 +131,9 @@ export function SingleCardTiltView({
         onPointerDownOutside={onClose} 
         onInteractOutside={onClose} 
       >
+        <DialogHeader className="sr-only"> {/* Added for accessibility */}
+            <DialogTitle>Full Screen Card View: {altText}</DialogTitle>
+        </DialogHeader>
         <div
           className="flex-grow flex items-center justify-center relative overflow-hidden h-full w-full"
           style={tiltContainerStyle}
@@ -129,8 +154,9 @@ export function SingleCardTiltView({
               layout="fill"
               objectFit="contain"
               priority
-              className="rounded-xl"
+              className="rounded-xl z-[1]" // Ensure image is below shine
             />
+            <div style={shineStyle} />
           </div>
         </div>
       </DialogContent>
