@@ -11,12 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Search, ListChecks, MapPin, Hash } from "lucide-react";
+import { Loader2, Search, ListChecks, MapPin, Hash, Trophy } from "lucide-react";
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
-import type { PokemonCard as CollectionPokemonCard } from "@/types"; // Import collection card type
+import type { PokemonCard as CollectionPokemonCard } from "@/types";
+import { Progress } from "@/components/ui/progress";
 
 const PokedexPage: NextPage = () => {
-  console.log("Attempting to re-render PokedexPage to refresh build artifacts.");
+  console.log("Attempting to re-render PokedexPage to refresh build artifacts. Adding a log to test.");
   const [pokemonList, setPokemonList] = useState<PokemonPokedexEntry[]>([]);
   const [filteredPokemon, setFilteredPokemon] = useState<PokemonPokedexEntry[]>([]);
   const [regions, setRegions] = useState<PokedexRegion[]>([]);
@@ -104,6 +105,22 @@ const PokedexPage: NextPage = () => {
     setFilteredPokemon(tempPokemon);
   }, [pokemonList, searchTerm, selectedRegion, isClient]);
 
+  const pokedexStats = useMemo(() => {
+    if (!isClient) return { collected: 0, total: 0, percentage: 0 };
+    
+    const totalPokemonInCurrentView = filteredPokemon.length;
+    const collectedInCurrentView = filteredPokemon.filter(p => collectedPokemonNames.has(p.name.toLowerCase())).length;
+    
+    const percentage = totalPokemonInCurrentView > 0 ? (collectedInCurrentView / totalPokemonInCurrentView) * 100 : 0;
+    
+    return {
+      collected: collectedInCurrentView,
+      total: totalPokemonInCurrentView,
+      percentage: parseFloat(percentage.toFixed(1)),
+    };
+  }, [filteredPokemon, collectedPokemonNames, isClient]);
+
+
   if (!isClient || isLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
@@ -122,12 +139,14 @@ const PokedexPage: NextPage = () => {
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Card className="shadow-xl">
           <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
               <div>
                 <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
                   <ListChecks className="h-8 w-8 text-primary" /> Pokédex
                 </CardTitle>
-                <CardDescription>Browse Pokémon. Colored sprites indicate a card of that Pokémon is in your collection.</CardDescription>
+                <CardDescription>
+                  Browse Pokémon. Colored sprites indicate a card of that Pokémon is in your collection.
+                </CardDescription>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                 <div className="relative flex-grow md:flex-grow-0 md:w-64">
@@ -155,9 +174,23 @@ const PokedexPage: NextPage = () => {
                 </Select>
               </div>
             </div>
+             {isClient && (
+              <div className="mt-2 pt-3 border-t border-border/70">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                    <Trophy className="h-4 w-4 text-accent" />
+                    Pokédex Completion (Current View):
+                  </div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {pokedexStats.collected} / {pokedexStats.total} Pokémon ({pokedexStats.percentage}%)
+                  </div>
+                </div>
+                <Progress value={pokedexStats.percentage} className="h-2 [&>div]:bg-accent" />
+              </div>
+            )}
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-20.1rem)] md:h-[calc(100vh-24.1rem)]">
+            <ScrollArea className="h-[calc(100vh-20.1rem-3.5rem)] md:h-[calc(100vh-24.1rem-3.5rem)]"> {/* Adjusted height for stats bar */}
               {filteredPokemon.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                   {filteredPokemon.map((pokemon) => {
