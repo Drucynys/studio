@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Loader2, Search, ListChecks, MapPin, Hash, Trophy } from "lucide-react";
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
@@ -26,6 +28,7 @@ const PokedexPage: NextPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
+  const [showOnlyCollected, setShowOnlyCollected] = useState(false); // New state for the filter
   const [isClient, setIsClient] = useState(false);
 
   const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
@@ -116,10 +119,14 @@ const PokedexPage: NextPage = () => {
       );
     }
     
+    if (showOnlyCollected) {
+      tempPokemon = tempPokemon.filter(p => collectedPokemonNames.has(p.name.toLowerCase()));
+    }
+    
     tempPokemon.sort((a,b) => a.id - b.id);
 
     setFilteredPokemon(tempPokemon);
-  }, [pokemonList, searchTerm, selectedRegion, isClient]);
+  }, [pokemonList, searchTerm, selectedRegion, isClient, showOnlyCollected, collectedPokemonNames]);
 
   const pokedexStats = useMemo(() => {
     if (!isClient) return { collected: 0, total: 0, percentage: 0 };
@@ -160,34 +167,45 @@ const PokedexPage: NextPage = () => {
                 <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
                   <ListChecks className="h-8 w-8 text-primary" /> Pokédex
                 </CardTitle>
-                <CardDescription>
-                  Browse Pokémon. Colored sprites indicate a card of that Pokémon is in your collection.
+                <CardDescription className="mt-1">
+                  Browse Pokémon. Colored sprites indicate a card of that Pokémon is in your collection. Use filters to search or show only collected Pokémon.
                 </CardDescription>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                <div className="relative flex-grow md:flex-grow-0 md:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search Pokémon..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-full"
-                  />
+              <div className="flex flex-col gap-3 md:items-end">
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                  <div className="relative flex-grow md:flex-grow-0 md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search Pokémon..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-full"
+                    />
+                  </div>
+                  <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                    <SelectTrigger className="w-full sm:w-auto md:w-48">
+                      <SelectValue placeholder="Filter by Region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Regions</SelectItem>
+                      {regions.map((region) => (
+                        <SelectItem key={region.name} value={region.name}>
+                          {region.name} (Gen {region.generation})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                  <SelectTrigger className="w-full sm:w-auto md:w-48">
-                    <SelectValue placeholder="Filter by Region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Regions</SelectItem>
-                    {regions.map((region) => (
-                      <SelectItem key={region.name} value={region.name}>
-                        {region.name} (Gen {region.generation})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center space-x-2 self-start sm:self-auto md:self-end">
+                  <Switch 
+                    id="show-only-collected" 
+                    checked={showOnlyCollected} 
+                    onCheckedChange={setShowOnlyCollected}
+                    aria-label="Show only collected Pokémon"
+                  />
+                  <Label htmlFor="show-only-collected" className="text-sm font-medium text-muted-foreground whitespace-nowrap">Show Only Collected</Label>
+                </div>
               </div>
             </div>
              {isClient && (
@@ -216,7 +234,7 @@ const PokedexPage: NextPage = () => {
                         <a className="block group">
                           <Card className={cn(
                               "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-3 text-center h-full",
-                              "group-hover:z-10 relative"
+                              "group-hover:z-10 relative" // Added relative for z-index context
                             )}>
                             <div className={`relative w-24 h-24 mb-2 bg-muted/30 rounded-full overflow-hidden flex items-center justify-center ${!isCollected ? 'grayscale' : ''}`} data-ai-hint="pokemon sprite icon">
                               <Image src={pokemon.spriteUrl} alt={pokemon.name} width={96} height={96} objectFit="contain" />
@@ -236,7 +254,12 @@ const PokedexPage: NextPage = () => {
               ) : (
                 <div className="text-center py-10 text-muted-foreground">
                   <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg">No Pokémon found matching your criteria.</p>
+                  <p className="text-lg">
+                    {showOnlyCollected ? "No collected Pokémon match your current filters." : "No Pokémon found matching your criteria."}
+                  </p>
+                   {showOnlyCollected && !searchTerm && selectedRegion === "all" && (
+                     <p className="text-sm">You haven't collected any Pokémon yet, or they don't match the current region filter.</p>
+                   )}
                 </div>
               )}
             </ScrollArea>
@@ -251,7 +274,7 @@ const PokedexPage: NextPage = () => {
 };
 
 export default PokedexPage;
-
+    
 
     
 
