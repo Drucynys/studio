@@ -22,7 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PokemonCard } from "@/types";
-import { Gem, DollarSign, ShieldCheck, Layers } from "lucide-react"; // Added Layers for quantity
+import { Gem, DollarSign, ShieldCheck, Layers, Languages } from "lucide-react"; // Added Layers, Languages
 
 type EditCardDialogProps = {
   isOpen: boolean;
@@ -31,6 +31,8 @@ type EditCardDialogProps = {
   onSave: (updatedCard: PokemonCard) => void;
   availableConditions: string[];
 };
+
+const languageOptions: Array<'English' | 'Japanese'> = ["English", "Japanese"];
 
 // Helper to format variant keys for display
 const formatDisplayVariant = (variantKey?: string): string | null => {
@@ -51,18 +53,20 @@ export function EditCardDialog({
   const [editableCard, setEditableCard] = useState<PokemonCard | null>(null);
   const [quantityInput, setQuantityInput] = useState<number>(1);
   const [valueInput, setValueInput] = useState<string>("0.00");
+  const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Japanese'>('English');
+
 
   useEffect(() => {
     if (card && isOpen) {
       setEditableCard({ ...card });
-      // Ensure quantityInput is always a number, default to 1 if card.quantity is not a valid number
       setQuantityInput(typeof card.quantity === 'number' && !isNaN(card.quantity) ? card.quantity : 1);
-      // Ensure valueInput is always a string representation of a number, default to "0.00"
       setValueInput(typeof card.value === 'number' && !isNaN(card.value) ? card.value.toFixed(2) : "0.00");
+      setSelectedLanguage(card.language || 'English');
     } else {
       setEditableCard(null);
       setQuantityInput(1);
       setValueInput("0.00");
+      setSelectedLanguage('English');
     }
   }, [card, isOpen]);
 
@@ -81,12 +85,19 @@ export function EditCardDialog({
     setValueInput(e.target.value);
   };
 
+  const handleLanguageChange = (value: 'English' | 'Japanese') => {
+    setSelectedLanguage(value);
+    if (editableCard) {
+        setEditableCard({...editableCard, language: value });
+    }
+  }
+
 
   const handleSave = () => {
     if (editableCard) {
       const parsedValue = parseFloat(valueInput);
       const finalValue = isNaN(parsedValue) ? 0 : parsedValue;
-      onSave({ ...editableCard, quantity: quantityInput, value: finalValue });
+      onSave({ ...editableCard, language: selectedLanguage, quantity: quantityInput, value: finalValue });
       onClose();
     }
   };
@@ -125,6 +136,27 @@ export function EditCardDialog({
                 key={currentCardToDisplay?.imageUrl || 'placeholder'}
               />
             </div>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="language" className="text-right col-span-1">
+              <Languages className="inline-block mr-1 h-4 w-4 text-blue-500"/>Language
+            </Label>
+            <Select
+              value={selectedLanguage}
+              onValueChange={handleLanguageChange}
+            >
+              <SelectTrigger id="language" className="col-span-3">
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent>
+                {languageOptions.map((lang) => (
+                  <SelectItem key={lang} value={lang}>
+                    {lang}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">

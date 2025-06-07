@@ -7,6 +7,7 @@ export interface PokemonCard {
   rarity: string;
   variant?: string;
   condition: string;
+  language: 'English' | 'Japanese'; // Added language field
   value: number; // This is typically TCGPlayer value in USD
   imageUrl?: string; // Optional: for displaying card image if available
   quantity: number;
@@ -58,3 +59,4 @@ export interface CardmarketProduct {
 
 // The price_guide_6.json is an array of these product entries
 export type CardmarketPriceGuide = CardmarketProduct[];
+

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye } from "lucide-react";
+import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye, Languages } from "lucide-react";
 import React, { useState, useEffect } from "react";
 
 type CardItemProps = {
@@ -39,7 +39,7 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
     setCmPrices(null); 
     setCmStatus(null); 
 
-    if (cardmarketPriceGuide && card.name && card.set) {
+    if (cardmarketPriceGuide && card.name && card.set && card.language === 'English') { // Only fetch CM for English cards
       const normalizedCardName = normalizeString(card.name);
       const normalizedCardSet = normalizeString(card.set);
       
@@ -61,6 +61,8 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
             setCmStatus("(CM: No match in guide)");
         }
       }
+    } else if (card.language === 'Japanese') {
+      setCmStatus("(Cardmarket prices N/A for Japanese cards)");
     } else if (cardmarketPriceGuide === null) {
       setCmStatus(null); 
     } else if (cardmarketPriceGuide && cardmarketPriceGuide.length === 0){
@@ -106,6 +108,10 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
             <strong>Variant:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-blue-500/50 text-blue-600">{displayVariant}</Badge>
           </div>
         )}
+         <div className="flex items-center gap-2 text-xs">
+          <Languages className="h-3.5 w-3.5 text-indigo-500" /> 
+          <strong>Language:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-indigo-500/50 text-indigo-600">{card.language}</Badge>
+        </div>
         <div className="flex items-center gap-2 text-xs">
           <ShieldCheck className="h-3.5 w-3.5 text-green-500" /> 
           <strong>Condition:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5">{card.condition}</Badge>
@@ -118,9 +124,9 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
       <CardFooter className="flex-col items-start space-y-2 pt-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-primary">
           <Coins className="h-4 w-4" />
-          TCGPlayer Value: ${card.value.toFixed(2)} (x{card.quantity} = ${(card.value * card.quantity).toFixed(2)})
+          Value: ${card.value.toFixed(2)} (x{card.quantity} = ${(card.value * card.quantity).toFixed(2)})
         </div>
-        {card.name && (
+        {card.name && card.language === 'English' && (
            <a
             href={tcgPlayerSearchUrl}
             target="_blank"
@@ -130,8 +136,12 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
             View on TCGPlayer <ExternalLink size={12} />
           </a>
         )}
+        {card.language === 'Japanese' && (
+            <p className="text-xs text-muted-foreground italic">(TCGPlayer link N/A for Japanese cards)</p>
+        )}
 
-        {hasDisplayableCmPrices && cmPrices && (
+
+        {hasDisplayableCmPrices && cmPrices && card.language === 'English' && (
           <div className="mt-1 pt-1 border-t border-border/30 w-full">
             <p className="text-xs font-semibold text-blue-600 flex items-center gap-1 my-1">
               <ShoppingCart size={12}/> Cardmarket (EUR):

@@ -25,6 +25,7 @@ const ScanCardOutputSchema = z.object({
   set: z.string().optional().describe("The name of the Pokémon TCG set the card belongs to."),
   cardNumber: z.string().optional().describe("The card number, including any prefixes/suffixes (e.g., '12/102', 'SWSH123', 'TG05/TG30')."),
   rarity: z.string().optional().describe("The rarity of the card (e.g., Common, Uncommon, Rare, Holo Rare, Ultra Rare)."),
+  language: z.enum(["English", "Japanese", "Unknown"]).optional().describe("The language of the card (e.g., English, Japanese). If unsure, set to Unknown or omit."),
   isPokemonCard: z.boolean().describe("Set to true if the image is identified as a Pokémon TCG card, false otherwise."),
   error: z.string().optional().describe("Any error message if identification fails or it's not a Pokémon card.")
 });
@@ -42,10 +43,11 @@ const prompt = ai.definePrompt({
 Respond in JSON format matching the provided schema.
 
 If the image is clearly a Pokémon TCG card, extract the following details:
-- name: The full name of the Pokémon or card.
-- set: The official English name of the expansion set.
-- cardNumber: The collector number of the card, exactly as it appears (e.g., "101/165", "SWSH001", "TG14/TG30").
-- rarity: The card's rarity (e.g., Common, Uncommon, Rare, Holo Rare, Ultra Rare, Secret Rare, Amazing Rare, Radiant).
+- name: The full name of the Pokémon or card. For Japanese cards, provide the English equivalent name if known, otherwise the Japanese name.
+- set: The official English name of the expansion set if possible. For Japanese cards, provide the English equivalent set name if known, otherwise the Japanese set name.
+- cardNumber: The collector number of the card, exactly as it appears (e.g., "101/165", "SWSH001", "TG14/TG30", "001/078").
+- rarity: The card's rarity (e.g., Common, Uncommon, Rare, Holo Rare, Ultra Rare, Secret Rare, Amazing Rare, Radiant, C, U, R, RR, RRR, SR, UR, HR).
+- language: Identify the primary language of the text on the card. Options are "English", "Japanese". If uncertain, set to "Unknown" or omit.
 - isPokemonCard: Set this to true.
 
 If any specific detail is unreadable or not present, omit that field or set it to null in the JSON.
@@ -96,6 +98,9 @@ const scanCardFlow = ai.defineFlow(
                 output.error = "Could not determine if image is a Pokémon card.";
             }
         }
+    }
+    if (output.isPokemonCard && !output.language) {
+      output.language = "English"; // Default to English if language not determined but is a Pokemon card
     }
     return output;
   }

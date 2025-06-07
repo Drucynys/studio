@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Languages } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const MAX_ROTATION = 10;
@@ -236,6 +236,9 @@ export function FullScreenCardView({
             <Badge variant="secondary" className="text-xs">{currentCard.rarity}</Badge>
             {displayVariant && <Badge variant="outline" className="text-xs">{displayVariant}</Badge>}
             <Badge variant="outline" className="text-xs">{currentCard.condition}</Badge>
+            <Badge variant="outline" className="text-xs border-indigo-500/50 text-indigo-600 flex items-center gap-1">
+                <Languages size={12}/> {currentCard.language}
+            </Badge>
              <Badge variant="outline" className="text-xs">Qty: {currentCard.quantity}</Badge>
           </div>
            <p className="text-xs text-muted-foreground mt-2">

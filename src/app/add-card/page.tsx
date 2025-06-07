@@ -15,7 +15,7 @@ import { PlusCircle } from "lucide-react";
 export default function AddCardPage() {
   const { toast } = useToast();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannedCardDataForForm, setScannedCardDataForForm] = useState<ScanCardOutput | null>(null);
+  const [scannedCardDataForForm, setScannedCardDataForForm] = useState<Partial<ScanCardOutput> | null>(null);
 
 
   const handleAddCardLocally = (newCard: PokemonCard) => {
@@ -28,7 +28,8 @@ export default function AddCardPage() {
                 item.set === newCard.set && 
                 item.cardNumber === newCard.cardNumber &&
                 item.variant === newCard.variant && 
-                item.condition === newCard.condition
+                item.condition === newCard.condition &&
+                item.language === newCard.language // Added language check
       );
 
       if (isDuplicate) {
@@ -38,7 +39,8 @@ export default function AddCardPage() {
             card.set === newCard.set && 
             card.cardNumber === newCard.cardNumber &&
             card.variant === newCard.variant && 
-            card.condition === newCard.condition
+            card.condition === newCard.condition &&
+            card.language === newCard.language // Added language check
           ) {
             return { ...card, quantity: card.quantity + (newCard.quantity || 1) };
           }
@@ -47,7 +49,7 @@ export default function AddCardPage() {
         localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
         toast({
           title: "Card Quantity Updated!",
-          description: `Quantity for ${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) increased.`,
+          description: `Quantity for ${newCard.name} (${newCard.language}) ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) increased.`,
           className: "bg-secondary text-secondary-foreground"
         });
 
@@ -56,7 +58,7 @@ export default function AddCardPage() {
         localStorage.setItem("pokemonCards", JSON.stringify(cardsToStore));
         toast({
           title: "Card Added!",
-          description: `${newCard.name} ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) has been added to your collection.`,
+          description: `${newCard.name} (${newCard.language}) ${newCard.variant ? '('+newCard.variant+')' : ''} (${newCard.condition}) has been added to your collection.`,
           className: "bg-secondary text-secondary-foreground"
         });
       }
@@ -77,10 +79,17 @@ export default function AddCardPage() {
   const handleScanComplete = (data: ScanCardOutput) => {
     setIsScannerOpen(false);
     if (data.isPokemonCard && (data.name || data.set || data.cardNumber)) {
-      setScannedCardDataForForm(data); // Set data to be passed to the form
+      const dataForForm: Partial<ScanCardOutput> = {
+        name: data.name,
+        set: data.set,
+        cardNumber: data.cardNumber,
+        rarity: data.rarity,
+        language: data.language || "English", // Default to English if not provided
+      };
+      setScannedCardDataForForm(dataForForm);
       toast({
         title: "Scan Processed",
-        description: `Card details extracted. Please verify and complete the form. Name: ${data.name || 'N/A'}, Set: ${data.set || 'N/A'}`,
+        description: `Card details extracted. Language: ${data.language || 'English'}. Please verify and complete the form.`,
         className: "bg-secondary text-secondary-foreground"
       });
     } else if (data.error) {

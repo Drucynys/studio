@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { PokemonCard } from "@/types";
 import type { ScanCardOutput } from "@/ai/flows/scan-card-flow";
-import { FilePlus, Loader2, Layers } from "lucide-react";
+import { FilePlus, Loader2, Layers, Languages } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
@@ -32,16 +32,19 @@ import Image from "next/image";
 const formSchema = z.object({
   selectedSetId: z.string().min(1, "Set is required"),
   selectedCardId: z.string().min(1, "Card is required"),
+  language: z.enum(["English", "Japanese"], { required_error: "Language is required" }),
   condition: z.string().min(1, "Condition is required"),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
 });
 
 type ManualCardInputFormProps = {
   onAddCard: (card: PokemonCard) => void;
-  initialScanData?: ScanCardOutput | null; // Optional prop for scanned data
+  initialScanData?: Partial<ScanCardOutput> | null; // Optional prop for scanned data
 };
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
+const languageOptions: Array<'English' | 'Japanese'> = ["English", "Japanese"];
+
 
 interface ApiSet {
   id: string;
@@ -123,6 +126,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
     defaultValues: {
       selectedSetId: "",
       selectedCardId: "",
+      language: "English",
       condition: "",
       quantity: 1,
     },
@@ -130,6 +134,8 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
 
   const watchedSetId = form.watch("selectedSetId");
   const watchedCardId = form.watch("selectedCardId");
+  const watchedLanguage = form.watch("language");
+
 
   const fetchSets = useCallback(async () => {
     setIsLoadingSets(true);
@@ -210,6 +216,12 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       if (initialScanData && availableSets.length > 0 && !isLoadingSets) {
         setIsPreFilling(true);
         let matchedSetId: string | undefined = undefined;
+
+        if (initialScanData.language && (initialScanData.language === 'English' || initialScanData.language === 'Japanese')) {
+          form.setValue("language", initialScanData.language, { shouldValidate: true });
+        } else {
+          form.setValue("language", "English", { shouldValidate: true }); // Default if scanner unsure
+        }
 
         if (initialScanData.set) {
           const normalizedScanSet = normalizeString(initialScanData.set);
@@ -292,22 +304,24 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
 
     const newCard: PokemonCard = {
       id: crypto.randomUUID(),
-      set: selectedSet.name,
+      set: selectedSet.name, // English set name from API
       cardNumber: selectedCardData.number,
-      name: selectedCardData.name,
-      rarity: selectedCardData.rarity || initialScanData?.rarity || "N/A", // Prioritize API rarity, then scanned, then N/A
+      name: selectedCardData.name, // English card name from API
+      rarity: selectedCardData.rarity || initialScanData?.rarity || "N/A",
+      language: values.language, // User selected language
       variant: cardVariant, 
       condition: values.condition,
       imageUrl: selectedCardData.images.large,
-      value: cardValue,
+      value: cardValue, // Based on English card API data
       quantity: values.quantity,
     };
     
     onAddCard(newCard); 
 
     form.reset({
-        selectedSetId: values.selectedSetId,
+        selectedSetId: values.selectedSetId, // Keep set selected
         selectedCardId: "",
+        language: values.language, // Keep language selected
         condition: "",
         quantity: 1,
     });
@@ -323,7 +337,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
           <FilePlus className="h-6 w-6 text-primary" />
           Manual Card Entry
         </CardTitle>
-        <CardDescription>Select Set, Card, Condition, and Quantity. Scanner may pre-fill some fields.</CardDescription>
+        <CardDescription>Select Set, Card, Language, Condition, and Quantity. Scanner may pre-fill some fields.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -337,10 +351,9 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
                   <Select 
                     onValueChange={(value) => {
                       field.onChange(value);
-                      // Resetting card ID here is fine as manual set change should clear card
                       form.resetField("selectedCardId", { defaultValue: "" }); 
                       setSelectedCardData(null);
-                      setCardsInSelectedSet([]); // Clear old cards before new fetch is triggered by watchedSetId
+                      setCardsInSelectedSet([]); 
                     }}
                     value={field.value}
                     disabled={isLoadingSets || !!errorSets || availableSets.length === 0 || isPreFilling}
@@ -350,7 +363,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
                         <SelectValue placeholder={
                           isLoadingSets ? "Loading sets..." : 
                           errorSets ? "Error loading sets" : 
-                          availableSets.length === 0 ? "No sets available" : "Select set"
+                          availableSets.length === 0 ? "No sets available" : "Select set (English name)"
                         } />
                       </SelectTrigger>
                     </FormControl>
@@ -383,7 +396,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
                           isLoadingCards ? "Loading cards..." :
                           !watchedSetId ? "Select a set first" :
                           errorCards ? "Error loading cards" :
-                          cardsInSelectedSet.length === 0 && watchedSetId && !isLoadingCards ? "No cards in set" : "Select card"
+                          cardsInSelectedSet.length === 0 && watchedSetId && !isLoadingCards ? "No cards in set" : "Select card (English name)"
                         } />
                       </SelectTrigger>
                     </FormControl>
@@ -411,12 +424,39 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
                     <p><strong>Set:</strong> {selectedCardData.set.name}</p>
                     <p><strong>Rarity:</strong> {selectedCardData.rarity || "N/A"}</p>
                     {selectedCardData.tcgplayer?.prices && (
-                        <p><strong>Est. Value:</strong> ${getDefaultMarketPrice(selectedCardData).value.toFixed(2)}</p>
+                        <p><strong>Est. Value (English):</strong> ${getDefaultMarketPrice(selectedCardData).value.toFixed(2)}</p>
                     )}
                   </div>
                 </div>
               </Card>
             )}
+
+            <FormField
+              control={form.control}
+              name="language"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-1"><Languages className="h-4 w-4 text-blue-500"/> Language</FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value} 
+                    disabled={isPreFilling || !selectedCardData}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={!selectedCardData ? "Select card first" : "Select language"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {languageOptions.map(option => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -427,7 +467,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
                   <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCardData || isPreFilling}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={!selectedCardData ? "Select card first" : "Select condition"} />
+                        <SelectValue placeholder={!selectedCardData ? "Select language first" : "Select condition"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
