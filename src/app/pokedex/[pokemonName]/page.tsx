@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, use } from "react"; // Added 'use'
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -23,13 +23,14 @@ interface PokemonDetailPageProps {
 }
 
 const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
-  const rawPokemonNameFromParams = params.pokemonName;
+  const resolvedParams = use(params); // Unwrap params using React.use()
+  const rawPokemonNameFromParams = resolvedParams.pokemonName; // Access pokemonName from resolvedParams
 
   const [pokemonName, setPokemonName] = useState<string>("");
   const [initializationError, setInitializationError] = useState<string | null>(null);
 
   const [pokemonDetails, setPokemonDetails] = useState<PokemonPokedexEntry | null>(null);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(true); // Start true until pokemonName is processed
+  const [isLoadingDetails, setIsLoadingDetails] = useState(true); 
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const [pokemonTcgCards, setPokemonTcgCards] = useState<ApiPokemonCard[]>([]);
@@ -59,18 +60,18 @@ const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
   }, []);
 
   useEffect(() => {
-    setIsLoadingDetails(true); // Set loading true at the start of this effect
+    setIsLoadingDetails(true); 
     if (rawPokemonNameFromParams) {
       try {
         const decodedName = decodeURIComponent(rawPokemonNameFromParams).toLowerCase();
         setPokemonName(decodedName);
         setInitializationError(null);
-        setErrorDetails(null); // Clear previous general errors
+        setErrorDetails(null); 
       } catch (e) {
         console.error("Error decoding pokemonName:", e);
         setInitializationError("Invalid Pokémon name in URL format.");
         setErrorDetails("Invalid Pokémon name in URL format.");
-        setPokemonName(""); // Clear pokemonName if decoding fails
+        setPokemonName(""); 
         setIsLoadingDetails(false);
       }
     } else {
@@ -87,9 +88,7 @@ const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
       return;
     }
     if (pokemonName) {
-      // This effect now correctly waits for pokemonName to be set
-      setIsLoadingDetails(true); // Ensure loading is true when we start fetching based on pokemonName
-      // setErrorDetails(null); // Clear previous errors before new fetch attempt
+      setIsLoadingDetails(true); 
       const foundPokemon = allPokemonData.find(p => p.name.toLowerCase() === pokemonName);
       if (foundPokemon) {
         setPokemonDetails(foundPokemon);
@@ -99,10 +98,7 @@ const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
       }
       setIsLoadingDetails(false);
     } else if (!rawPokemonNameFromParams) {
-        // This handles the case where rawPokemonNameFromParams was empty/undefined from the start
-        // and pokemonName state didn't get set.
         setIsLoadingDetails(false);
-        // Error already set by previous effect
     }
   }, [pokemonName, initializationError, rawPokemonNameFromParams]);
 
@@ -235,7 +231,6 @@ const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
 
 
   if (!isClient || (isLoadingDetails && !initializationError && !errorDetails && !pokemonDetails)) {
-    // Show main loading spinner only if not yet initialized, no init error, no detail error, and no details yet
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -250,7 +245,6 @@ const PokemonDetailPage: NextPage<PokemonDetailPageProps> = ({ params }) => {
   const displayNameToShow = pokemonDetails ? pokemonDetails.name : (pokemonName || "Selected Pokémon");
 
   if (initializationError || (errorDetails && !pokemonDetails)) {
-    // Handle critical errors that prevent display of Pokémon details
      return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
