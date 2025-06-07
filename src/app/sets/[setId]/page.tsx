@@ -137,7 +137,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
         name: setData.data.name,
         logoUrl: setData.data.images?.logo,
         releaseDate: setData.data.releaseDate,
-        totalCards: setData.data.printedTotal || setData.data.total || 0,
+        totalCards: setData.data.printedTotal || setData.data.total || 0, // This remains the official printed total
         series: setData.data.series,
       });
       
@@ -356,8 +356,8 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                         <div>
-                            <p className="font-medium text-muted-foreground">Printed Cards</p>
-                            <p className="font-semibold text-lg">{setDetails.totalCards}</p>
+                            <p className="font-medium text-muted-foreground">Cards in Set (Unique)</p>
+                            <p className="font-semibold text-lg">{setCompletion.total}</p>
                         </div>
                         <div>
                             <p className="font-medium text-muted-foreground">Release Date</p>
@@ -498,3 +498,4 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
 };
 
 export default SetDetailsPage;
+
