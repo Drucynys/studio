@@ -305,6 +305,10 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     return key.replace(/([A-Z0-9])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
   };
 
+  const card1 = mostExpensiveCards.length > 0 ? mostExpensiveCards[0] : null;
+  const card2 = mostExpensiveCards.length > 1 ? mostExpensiveCards[1] : null;
+  const card3 = mostExpensiveCards.length > 2 ? mostExpensiveCards[2] : null;
+
   if (!isClient && isLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
@@ -361,7 +365,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                             <p className="font-semibold text-lg">${totalMarketValue.toFixed(2)}</p>
                         </div>
                         <div className="pt-1">
-                            <p className="font-medium text-muted-foreground">Set Completion (Unique)</p>
+                            <p className="font-medium text-muted-foreground">Set Completion (Unique Cards)</p>
                              <div className="flex items-center justify-between mt-0.5">
                                 <p className="font-semibold text-base">
                                     {setCompletion.collected} / {setCompletion.total}
@@ -375,22 +379,51 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                         </div>
                     </CardContent>
                 </Card>
-                <Card className="sm:col-span-1 xl:col-span-1">
+                 <Card className="sm:col-span-1 xl:col-span-1">
                     <CardHeader>
                         <CardTitle className="text-lg font-semibold text-primary flex items-center gap-2"><TrendingUp size={20}/>Most Expensive</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                        {mostExpensiveCards.length > 0 ? mostExpensiveCards.map(card => (
-                            <div key={card.id} className="flex items-center gap-3">
-                                <div className="relative w-10 h-14 flex-shrink-0 rounded overflow-hidden shadow-sm" data-ai-hint="pokemon card front small">
-                                    <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" />
+                    <CardContent className="flex flex-col items-center justify-start pt-3 space-y-2 h-full">
+                        {mostExpensiveCards.length > 0 ? (
+                            <div className="flex items-end justify-around w-full h-full">
+                                {/* 2nd Place */}
+                                {card2 && (
+                                <div className="flex flex-col items-center text-center w-1/3 px-1 transform translate-y-2">
+                                    <div className="relative w-10 h-14 flex-shrink-0 rounded overflow-hidden shadow-sm" data-ai-hint="pokemon card front small">
+                                    <Image src={card2.images.small} alt={card2.name} layout="fill" objectFit="contain" />
+                                    </div>
+                                    <p className="text-xs font-semibold truncate mt-1 w-full" title={card2.name}>{card2.name}</p>
+                                    <p className="text-xs text-muted-foreground">${getDefaultMarketPrice(card2).value.toFixed(2)}</p>
                                 </div>
-                                <div className="text-sm overflow-hidden">
-                                    <p className="font-semibold truncate leading-tight" title={card.name}>{card.name}</p>
-                                    <p className="text-xs text-muted-foreground">${getDefaultMarketPrice(card).value.toFixed(2)}</p>
+                                )}
+                                {!card2 && mostExpensiveCards.length > 1 && <div className="w-1/3"></div>}
+
+                                {/* 1st Place */}
+                                {card1 && (
+                                <div className="flex flex-col items-center text-center w-1/3 px-1 z-10">
+                                    <div className="relative w-14 h-20 flex-shrink-0 rounded overflow-hidden shadow-md border-2 border-primary" data-ai-hint="pokemon card front medium">
+                                    <Image src={card1.images.small} alt={card1.name} layout="fill" objectFit="contain" />
+                                    </div>
+                                    <p className="text-sm font-bold truncate mt-1 w-full" title={card1.name}>{card1.name}</p>
+                                    <p className="text-xs text-primary font-semibold">${getDefaultMarketPrice(card1).value.toFixed(2)}</p>
                                 </div>
+                                )}
+
+                                {/* 3rd Place */}
+                                {card3 && (
+                                <div className="flex flex-col items-center text-center w-1/3 px-1 transform translate-y-2">
+                                    <div className="relative w-10 h-14 flex-shrink-0 rounded overflow-hidden shadow-sm" data-ai-hint="pokemon card front small">
+                                    <Image src={card3.images.small} alt={card3.name} layout="fill" objectFit="contain" />
+                                    </div>
+                                    <p className="text-xs font-semibold truncate mt-1 w-full" title={card3.name}>{card3.name}</p>
+                                    <p className="text-xs text-muted-foreground">${getDefaultMarketPrice(card3).value.toFixed(2)}</p>
+                                </div>
+                                )}
+                                {!card3 && mostExpensiveCards.length > 1 && <div className="w-1/3"></div>}
                             </div>
-                        )) : <p className="text-sm text-muted-foreground">No pricing data available.</p>}
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4 h-full flex items-center justify-center">No pricing data available.</p>
+                        )}
                     </CardContent>
                 </Card>
                 <Card className="bg-muted/30 border-dashed">
@@ -522,3 +555,5 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
 
 export default SetDetailsPage;
 
+
+    
