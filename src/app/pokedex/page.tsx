@@ -213,7 +213,11 @@ const PokedexPage: NextPage = () => {
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
                     <Trophy className="h-4 w-4 text-accent" />
-                    Pokédex Completion (Current View):
+                    Pokédex Completion ({
+                      selectedRegion === "all" 
+                        ? "All Regions" 
+                        : `${selectedRegion} Region`
+                    }{showOnlyCollected ? ", Collected Only" : ""}):
                   </div>
                   <div className="text-sm font-semibold text-foreground">
                     {pokedexStats.collected} / {pokedexStats.total} Pokémon ({pokedexStats.percentage}%)
@@ -224,9 +228,9 @@ const PokedexPage: NextPage = () => {
             )}
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-20.1rem-3.5rem)] md:h-[calc(100vh-24.1rem-3.5rem)]"> {/* Adjusted height for stats bar */}
+            <ScrollArea className="h-[calc(100vh-20.1rem-3.5rem)] md:h-[calc(100vh-24.1rem-3.5rem)] pt-4 pb-24 px-4">
               {filteredPokemon.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                   {filteredPokemon.map((pokemon) => {
                     const isCollected = collectedPokemonNames.has(pokemon.name.toLowerCase());
                     return (
