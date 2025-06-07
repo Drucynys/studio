@@ -1,17 +1,22 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { ManualCardInputForm } from "@/components/ManualCardInputForm";
 import { CardScannerButton } from "@/components/CardScannerButton";
+import { CardScannerDialog } from "@/components/CardScannerDialog"; // Import the dialog
 import type { PokemonCard } from "@/types";
+import type { ScanCardOutput } from "@/ai/flows/scan-card-flow"; // Import scan output type
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { PlusCircle } from "lucide-react";
 
 export default function AddCardPage() {
   const { toast } = useToast();
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannedCardDataForForm, setScannedCardDataForForm] = useState<ScanCardOutput | null>(null);
+
 
   const handleAddCardLocally = (newCard: PokemonCard) => {
     try {
@@ -27,7 +32,6 @@ export default function AddCardPage() {
       );
 
       if (isDuplicate) {
-        // If it's a duplicate, find it and increment quantity
         const updatedCards = storedCards.map(card => {
           if (
             card.name === newCard.name && 
@@ -48,7 +52,6 @@ export default function AddCardPage() {
         });
 
       } else {
-        // If not a duplicate, add as new card
         const cardsToStore = [newCard, ...storedCards];
         localStorage.setItem("pokemonCards", JSON.stringify(cardsToStore));
         toast({
@@ -57,7 +60,6 @@ export default function AddCardPage() {
           className: "bg-secondary text-secondary-foreground"
         });
       }
-      // Trigger a storage event to notify other tabs/pages
       window.dispatchEvent(new StorageEvent('storage', { key: 'pokemonCards', newValue: localStorage.getItem("pokemonCards") }));
 
     } catch (e) {
@@ -67,6 +69,34 @@ export default function AddCardPage() {
         title: "Storage Error",
         description: "Could not save card to your collection.",
       });
+    }
+     // Reset scanned data after adding to prevent re-filling for next manual entry
+    setScannedCardDataForForm(null);
+  };
+
+  const handleScanComplete = (data: ScanCardOutput) => {
+    setIsScannerOpen(false);
+    if (data.isPokemonCard && (data.name || data.set || data.cardNumber)) {
+      setScannedCardDataForForm(data); // Set data to be passed to the form
+      toast({
+        title: "Scan Processed",
+        description: `Card details extracted. Please verify and complete the form. Name: ${data.name || 'N/A'}, Set: ${data.set || 'N/A'}`,
+        className: "bg-secondary text-secondary-foreground"
+      });
+    } else if (data.error) {
+      toast({
+        variant: "destructive",
+        title: "Scan Inconclusive",
+        description: data.error,
+      });
+       setScannedCardDataForForm(null); // Clear any previous scan data
+    } else {
+       toast({
+        variant: "destructive",
+        title: "Scan Inconclusive",
+        description: "Could not extract significant details from the card.",
+      });
+       setScannedCardDataForForm(null);
     }
   };
 
@@ -82,12 +112,16 @@ export default function AddCardPage() {
           </h2>
           <div className="grid md:grid-cols-2 gap-8 items-start">
             <div className="md:col-span-1 space-y-6">
-              <ManualCardInputForm onAddCard={handleAddCardLocally} />
+              <ManualCardInputForm 
+                onAddCard={handleAddCardLocally} 
+                initialScanData={scannedCardDataForForm} 
+                key={scannedCardDataForForm ? JSON.stringify(scannedCardDataForForm) : 'manual-form'} // Force re-render on new scan data
+              />
             </div>
-            <div className="md:col-span-1 space-y-6 flex flex-col justify-start pt-[4.5rem]"> {/* Adjust pt to align with form label if needed */}
-               <CardScannerButton />
+            <div className="md:col-span-1 space-y-6 flex flex-col justify-start pt-[4.5rem]">
+               <CardScannerButton onScanClick={() => setIsScannerOpen(true)} />
                <p className="text-sm text-muted-foreground text-center mt-2">
-                Use the form to manually enter card details, or try the scanner (feature coming soon!).
+                Use the form to manually enter card details, or try the scanner.
               </p>
             </div>
           </div>
@@ -97,6 +131,15 @@ export default function AddCardPage() {
             Once cards are added, you can view and manage them in <a href="/my-collection" className="text-primary hover:underline">My Collection</a>.
         </p>
       </main>
+
+      {isScannerOpen && (
+        <CardScannerDialog 
+          isOpen={isScannerOpen} 
+          onClose={() => setIsScannerOpen(false)} 
+          onScanComplete={handleScanComplete} 
+        />
+      )}
+
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
         Pokédex Tracker &copy; {new Date().getFullYear()}
       </footer>

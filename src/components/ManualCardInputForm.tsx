@@ -20,27 +20,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input"; // Added Input
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { PokemonCard } from "@/types";
-import { FilePlus, Loader2, Layers } from "lucide-react"; // Changed icon, added Layers
+import type { ScanCardOutput } from "@/ai/flows/scan-card-flow";
+import { FilePlus, Loader2, Layers } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
 
-// Zod schema for form validation
 const formSchema = z.object({
   selectedSetId: z.string().min(1, "Set is required"),
   selectedCardId: z.string().min(1, "Card is required"),
   condition: z.string().min(1, "Condition is required"),
-  quantity: z.coerce.number().min(1, "Quantity must be at least 1"), // Added quantity
+  quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
 });
 
 type ManualCardInputFormProps = {
   onAddCard: (card: PokemonCard) => void;
+  initialScanData?: ScanCardOutput | null; // Optional prop for scanned data
 };
 
-// Static condition options
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
 interface ApiSet {
@@ -80,20 +80,15 @@ interface ApiPokemonCard {
   };
 }
 
-// Helper to get a default market price (e.g., for 'normal' or 'holofoil')
 const getDefaultMarketPrice = (apiCard: ApiPokemonCard | null): { value: number, variant?: string } => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return { value: 0 };
   const prices = apiCard.tcgplayer.prices;
-  
   const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
-
   for (const variant of variantPriority) {
     if (prices[variant]?.market && typeof prices[variant]!.market === 'number') {
       return { value: prices[variant]!.market!, variant: variant };
     }
   }
-  
-  // Fallback to the first available market price
   for (const key in prices) {
     if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market && typeof prices[key]!.market === 'number') {
       return { value: prices[key]!.market!, variant: key };
@@ -102,8 +97,13 @@ const getDefaultMarketPrice = (apiCard: ApiPokemonCard | null): { value: number,
   return { value: 0 };
 };
 
+// Helper to normalize strings for matching
+const normalizeString = (str: string = ""): string => {
+  return str.toLowerCase().replace(/[^a-z0-9]/gi, '');
+};
 
-export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
+
+export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardInputFormProps) {
   const { toast } = useToast();
   
   const [availableSets, setAvailableSets] = useState<ApiSet[]>([]);
@@ -115,6 +115,8 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
   const [errorCards, setErrorCards] = useState<string | null>(null);
 
   const [selectedCardData, setSelectedCardData] = useState<ApiPokemonCard | null>(null);
+  const [isPreFilling, setIsPreFilling] = useState(false);
+
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -122,95 +124,160 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
       selectedSetId: "",
       selectedCardId: "",
       condition: "",
-      quantity: 1, // Default quantity
+      quantity: 1,
     },
   });
 
   const watchedSetId = form.watch("selectedSetId");
   const watchedCardId = form.watch("selectedCardId");
 
-  useEffect(() => {
-    const fetchSets = async () => {
-      setIsLoadingSets(true);
-      setErrorSets(null);
-      try {
-        const headers: HeadersInit = {};
-        if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
-          headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-        }
-        const response = await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate", { headers });
-        if (!response.ok) throw new Error(`Failed to fetch sets: ${response.statusText}`);
-        const data = await response.json();
-        setAvailableSets((data.data as ApiSet[]).sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()));
-      } catch (err) {
-        setErrorSets(err instanceof Error ? err.message : "An unknown error occurred");
-        toast({ variant: "destructive", title: "Error fetching Sets", description: "Could not load sets." });
-      } finally {
-        setIsLoadingSets(false);
+  const fetchSets = useCallback(async () => {
+    setIsLoadingSets(true);
+    setErrorSets(null);
+    try {
+      const headers: HeadersInit = {};
+      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
+        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
       }
-    };
-    fetchSets();
+      const response = await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate", { headers });
+      if (!response.ok) throw new Error(`Failed to fetch sets: ${response.statusText}`);
+      const data = await response.json();
+      const sortedSets = (data.data as ApiSet[]).sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+      setAvailableSets(sortedSets);
+      return sortedSets; // Return sets for chained useEffect
+    } catch (err) {
+      setErrorSets(err instanceof Error ? err.message : "An unknown error occurred");
+      toast({ variant: "destructive", title: "Error fetching Sets", description: "Could not load sets." });
+      return [];
+    } finally {
+      setIsLoadingSets(false);
+    }
   }, [toast]);
 
   useEffect(() => {
-    if (!watchedSetId) {
+    fetchSets();
+  }, [fetchSets]);
+
+  const fetchCardsForSet = useCallback(async (setId: string) => {
+    if (!setId) return [];
+    setIsLoadingCards(true);
+    setErrorCards(null);
+    // setSelectedCardData(null); // Don't reset this if we are trying to pre-fill
+    // form.resetField("selectedCardId", { defaultValue: "" }); // Don't reset this
+
+    try {
+      const headers: HeadersInit = {};
+      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
+        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
+      }
+      let allCards: ApiPokemonCard[] = [];
+      let page = 1;
+      let hasMore = true;
+      
+      while(hasMore) {
+        const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250&orderBy=number`, { headers });
+        if (!response.ok) throw new Error(`Failed to fetch cards for set ${setId}: ${response.statusText}`);
+        const data = await response.json();
+        allCards = allCards.concat(data.data as ApiPokemonCard[]);
+        page++;
+        hasMore = data.page * data.pageSize < data.totalCount;
+      }
+      
+      allCards.sort((a, b) => {
+          const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
+          const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
+          const suffixA = a.number.replace(/\d/g, '');
+          const suffixB = b.number.replace(/\d/g, '');
+          if (numA === numB) return suffixA.localeCompare(suffixB);
+          return numA - numB;
+      });
+      setCardsInSelectedSet(allCards);
+      return allCards; // Return cards for chained useEffect
+    } catch (err) {
+      setErrorCards(err instanceof Error ? err.message : "An unknown error occurred");
+      toast({ variant: "destructive", title: "Error fetching cards", description: `Could not load cards for the selected set.` });
       setCardsInSelectedSet([]);
-      setSelectedCardData(null);
-      form.resetField("selectedCardId");
-      return;
+      return [];
+    } finally {
+      setIsLoadingCards(false);
     }
-    const fetchCardsForSet = async () => {
-      setIsLoadingCards(true);
-      setErrorCards(null);
-      setSelectedCardData(null);
-      form.resetField("selectedCardId", { defaultValue: "" });
+  }, [toast]);
 
-      try {
-        const headers: HeadersInit = {};
-        if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
-          headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-        }
-        let allCards: ApiPokemonCard[] = [];
-        let page = 1;
-        let hasMore = true;
-        
-        while(hasMore) {
-          const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${watchedSetId}&page=${page}&pageSize=250&orderBy=number`, { headers });
-          if (!response.ok) throw new Error(`Failed to fetch cards for set ${watchedSetId}: ${response.statusText}`);
-          const data = await response.json();
-          allCards = allCards.concat(data.data as ApiPokemonCard[]);
-          page++;
-          hasMore = data.page * data.pageSize < data.totalCount;
+
+  // Effect for pre-filling from initialScanData
+  useEffect(() => {
+    const preFillForm = async () => {
+      if (initialScanData && availableSets.length > 0 && !isLoadingSets) {
+        setIsPreFilling(true);
+        let matchedSetId: string | undefined = undefined;
+
+        if (initialScanData.set) {
+          const normalizedScanSet = normalizeString(initialScanData.set);
+          const foundSet = availableSets.find(s => normalizeString(s.name).includes(normalizedScanSet) || normalizeString(s.id).includes(normalizedScanSet));
+          if (foundSet) {
+            form.setValue("selectedSetId", foundSet.id, { shouldValidate: true });
+            matchedSetId = foundSet.id;
+          } else {
+            toast({ title: "Scan Info", description: `Could not auto-match set "${initialScanData.set}". Please select manually.`});
+          }
         }
         
-        allCards.sort((a, b) => {
-            const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
-            const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
-            const suffixA = a.number.replace(/\d/g, '');
-            const suffixB = b.number.replace(/\d/g, '');
-            if (numA === numB) return suffixA.localeCompare(suffixB);
-            return numA - numB;
-        });
-        setCardsInSelectedSet(allCards);
+        if (matchedSetId && (initialScanData.name || initialScanData.cardNumber)) {
+            // Wait for cards of the matched set to be loaded if necessary
+            let currentCardsInSet = cardsInSelectedSet;
+            if (watchedSetId !== matchedSetId || cardsInSelectedSet.length === 0) {
+                 // Fetch cards if not already loaded for the pre-filled set
+                currentCardsInSet = await fetchCardsForSet(matchedSetId);
+            }
 
-      } catch (err) {
-        setErrorCards(err instanceof Error ? err.message : "An unknown error occurred");
-        toast({ variant: "destructive", title: "Error fetching cards", description: `Could not load cards for the selected set.` });
-      } finally {
-        setIsLoadingCards(false);
+            if (currentCardsInSet.length > 0) {
+                const normalizedScanName = normalizeString(initialScanData.name);
+                const normalizedScanCardNumber = normalizeString(initialScanData.cardNumber);
+
+                const foundCard = currentCardsInSet.find(c => 
+                    (normalizedScanName && normalizeString(c.name).includes(normalizedScanName)) ||
+                    (normalizedScanCardNumber && normalizeString(c.number) === normalizedScanCardNumber)
+                );
+
+                if (foundCard) {
+                    form.setValue("selectedCardId", foundCard.id, { shouldValidate: true });
+                } else {
+                    toast({ title: "Scan Info", description: `Could not auto-match card "${initialScanData.name || initialScanData.cardNumber}". Please select manually.`});
+                }
+            }
+        }
+        setIsPreFilling(false);
       }
     };
-    fetchCardsForSet();
-  }, [watchedSetId, form, toast]);
+    preFillForm();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialScanData, availableSets, isLoadingSets, form.setValue, toast, fetchCardsForSet]);
+
 
   useEffect(() => {
-    if (!watchedCardId) {
-      setSelectedCardData(null);
+    if (!watchedSetId || isPreFilling) { // Prevent fetching if pre-filling or no set selected
+      if(!isPreFilling) { // only clear if not prefilling
+        setCardsInSelectedSet([]);
+        setSelectedCardData(null);
+        form.resetField("selectedCardId");
+      }
+      return;
+    }
+    // This effect now primarily handles manual set changes
+    if (watchedSetId !== selectedCardData?.set.id) { // Only fetch if set actually changed from current card
+        fetchCardsForSet(watchedSetId);
+    }
+  }, [watchedSetId, form, fetchCardsForSet, isPreFilling, selectedCardData]);
+
+
+  useEffect(() => {
+    if (!watchedCardId || isPreFilling) { // Prevent update if pre-filling
+      if(!isPreFilling && !watchedSetId) setSelectedCardData(null); // only clear if not prefilling and no set selected
       return;
     }
     const card = cardsInSelectedSet.find(c => c.id === watchedCardId);
     setSelectedCardData(card || null);
-  }, [watchedCardId, cardsInSelectedSet, form]);
+  }, [watchedCardId, cardsInSelectedSet, isPreFilling, watchedSetId]);
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
@@ -224,29 +291,30 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     const { value: cardValue, variant: cardVariant } = getDefaultMarketPrice(selectedCardData);
 
     const newCard: PokemonCard = {
-      id: crypto.randomUUID(), // This ID is temporary for local additions, will be different in MyCollectionPage
+      id: crypto.randomUUID(),
       set: selectedSet.name,
       cardNumber: selectedCardData.number,
       name: selectedCardData.name,
-      rarity: selectedCardData.rarity || "N/A",
+      rarity: selectedCardData.rarity || initialScanData?.rarity || "N/A", // Prioritize API rarity, then scanned, then N/A
       variant: cardVariant, 
       condition: values.condition,
       imageUrl: selectedCardData.images.large,
       value: cardValue,
-      quantity: values.quantity, // Use quantity from form
+      quantity: values.quantity,
     };
     
     onAddCard(newCard); 
 
-    // Reset specific fields, keep set selected for convenience
     form.reset({
-        selectedSetId: values.selectedSetId, // Keep set selected
+        selectedSetId: values.selectedSetId,
         selectedCardId: "",
         condition: "",
-        quantity: 1, // Reset quantity to 1
+        quantity: 1,
     });
     setSelectedCardData(null); 
   }
+
+  const isUIDisabled = form.formState.isSubmitting || isLoadingSets || isLoadingCards || isPreFilling;
 
   return (
     <Card className="shadow-lg">
@@ -255,7 +323,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
           <FilePlus className="h-6 w-6 text-primary" />
           Manual Card Entry
         </CardTitle>
-        <CardDescription>Select Set, Card, Condition, and Quantity.</CardDescription>
+        <CardDescription>Select Set, Card, Condition, and Quantity. Scanner may pre-fill some fields.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -269,12 +337,13 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                   <Select 
                     onValueChange={(value) => {
                       field.onChange(value);
-                      form.resetField("selectedCardId", { defaultValue: "" });
+                      // Resetting card ID here is fine as manual set change should clear card
+                      form.resetField("selectedCardId", { defaultValue: "" }); 
                       setSelectedCardData(null);
-                      setCardsInSelectedSet([]);
+                      setCardsInSelectedSet([]); // Clear old cards before new fetch is triggered by watchedSetId
                     }}
                     value={field.value}
-                    disabled={isLoadingSets || !!errorSets || availableSets.length === 0}
+                    disabled={isLoadingSets || !!errorSets || availableSets.length === 0 || isPreFilling}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -305,11 +374,12 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                   <Select 
                     onValueChange={field.onChange}
                     value={field.value}
-                    disabled={!watchedSetId || isLoadingCards || !!errorCards || cardsInSelectedSet.length === 0}
+                    disabled={!watchedSetId || isLoadingCards || !!errorCards || cardsInSelectedSet.length === 0 || isPreFilling}
                   >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={
+                          isPreFilling ? "Pre-filling..." :
                           isLoadingCards ? "Loading cards..." :
                           !watchedSetId ? "Select a set first" :
                           errorCards ? "Error loading cards" :
@@ -354,7 +424,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Condition</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCardData}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCardData || isPreFilling}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder={!selectedCardData ? "Select card first" : "Select condition"} />
@@ -382,7 +452,7 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
                       type="number" 
                       min="1" 
                       {...field} 
-                      disabled={!selectedCardData}
+                      disabled={!selectedCardData || isPreFilling}
                       onChange={event => field.onChange(parseInt(event.target.value, 10) || 1)}
                     />
                   </FormControl>
@@ -394,9 +464,10 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
             <Button 
               type="submit" 
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              disabled={form.formState.isSubmitting || isLoadingSets || isLoadingCards || !form.formState.isValid}
+              disabled={isUIDisabled || !form.formState.isValid}
             >
-              {(form.formState.isSubmitting || isLoadingSets || isLoadingCards) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {(isUIDisabled && !form.formState.isSubmitting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Card
             </Button>
           </form>
@@ -405,4 +476,3 @@ export function ManualCardInputForm({ onAddCard }: ManualCardInputFormProps) {
     </Card>
   );
 }
-
