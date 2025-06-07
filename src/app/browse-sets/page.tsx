@@ -147,7 +147,11 @@ const BrowseSetsPage: NextPage = () => {
 
     } catch (err) {
       console.error(`Error fetching ${selectedLanguage} sets:`, err);
-      setError(err instanceof Error ? err.message : "An unknown error occurred");
+      let detailedError = err instanceof Error ? err.message : "An unknown error occurred";
+      if (err instanceof Error && err.message.includes("(status: 404)") && selectedLanguage === 'Japanese') {
+        detailedError = "The data source for Japanese sets (TCGdex API) returned a 'Not Found' error. This might be a temporary issue with the API. Please try again later or select English sets.";
+      }
+      setError(detailedError);
     } finally {
       setIsLoading(false);
     }
@@ -239,7 +243,7 @@ const BrowseSetsPage: NextPage = () => {
               <div className="flex flex-col items-center justify-center py-10 text-destructive">
                 <ServerCrash className="h-16 w-16 mb-4" />
                 <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                <p className="text-center">Could not load {selectedLanguage} sets: {error}.<br />Please try again later.</p>
+                <p className="text-center">Could not load {selectedLanguage} sets: {error}<br />Please try again later.</p>
               </div>
             )}
             {!isLoading && !error && (
@@ -303,6 +307,7 @@ const BrowseSetsPage: NextPage = () => {
 };
 
 export default BrowseSetsPage;
+    
 
     
 
