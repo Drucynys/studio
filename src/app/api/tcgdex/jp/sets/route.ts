@@ -6,7 +6,7 @@ export async function GET() {
     // This is the target API endpoint we want to fetch from
     const TCGDEX_JAPANESE_SETS_URL = "https://api.tcgdex.dev/v2/jp/sets";
     
-    const response = await fetch(TCGDEX_JAPANESE_SETS_URL);
+    const response = await fetch(TCGDEX_JAPANESE_SETS_URL, { cache: 'no-store' });
 
     if (!response.ok) {
       // Attempt to get more detailed error information from the TCGdex API response
@@ -25,11 +25,17 @@ export async function GET() {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error("Error in /api/tcgdex/jp/sets proxy route:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while fetching Japanese sets via proxy.";
+    let detailedErrorMessage = "An unknown error occurred while fetching Japanese sets via proxy.";
+    if (error instanceof Error) {
+      detailedErrorMessage = error.message;
+    }
+    // Log the full error object for server-side inspection, this is crucial for "fetch failed" errors
+    console.error("Error in /api/tcgdex/jp/sets proxy route:", error); 
+    
     return NextResponse.json(
-      { message: 'Error fetching Japanese sets via proxy', error: errorMessage },
+      { message: 'Error fetching Japanese sets via proxy', error: detailedErrorMessage },
       { status: 500 }
     );
   }
 }
+
