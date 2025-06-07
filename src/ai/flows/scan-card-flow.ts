@@ -20,7 +20,7 @@ const ScanCardInputSchema = z.object({
 });
 export type ScanCardInput = z.infer<typeof ScanCardInputSchema>;
 
-export const ScanCardOutputSchema = z.object({
+const ScanCardOutputSchema = z.object({
   name: z.string().optional().describe("The name of the Pokémon card."),
   set: z.string().optional().describe("The name of the Pokémon TCG set the card belongs to."),
   cardNumber: z.string().optional().describe("The card number, including any prefixes/suffixes (e.g., '12/102', 'SWSH123', 'TG05/TG30')."),
@@ -100,3 +100,4 @@ const scanCardFlow = ai.defineFlow(
     return output;
   }
 );
+
