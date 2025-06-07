@@ -111,7 +111,7 @@ const BrowseSetsPage: NextPage = () => {
         }
         const response = await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate", { headers });
         if (!response.ok) {
-          throw new Error(`Failed to fetch English sets: ${response.statusText}`);
+          throw new Error(`Failed to fetch English sets: ${response.statusText || 'Server responded with an error'} (status: ${response.status})`);
         }
         const data = await response.json();
         fetchedDisplaySets = (data.data as ApiSet[]).map(apiSet => ({
@@ -126,7 +126,7 @@ const BrowseSetsPage: NextPage = () => {
       } else { // Japanese
         const response = await fetch("https://api.tcgdex.net/v2/jp/sets");
         if (!response.ok) {
-          throw new Error(`Failed to fetch Japanese sets: ${response.statusText}`);
+          throw new Error(`Failed to fetch Japanese sets: ${response.statusText || 'Server responded with an error'} (status: ${response.status})`);
         }
         const data = await response.json();
         fetchedDisplaySets = (data as TcgDexApiSet[]).map(tcgDexSet => ({
@@ -303,5 +303,7 @@ const BrowseSetsPage: NextPage = () => {
 };
 
 export default BrowseSetsPage;
+
+    
 
     
