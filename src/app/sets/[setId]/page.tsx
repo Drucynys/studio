@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { TiltableCard } from "@/components/TiltableCard"; // Import the new component
 
 export interface ApiPokemonCard {
   id: string;
@@ -154,7 +155,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     if (!selectedApiCard) return;
 
     const newCard: CollectionPokemonCard = {
-      id: crypto.randomUUID(), // This ID is for the specific instance in collection.
+      id: crypto.randomUUID(), 
       name: selectedApiCard.name,
       set: selectedApiCard.set.name,
       cardNumber: selectedApiCard.number,
@@ -179,7 +180,6 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
       );
 
       if (existingCardIndex > -1) {
-         // Add the new quantity to the existing card's quantity
          currentStoredCards[existingCardIndex].quantity += newCard.quantity;
          toast({
           title: "Card Quantity Updated!",
@@ -187,7 +187,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
           className: "bg-secondary text-secondary-foreground"
         });
       } else {
-        currentStoredCards = [newCard, ...currentStoredCards]; // Add as new card with specified quantity
+        currentStoredCards = [newCard, ...currentStoredCards]; 
          toast({
           title: "Card Added!",
           description: `${newCard.name} ${newCard.variant ? '('+formatVariantKey(newCard.variant)+')' : ''} (${newCard.condition}) x${newCard.quantity} from ${newCard.set} has been added.`,
@@ -217,22 +217,19 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
 
   const setCompletion = (() => {
     if (!isClient || !setName || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
-    // Calculate unique cards collected for this set
     const collectedCardIdentifiersInSet = new Set<string>();
     collectionCards.forEach(card => {
         if (card.set === setName) {
-            // Create a unique identifier for a card (name + cardNumber, ignoring variant/condition for set completion)
             collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
         }
     });
     const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
-    const totalInThisSet = cardsInSet.length; // Total unique cards available in the set
+    const totalInThisSet = cardsInSet.length; 
     const percentage = totalInThisSet > 0 ? (uniqueCollectedCount / totalInThisSet) * 100 : 0;
     return { collected: uniqueCollectedCount, total: totalInThisSet, percentage };
   })();
 
 
-  // Listener for localStorage changes from other tabs/pages
   useEffect(() => {
     if (!isClient) return;
     const handleStorageChange = (event: StorageEvent) => {
@@ -264,7 +261,6 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     );
   }
 
-  // Helper to format variant keys for display
   const formatVariantKey = (key: string): string => {
     if (!key) return "N/A";
     return key
@@ -337,8 +333,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
             )}
             {!isLoading && !error && (
               <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]">
-                {filteredCards.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                     {filteredCards.map((card) => {
                         const isCollected = collectionCards.some(
                             (collected) =>
@@ -347,22 +342,26 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                             collected.cardNumber === card.number
                         );
                         return (
-                            <Card
+                            <TiltableCard
                                 key={card.id}
                                 onClick={() => openDialogForCard(card)}
-                                className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transform transition-all duration-200 ease-out hover:scale-105 hover:-translate-y-1 group flex flex-col relative group-hover:z-10 bg-card"
+                                className={cn(
+                                    "p-2 cursor-pointer group flex flex-col relative bg-card",
+                                    "transform transition-all duration-200 ease-out", // Base for transition
+                                    "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:border-primary group-hover:z-10" // Hover effects
+                                )}
                             >
-                            <div className={cn(
-                                "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 group-hover:grayscale-0",
-                                !isCollected && "grayscale"
-                            )}>
-                                <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
-                            </div>
-                            <div className="text-center mt-auto">
-                                <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
-                                <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
-                            </div>
-                            </Card>
+                              <div className={cn(
+                                  "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 group-hover:grayscale-0",
+                                  !isCollected && "grayscale"
+                              )}>
+                                  <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                              </div>
+                              <div className="text-center mt-auto">
+                                  <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
+                                  <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
+                              </div>
+                            </TiltableCard>
                         );
                     })}
                     </div>
@@ -399,4 +398,3 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
 };
 
 export default SetDetailsPage;
-

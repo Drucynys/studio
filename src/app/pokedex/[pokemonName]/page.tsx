@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { allPokemonData, type PokemonPokedexEntry } from "../pokedexData";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { cn } from "@/lib/utils";
+import { TiltableCard } from "@/components/TiltableCard"; // Import the new component
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
@@ -305,7 +306,6 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
           </Card>
         )}
 
-        {/* TCG Cards Section - only render if pokemonDetails are available */}
         {pokemonDetails && (
           <section id="pokemon-tcg-cards">
             <h2 className="text-2xl font-semibold text-primary mb-4 flex items-center gap-2">
@@ -331,7 +331,7 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
             {!isLoadingCards && !errorCards && (
               <ScrollArea className="h-[calc(100vh-30rem)] md:h-[calc(100vh-34rem)]">
                 {pokemonTcgCards.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                     {pokemonTcgCards.map((card) => {
                         const isCollected = collectionCards.some(
                             (collected) =>
@@ -340,14 +340,19 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
                             collected.cardNumber === card.number
                         );
                         return (
-                            <Card
+                            <TiltableCard
                                 key={card.id}
                                 onClick={() => openDialogForCard(card)}
-                                className="p-2 cursor-pointer hover:shadow-lg hover:border-primary transition-all group flex flex-col bg-card"
+                                className={cn(
+                                  "p-2 cursor-pointer group flex flex-col relative bg-card", // Base classes
+                                  "transform transition-all duration-200 ease-out", // Base for transition
+                                  "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:border-primary group-hover:z-10" // Hover effects
+                                )}
                             >
                             <div className={cn(
                                 "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner",
-                                !isCollected && "grayscale group-hover:grayscale-0"
+                                "group-hover:grayscale-0", // Apply to group for TiltableCard
+                                !isCollected && "grayscale"
                             )}>
                                 <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
                             </div>
@@ -356,7 +361,7 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
                                 <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
                                 <p className="text-xs text-muted-foreground">{card.set.name}</p>
                             </div>
-                            </Card>
+                            </TiltableCard>
                         );
                     })}
                     </div>
@@ -371,7 +376,6 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
             )}
           </section>
         )}
-        {/* Fallback if pokemonDetails never load and no init error (e.g. still loading or unexpected state) */}
         {!pokemonDetails && !initializationError && !isLoadingDetails && !errorDetails && (
              <div className="text-center py-10 text-muted-foreground">
                 <Info className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -403,4 +407,3 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
 };
 
 export default PokemonDetailPage;
-    
