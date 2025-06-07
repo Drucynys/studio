@@ -53,7 +53,9 @@ const knownPokemonNames: { [id: number]: string } = {
   650: "Chespin", 653: "Fennekin", 656: "Froakie",
   722: "Rowlet", 725: "Litten", 728: "Popplio",
   810: "Grookey", 813: "Scorbunny", 816: "Sobble",
-  906: "Sprigatito", 909: "Fuecoco", 912: "Quaxly",
+  906: "Sprigatito", 907: "Floragato", 908: "Meowscarada",
+  909: "Fuecoco",
+  912: "Quaxly",
   932: "Nacli", 933: "Naclstack", 934: "Garganacl",
 };
 
