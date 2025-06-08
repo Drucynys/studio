@@ -10,16 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, MapPin, Hash, Trophy, ChevronDown, ListChecks } from "lucide-react";
+import { Loader2, Search, Hash, Trophy, ListChecks } from "lucide-react";
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Progress } from "@/components/ui/progress";
@@ -92,7 +85,7 @@ const PokedexPage: NextPage = () => {
       }
     });
     return names;
-  }, [collectionCards, isClient]); // allPokemonData is constant, can be removed if it causes issues
+  }, [collectionCards, isClient]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -125,18 +118,22 @@ const PokedexPage: NextPage = () => {
     const totalPokemonInCurrentView = filteredPokemon.length;
     const collectedInCurrentView = filteredPokemon.filter(p => collectedPokemonNames.has(p.name.toLowerCase())).length;
     const percentage = totalPokemonInCurrentView > 0 ? (collectedInCurrentView / totalPokemonInCurrentView) * 100 : 0;
+    
+    let regionText = "All Regions";
+    if (selectedRegions.size === 1) {
+      regionText = Array.from(selectedRegions)[0];
+    } else if (selectedRegions.size > 1) {
+      regionText = `${selectedRegions.size} Regions`;
+    }
+
     return {
       collected: collectedInCurrentView,
       total: totalPokemonInCurrentView,
       percentage: parseFloat(percentage.toFixed(1)),
+      regionDisplayText: regionText,
     };
-  }, [filteredPokemon, collectedPokemonNames, isClient]);
+  }, [filteredPokemon, collectedPokemonNames, isClient, selectedRegions]);
 
-  const displaySelectedRegionsText = () => {
-    if (selectedRegions.size === 0) return "All Regions";
-    if (selectedRegions.size === 1) return Array.from(selectedRegions)[0];
-    return `${selectedRegions.size} Regions Selected`;
-  };
 
   if (!isClient || isLoading) {
     return (
@@ -177,48 +174,6 @@ const PokedexPage: NextPage = () => {
                       className="pl-10 w-full"
                     />
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="w-full sm:w-auto md:w-56 justify-between">
-                        <MapPin className="mr-2 h-4 w-4 opacity-70" />
-                        <span className="truncate">{displaySelectedRegionsText()}</span>
-                        <ChevronDown className="ml-auto h-4 w-4 flex-shrink-0 opacity-50" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-full sm:w-[--radix-dropdown-menu-trigger-width] md:w-56">
-                      <DropdownMenuCheckboxItem
-                        key="all-regions-filter"
-                        checked={selectedRegions.size === 0}
-                        onCheckedChange={(isChecked) => {
-                          if (isChecked) {
-                            setSelectedRegions(new Set<string>());
-                          }
-                        }}
-                      >
-                        All Regions
-                      </DropdownMenuCheckboxItem>
-                      <DropdownMenuSeparator />
-                      {regions.map((region) => (
-                        <DropdownMenuCheckboxItem
-                          key={region.name}
-                          checked={selectedRegions.has(region.name)}
-                          onCheckedChange={(isChecked) => {
-                            setSelectedRegions(prevSelectedRegions => {
-                              const newSelectedRegions = new Set(prevSelectedRegions);
-                              if (isChecked) {
-                                newSelectedRegions.add(region.name);
-                              } else {
-                                newSelectedRegions.delete(region.name);
-                              }
-                              return newSelectedRegions;
-                            });
-                          }}
-                        >
-                          {region.name} (Gen {region.generation})
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
                 <div className="flex items-center space-x-2 self-start sm:self-auto md:self-end">
                   <Switch 
@@ -231,16 +186,46 @@ const PokedexPage: NextPage = () => {
                 </div>
               </div>
             </div>
-             {isClient && (
-              <div className="mt-2 pt-3 border-t border-border/70">
+
+            <div className="mt-4 pt-4 border-t border-border/70">
+              <CardDescription className="mb-3 text-sm font-medium">Filter by Region:</CardDescription>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant={selectedRegions.size === 0 ? "default" : "outline"}
+                  onClick={() => setSelectedRegions(new Set())}
+                  className={selectedRegions.size === 0 ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
+                >
+                  All Regions
+                </Button>
+                {regions.map((region) => (
+                  <Button
+                    key={region.name}
+                    size="sm"
+                    variant={selectedRegions.has(region.name) ? "default" : "outline"}
+                    onClick={() => {
+                      const newSelectedRegions = new Set(selectedRegions);
+                      if (newSelectedRegions.has(region.name)) {
+                        newSelectedRegions.delete(region.name);
+                      } else {
+                        newSelectedRegions.add(region.name);
+                      }
+                      setSelectedRegions(newSelectedRegions);
+                    }}
+                    className={selectedRegions.has(region.name) ? "bg-primary text-primary-foreground hover:bg-primary/90" : ""}
+                  >
+                    {region.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            
+            {isClient && (
+              <div className="mt-6 pt-3 border-t border-border/70">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
                     <Trophy className="h-4 w-4 text-accent" />
-                    Pokédex Completion ({
-                      selectedRegions.size === 0
-                        ? "All Regions" 
-                        : `${displaySelectedRegionsText()}`
-                    }{showOnlyCollected ? ", Collected Only" : ""}):
+                    Pokédex Completion ({pokedexStats.regionDisplayText}{showOnlyCollected ? ", Collected Only" : ""}):
                   </div>
                   <div className="text-sm font-semibold text-foreground">
                     {pokedexStats.collected} / {pokedexStats.total} Pokémon ({pokedexStats.percentage}%)
@@ -251,7 +236,7 @@ const PokedexPage: NextPage = () => {
             )}
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-20.1rem-3.5rem)] md:h-[calc(100vh-24.1rem-3.5rem)]">
+            <ScrollArea className="h-[calc(100vh-24rem-3.5rem)] md:h-[calc(100vh-28rem-3.5rem)]">
               {filteredPokemon.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                   {filteredPokemon.map((pokemon) => {
@@ -264,7 +249,7 @@ const PokedexPage: NextPage = () => {
                               "group-hover:z-10 relative overflow-hidden aspect-square" 
                             )}>
                             <div className={cn(
-                                `w-full h-full transition-all duration-300 p-2`, // Added padding here for the image
+                                `w-full h-full transition-all duration-300 p-2`, 
                                 !isCollected ? 'grayscale group-hover:grayscale-0' : ''
                               )}
                               data-ai-hint="pokemon sprite icon"
@@ -290,10 +275,11 @@ const PokedexPage: NextPage = () => {
                 <div className="text-center py-10 text-muted-foreground">
                   <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg">
-                    {showOnlyCollected ? "No collected Pokémon match your current filters." : "No Pokémon found matching your criteria."}
+                    {showOnlyCollected && collectedPokemonNames.size === 0 && selectedRegions.size === 0 && !searchTerm ? "You haven't collected any Pokémon yet." : 
+                    (showOnlyCollected ? "No collected Pokémon match your current filters." : "No Pokémon found matching your criteria.")}
                   </p>
-                   {showOnlyCollected && selectedRegions.size === 0 && !searchTerm && (
-                     <p className="text-sm">You haven't collected any Pokémon yet.</p>
+                   {(showOnlyCollected && collectedPokemonNames.size === 0 && (selectedRegions.size > 0 || searchTerm)) && (
+                     <p className="text-sm">Try adjusting your filters or adding Pokémon to your collection.</p>
                    )}
                 </div>
               )}
@@ -309,5 +295,3 @@ const PokedexPage: NextPage = () => {
 };
 
 export default PokedexPage;
-
-    
