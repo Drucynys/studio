@@ -7,7 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card"; // Removed CardHeader, CardTitle, CardDescription from here
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
@@ -63,7 +63,7 @@ const PokedexPage: NextPage = () => {
     if (!isClient) return;
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === "pokemonCards") {
-        loadCollectionCards(); 
+        loadCollectionCards();
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -105,11 +105,11 @@ const PokedexPage: NextPage = () => {
           p.id.toString().includes(lowerSearchTerm)
       );
     }
-    
+
     if (showOnlyCollected) {
       tempPokemon = tempPokemon.filter(p => collectedPokemonNames.has(p.name.toLowerCase()));
     }
-    
+
     tempPokemon.sort((a,b) => a.id - b.id);
     setFilteredPokemon(tempPokemon);
   }, [pokemonList, searchTerm, selectedRegions, isClient, showOnlyCollected, collectedPokemonNames]);
@@ -119,7 +119,7 @@ const PokedexPage: NextPage = () => {
     const totalPokemonInCurrentView = filteredPokemon.length;
     const collectedInCurrentView = filteredPokemon.filter(p => collectedPokemonNames.has(p.name.toLowerCase())).length;
     const percentage = totalPokemonInCurrentView > 0 ? (collectedInCurrentView / totalPokemonInCurrentView) * 100 : 0;
-    
+
     let regionText = "All Regions";
     if (selectedRegions.size === 1) {
       regionText = Array.from(selectedRegions)[0];
@@ -151,7 +151,6 @@ const PokedexPage: NextPage = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
-      {/* AppHeader height is approx 4rem. Sticky bar will be top-[4rem] */}
       <main className="flex-grow container mx-auto px-4 md:px-8 pt-4 pb-8">
         <div className="sticky top-[4rem] z-30 bg-background/95 backdrop-blur-sm p-4 mb-6 shadow-sm rounded-b-lg border border-border border-t-0">
           <div className="flex flex-col gap-4">
@@ -167,7 +166,7 @@ const PokedexPage: NextPage = () => {
             </div>
 
             <div>
-              <CardDescription className="mb-2 text-sm font-medium">Filter by Region:</CardDescription>
+              <p className="mb-2 text-sm font-medium text-muted-foreground">Filter by Region:</p>
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
@@ -198,50 +197,45 @@ const PokedexPage: NextPage = () => {
                 ))}
               </div>
             </div>
-            
+
             {isClient && (
-              <div className="mt-2 pt-3 border-t border-border/70">
-                <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                        <Switch 
-                            id="show-only-collected" 
-                            checked={showOnlyCollected} 
-                            onCheckedChange={setShowOnlyCollected}
-                            aria-label="Show only collected Pokémon"
-                        />
-                        <Label htmlFor="show-only-collected" className="text-sm font-medium text-muted-foreground whitespace-nowrap">Show Only Collected</Label>
-                    </div>
-                    <div className="text-sm font-semibold text-foreground text-right">
-                        {pokedexStats.collected} / {pokedexStats.total} ({pokedexStats.percentage}%)
-                    </div>
+              <div className="mt-4 flex items-center justify-between pt-3 border-t border-border/70">
+                {/* Left: Switch */}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="show-only-collected"
+                    checked={showOnlyCollected}
+                    onCheckedChange={setShowOnlyCollected}
+                    aria-label="Show only collected Pokémon"
+                  />
+                  <Label htmlFor="show-only-collected" className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+                    Show Only Collected
+                  </Label>
                 </div>
-                 <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground mb-1">
-                    <Trophy className="h-4 w-4 text-accent" />
-                    Pokédex Completion ({pokedexStats.regionDisplayText}{showOnlyCollected && collectedPokemonNames.size > 0 && filteredPokemon.length > 0 ? ", Collected Only" : ""}):
+
+                {/* Right: Stats and Progress Bar */}
+                <div className="flex flex-col items-end text-right space-y-1 w-auto max-w-xs sm:max-w-sm md:max-w-md">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground w-full justify-end">
+                    <Trophy className="h-4 w-4 text-accent flex-shrink-0" />
+                    <span className="truncate">
+                      Pokédex Completion ({pokedexStats.regionDisplayText}
+                      {showOnlyCollected && collectedPokemonNames.size > 0 && filteredPokemon.length > 0 ? ", Collected Only" : ""}):
+                    </span>
+                    <span className="font-semibold text-foreground ml-1 whitespace-nowrap">
+                      {pokedexStats.collected}/{pokedexStats.total} ({pokedexStats.percentage}%)
+                    </span>
                   </div>
-                <Progress value={pokedexStats.percentage} className="h-2 [&>div]:bg-accent" />
+                  <Progress value={pokedexStats.percentage} className="h-2 [&>div]:bg-accent w-full" />
+                </div>
               </div>
             )}
           </div>
         </div>
 
         <Card className="shadow-xl">
-          <CardHeader>
-             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-              <div>
-                <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
-                  <ListChecks className="h-8 w-8 text-primary" /> Pokédex
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  Browse Pokémon. Colored sprites indicate a collected card. Hover for name. Click for details.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Adjusted ScrollArea height. Approx: AppHeader (4rem) + StickyBar (12rem) + PokedexCardHeader (4rem) + Footer (2rem) + PagePadding (container py-4 -> 2rem) = ~24rem. */}
-            {/* Old: md:h-[calc(100vh-28rem-3.5rem)] was 31.5rem. New is less. */}
-            <ScrollArea className="h-[calc(100vh-27rem)] sm:h-[calc(100vh-29rem)]">
+          {/* CardHeader with Pokédex title and description is REMOVED as per image annotation */}
+          <CardContent className="p-6"> {/* Added p-6 to ensure padding if header is removed */}
+            <ScrollArea className="h-[calc(100vh-23rem)] sm:h-[calc(100vh-25rem)]"> {/* Adjusted height */}
               {filteredPokemon.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                   {filteredPokemon.map((pokemon) => {
@@ -254,22 +248,22 @@ const PokedexPage: NextPage = () => {
                               <a className="block group">
                                 <Card className={cn(
                                     "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105",
-                                    "group-hover:z-10 relative overflow-hidden aspect-square" 
+                                    "group-hover:z-10 relative overflow-hidden aspect-square"
                                   )}>
                                   {isCollected && (
                                     <CheckCircle className="absolute top-1.5 right-1.5 h-5 w-5 text-green-500 bg-background/80 backdrop-blur-sm rounded-full p-0.5 z-10 shadow-sm" />
                                   )}
                                   <div className={cn(
-                                      `w-full h-full transition-all duration-300 p-2`, 
+                                      `w-full h-full transition-all duration-300 p-2`,
                                       !isCollected ? 'grayscale group-hover:grayscale-0' : ''
                                     )}
                                     data-ai-hint="pokemon sprite icon"
                                   >
-                                    <Image 
-                                      src={pokemon.spriteUrl} 
-                                      alt={pokemon.name} 
-                                      layout="fill" 
-                                      objectFit="contain" 
+                                    <Image
+                                      src={pokemon.spriteUrl}
+                                      alt={pokemon.name}
+                                      layout="fill"
+                                      objectFit="contain"
                                     />
                                   </div>
                                   <div className="absolute bottom-1.5 right-1.5 bg-background/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-xs text-foreground font-medium flex items-center">
@@ -292,7 +286,7 @@ const PokedexPage: NextPage = () => {
                 <div className="text-center py-10 text-muted-foreground">
                   <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p className="text-lg">
-                    {showOnlyCollected && collectedPokemonNames.size === 0 && selectedRegions.size === 0 && !searchTerm ? "You haven't collected any Pokémon yet." : 
+                    {showOnlyCollected && collectedPokemonNames.size === 0 && selectedRegions.size === 0 && !searchTerm ? "You haven't collected any Pokémon yet." :
                     (showOnlyCollected ? "No collected Pokémon match your current filters." : "No Pokémon found matching your criteria.")}
                   </p>
                    {(showOnlyCollected && collectedPokemonNames.size === 0 && (selectedRegions.size > 0 || searchTerm)) && (
@@ -312,6 +306,3 @@ const PokedexPage: NextPage = () => {
 };
 
 export default PokedexPage;
-
-
-    
