@@ -13,28 +13,26 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, ListChecks, MapPin, Hash, Trophy, ChevronDown } from "lucide-react";
+import { Loader2, Search, MapPin, Hash, Trophy, ChevronDown, ListChecks } from "lucide-react";
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 const PokedexPage: NextPage = () => {
-  console.log("Attempting to re-render PokedexPage to refresh build artifacts. Adding a log to test.");
   const [pokemonList, setPokemonList] = useState<PokemonPokedexEntry[]>([]);
-  const [filteredPokemon, setFilteredPokemon] = useState<PokemonPokedexEntry[]>([]);
   const [regions, setRegions] = useState<PokedexRegion[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState<string>("all");
-  const [showOnlyCollected, setShowOnlyCollected] = useState(false); // New state for the filter
+  const [selectedRegions, setSelectedRegions] = useState<Set<string>>(new Set());
+  const [showOnlyCollected, setShowOnlyCollected] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
@@ -60,7 +58,6 @@ const PokedexPage: NextPage = () => {
   useEffect(() => {
     setIsClient(true);
     loadCollectionCards();
-    // Simulate loading data
     setTimeout(() => {
       setPokemonList(allPokemonData);
       setRegions(pokedexRegions);
@@ -68,7 +65,6 @@ const PokedexPage: NextPage = () => {
     }, 500);
   }, [loadCollectionCards]);
 
-  // Listener for localStorage changes from other tabs/pages
   useEffect(() => {
     if (!isClient) return;
     const handleStorageChange = (event: StorageEvent) => {
@@ -80,40 +76,31 @@ const PokedexPage: NextPage = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [isClient, loadCollectionCards]);
 
-
   const collectedPokemonNames = useMemo(() => {
     if (!isClient) return new Set<string>();
     const names = new Set<string>();
-
-    // Get a list of all canonical Pokémon names from pokedexData, in lowercase
     const canonicalPokedexNamesLower = allPokemonData.map(p => p.name.toLowerCase());
-
     collectionCards.forEach(cardInCollection => {
       if (cardInCollection.name) {
         const collectionCardNameLower = cardInCollection.name.toLowerCase();
-        
-        // Find a canonical Pokédex name that the collected card's name starts with.
-        // This handles cases like "Pikachu VMAX" (card) matching "Pikachu" (Pokédex).
         const matchedCanonicalName = canonicalPokedexNamesLower.find(
           canonicalName => collectionCardNameLower.startsWith(canonicalName)
         );
-        
         if (matchedCanonicalName) {
-          names.add(matchedCanonicalName); // Add the canonical lowercase name
+          names.add(matchedCanonicalName);
         }
       }
     });
     return names;
-  }, [collectionCards, isClient, allPokemonData]); // Ensure allPokemonData is a dependency
-
+  }, [collectionCards, isClient, allPokemonData]);
 
   useEffect(() => {
     if (!isClient) return;
 
     let tempPokemon = [...pokemonList];
 
-    if (selectedRegion !== "all") {
-      tempPokemon = tempPokemon.filter(p => p.region === selectedRegion);
+    if (selectedRegions.size > 0) {
+      tempPokemon = tempPokemon.filter(p => selectedRegions.has(p.region));
     }
 
     if (searchTerm) {
@@ -130,18 +117,14 @@ const PokedexPage: NextPage = () => {
     }
     
     tempPokemon.sort((a,b) => a.id - b.id);
-
     setFilteredPokemon(tempPokemon);
-  }, [pokemonList, searchTerm, selectedRegion, isClient, showOnlyCollected, collectedPokemonNames]);
+  }, [pokemonList, searchTerm, selectedRegions, isClient, showOnlyCollected, collectedPokemonNames]);
 
   const pokedexStats = useMemo(() => {
     if (!isClient) return { collected: 0, total: 0, percentage: 0 };
-    
     const totalPokemonInCurrentView = filteredPokemon.length;
     const collectedInCurrentView = filteredPokemon.filter(p => collectedPokemonNames.has(p.name.toLowerCase())).length;
-    
     const percentage = totalPokemonInCurrentView > 0 ? (collectedInCurrentView / totalPokemonInCurrentView) * 100 : 0;
-    
     return {
       collected: collectedInCurrentView,
       total: totalPokemonInCurrentView,
@@ -149,6 +132,11 @@ const PokedexPage: NextPage = () => {
     };
   }, [filteredPokemon, collectedPokemonNames, isClient]);
 
+  const displaySelectedRegionsText = () => {
+    if (selectedRegions.size === 0) return "All Regions";
+    if (selectedRegions.size === 1) return Array.from(selectedRegions)[0];
+    return `${selectedRegions.size} Regions Selected`;
+  };
 
   if (!isClient || isLoading) {
     return (
@@ -191,24 +179,46 @@ const PokedexPage: NextPage = () => {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="w-full sm:w-auto md:w-48 justify-between">
-                        <span className="truncate">
-                          {selectedRegion === "all"
-                            ? "All Regions"
-                            : regions.find(r => r.name === selectedRegion)?.name || "Filter by Region"}
-                        </span>
-                        <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0" />
+                      <Button variant="outline" className="w-full sm:w-auto md:w-56 justify-between">
+                        <MapPin className="mr-2 h-4 w-4 opacity-70" />
+                        <span className="truncate">{displaySelectedRegionsText()}</span>
+                        <ChevronDown className="ml-auto h-4 w-4 flex-shrink-0 opacity-50" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-full sm:w-[--radix-dropdown-menu-trigger-width] md:w-48">
-                      <DropdownMenuRadioGroup value={selectedRegion} onValueChange={setSelectedRegion}>
-                        <DropdownMenuRadioItem value="all">All Regions</DropdownMenuRadioItem>
-                        {regions.map((region) => (
-                          <DropdownMenuRadioItem key={region.name} value={region.name}>
-                            {region.name} (Gen {region.generation})
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
+                    <DropdownMenuContent className="w-full sm:w-[--radix-dropdown-menu-trigger-width] md:w-56">
+                      <DropdownMenuCheckboxItem
+                        key="all-regions-filter"
+                        checked={selectedRegions.size === 0}
+                        onCheckedChange={(isChecked) => {
+                          if (isChecked) {
+                            setSelectedRegions(new Set<string>());
+                          }
+                          // If unchecking "All Regions", user will select specific regions.
+                          // No explicit action needed here as specific selections handle it.
+                        }}
+                      >
+                        All Regions
+                      </DropdownMenuCheckboxItem>
+                      <DropdownMenuSeparator />
+                      {regions.map((region) => (
+                        <DropdownMenuCheckboxItem
+                          key={region.name}
+                          checked={selectedRegions.has(region.name)}
+                          onCheckedChange={(isChecked) => {
+                            setSelectedRegions(prevSelectedRegions => {
+                              const newSelectedRegions = new Set(prevSelectedRegions);
+                              if (isChecked) {
+                                newSelectedRegions.add(region.name);
+                              } else {
+                                newSelectedRegions.delete(region.name);
+                              }
+                              return newSelectedRegions;
+                            });
+                          }}
+                        >
+                          {region.name} (Gen {region.generation})
+                        </DropdownMenuCheckboxItem>
+                      ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -229,9 +239,9 @@ const PokedexPage: NextPage = () => {
                   <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
                     <Trophy className="h-4 w-4 text-accent" />
                     Pokédex Completion ({
-                      selectedRegion === "all" 
+                      selectedRegions.size === 0
                         ? "All Regions" 
-                        : `${selectedRegion} Region`
+                        : `${displaySelectedRegionsText()}`
                     }{showOnlyCollected ? ", Collected Only" : ""}):
                   </div>
                   <div className="text-sm font-semibold text-foreground">
@@ -266,7 +276,7 @@ const PokedexPage: NextPage = () => {
                                 alt={pokemon.name} 
                                 layout="fill" 
                                 objectFit="contain" 
-                                className="p-2" // Add some padding so sprite isn't edge-to-edge
+                                className="p-2"
                               />
                             </div>
                             <div className="absolute bottom-1.5 right-1.5 bg-background/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-xs text-foreground font-medium flex items-center">
@@ -285,8 +295,8 @@ const PokedexPage: NextPage = () => {
                   <p className="text-lg">
                     {showOnlyCollected ? "No collected Pokémon match your current filters." : "No Pokémon found matching your criteria."}
                   </p>
-                   {showOnlyCollected && !searchTerm && selectedRegion === "all" && (
-                     <p className="text-sm">You haven't collected any Pokémon yet, or they don't match the current region filter.</p>
+                   {showOnlyCollected && selectedRegions.size === 0 && !searchTerm && (
+                     <p className="text-sm">You haven't collected any Pokémon yet.</p>
                    )}
                 </div>
               )}
@@ -302,10 +312,3 @@ const PokedexPage: NextPage = () => {
 };
 
 export default PokedexPage;
-    
-
-    
-
-    
-
-    
