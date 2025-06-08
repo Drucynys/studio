@@ -10,10 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, ListChecks, MapPin, Hash, Trophy } from "lucide-react";
+import { Loader2, Search, ListChecks, MapPin, Hash, Trophy, ChevronDown } from "lucide-react";
 import { pokedexRegions, allPokemonData, type PokemonPokedexEntry, type PokedexRegion } from "./pokedexData";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Progress } from "@/components/ui/progress";
@@ -183,19 +189,28 @@ const PokedexPage: NextPage = () => {
                       className="pl-10 w-full"
                     />
                   </div>
-                  <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                    <SelectTrigger className="w-full sm:w-auto md:w-48">
-                      <SelectValue placeholder="Filter by Region" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Regions</SelectItem>
-                      {regions.map((region) => (
-                        <SelectItem key={region.name} value={region.name}>
-                          {region.name} (Gen {region.generation})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-full sm:w-auto md:w-48 justify-between">
+                        <span className="truncate">
+                          {selectedRegion === "all"
+                            ? "All Regions"
+                            : regions.find(r => r.name === selectedRegion)?.name || "Filter by Region"}
+                        </span>
+                        <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-full sm:w-[--radix-dropdown-menu-trigger-width] md:w-48">
+                      <DropdownMenuRadioGroup value={selectedRegion} onValueChange={setSelectedRegion}>
+                        <DropdownMenuRadioItem value="all">All Regions</DropdownMenuRadioItem>
+                        {regions.map((region) => (
+                          <DropdownMenuRadioItem key={region.name} value={region.name}>
+                            {region.name} (Gen {region.generation})
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <div className="flex items-center space-x-2 self-start sm:self-auto md:self-end">
                   <Switch 
@@ -293,3 +308,4 @@ export default PokedexPage;
 
     
 
+    
