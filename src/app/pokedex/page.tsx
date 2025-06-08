@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 const PokedexPage: NextPage = () => {
   const [pokemonList, setPokemonList] = useState<PokemonPokedexEntry[]>([]);
   const [regions, setRegions] = useState<PokedexRegion[]>([]);
-  
+  const [filteredPokemon, setFilteredPokemon] = useState<PokemonPokedexEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRegions, setSelectedRegions] = useState<Set<string>>(new Set());
@@ -92,7 +92,7 @@ const PokedexPage: NextPage = () => {
       }
     });
     return names;
-  }, [collectionCards, isClient, allPokemonData]);
+  }, [collectionCards, isClient]); // allPokemonData is constant, can be removed if it causes issues
 
   useEffect(() => {
     if (!isClient) return;
@@ -193,8 +193,6 @@ const PokedexPage: NextPage = () => {
                           if (isChecked) {
                             setSelectedRegions(new Set<string>());
                           }
-                          // If unchecking "All Regions", user will select specific regions.
-                          // No explicit action needed here as specific selections handle it.
                         }}
                       >
                         All Regions
@@ -266,7 +264,7 @@ const PokedexPage: NextPage = () => {
                               "group-hover:z-10 relative overflow-hidden aspect-square" 
                             )}>
                             <div className={cn(
-                                `w-full h-full transition-all duration-300`,
+                                `w-full h-full transition-all duration-300 p-2`, // Added padding here for the image
                                 !isCollected ? 'grayscale group-hover:grayscale-0' : ''
                               )}
                               data-ai-hint="pokemon sprite icon"
@@ -276,7 +274,6 @@ const PokedexPage: NextPage = () => {
                                 alt={pokemon.name} 
                                 layout="fill" 
                                 objectFit="contain" 
-                                className="p-2"
                               />
                             </div>
                             <div className="absolute bottom-1.5 right-1.5 bg-background/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-xs text-foreground font-medium flex items-center">
@@ -312,3 +309,5 @@ const PokedexPage: NextPage = () => {
 };
 
 export default PokedexPage;
+
+    
