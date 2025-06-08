@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from "react";
 import { AppHeader } from "@/components/AppHeader";
-import { ImageGallery } from "@/components/ImageGallery";
 import { Separator } from "@/components/ui/separator";
 import { Images, BookOpen, PlusSquare } from "lucide-react";
 import Link from "next/link";
@@ -51,16 +50,6 @@ export default function Home() {
           </div>
         </section>
         
-        <Separator className="my-8" />
-        
-        <section id="image-gallery" aria-labelledby="image-gallery-heading">
-          <h2 id="image-gallery-heading" className="text-3xl font-headline font-semibold mb-6 text-foreground flex items-center gap-2">
-            <Images className="h-7 w-7 text-primary" />
-            Featured Card Art
-          </h2>
-          <ImageGallery />
-        </section>
-
       </main>
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
         Pokédex Tracker &copy; {new Date().getFullYear()}
