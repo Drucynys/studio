@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     // This is the target API endpoint we want to fetch from
-    const TCGDEX_JAPANESE_SETS_URL = "https://api.tcgdex.dev/v2/jp/sets";
+    const TCGDEX_JAPANESE_SETS_URL = "https://api.tcgdex.net/v2/jp/sets"; // Changed .dev to .net
     
     const response = await fetch(TCGDEX_JAPANESE_SETS_URL, { cache: 'no-store' });
 
