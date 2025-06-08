@@ -12,22 +12,22 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Camera, ScanLine, AlertCircle } from "lucide-react";
+import { Loader2, Camera, ImageUp, AlertCircle } from "lucide-react"; // Changed ScanLine to ImageUp
 import { useToast } from "@/hooks/use-toast";
-import { scanCard, type ScanCardOutput } from "@/ai/flows/scan-card-flow";
+// Removed: import { scanCard, type ScanCardOutput } from "@/ai/flows/scan-card-flow";
 
 type CardScannerDialogProps = {
   isOpen: boolean;
   onClose: () => void;
-  onScanComplete: (scannedData: ScanCardOutput) => void;
+  onImageCaptured: (imageDataUri: string) => void; // Changed from onScanComplete
 };
 
-export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScannerDialogProps) {
+export function CardScannerDialog({ isOpen, onClose, onImageCaptured }: CardScannerDialogProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false); // Changed from isScanning
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -44,7 +44,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
   useEffect(() => {
     if (!isOpen) {
       stopCamera();
-      setHasCameraPermission(null); // Reset permission status when dialog closes
+      setHasCameraPermission(null); 
       return;
     }
 
@@ -73,18 +73,17 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
 
     getCameraPermission();
 
-    // Cleanup function to stop camera when component unmounts or dialog closes
     return () => {
       stopCamera();
     };
   }, [isOpen, toast, stopCamera]);
 
-  const handleCaptureAndScan = async () => {
+  const handleCaptureImage = async () => {
     if (!videoRef.current || !canvasRef.current || !hasCameraPermission) {
-      toast({ variant: "destructive", title: "Scanner Error", description: "Camera not ready or no permission." });
+      toast({ variant: "destructive", title: "Capture Error", description: "Camera not ready or no permission." });
       return;
     }
-    setIsScanning(true);
+    setIsCapturing(true);
     setError(null);
 
     const video = videoRef.current;
@@ -94,27 +93,20 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     const context = canvas.getContext("2d");
     if (!context) {
         toast({ variant: "destructive", title: "Canvas Error", description: "Could not get canvas context." });
-        setIsScanning(false);
+        setIsCapturing(false);
         return;
     }
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageDataUri = canvas.toDataURL("image/jpeg");
 
     try {
-      const result = await scanCard({ imageDataUri });
-      if (result.error && !result.isPokemonCard) {
-        toast({ variant: "destructive", title: "Scan Failed", description: result.error });
-      } else if (!result.isPokemonCard) {
-        toast({ variant: "destructive", title: "Not a Pokémon Card", description: "The scanned image does not appear to be a Pokémon card." });
-      } else {
-        toast({ title: "Scan Successful!", description: `Found: ${result.name || 'Unknown Name'}, Set: ${result.set || 'Unknown Set'}`});
-        onScanComplete(result);
-      }
+      onImageCaptured(imageDataUri); // Pass the image data URI
+      // Removed AI call and related logic
     } catch (e) {
-      console.error("Error during AI scan:", e);
-      toast({ variant: "destructive", title: "AI Scan Error", description: e instanceof Error ? e.message : "An unknown error occurred during scanning." });
+      console.error("Error during image capture processing:", e);
+      toast({ variant: "destructive", title: "Capture Error", description: e instanceof Error ? e.message : "An unknown error occurred during capture." });
     } finally {
-      setIsScanning(false);
+      setIsCapturing(false);
     }
   };
   
@@ -128,10 +120,10 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleDialogClose(); }}>
       <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Camera className="h-6 w-6 text-primary" /> Card Scanner</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Camera className="h-6 w-6 text-primary" /> Card Image Capture</DialogTitle>
           <DialogDescription>
             Position your Pokémon card clearly in the frame and capture.
-            Ensure good lighting for best results.
+            Ensure good lighting. You will need to enter details manually after capture.
           </DialogDescription>
         </DialogHeader>
 
@@ -157,20 +149,20 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={handleDialogClose} disabled={isScanning}>
+          <Button variant="outline" onClick={handleDialogClose} disabled={isCapturing}>
             Cancel
           </Button>
           <Button 
-            onClick={handleCaptureAndScan} 
-            disabled={!hasCameraPermission || isScanning}
+            onClick={handleCaptureImage} 
+            disabled={!hasCameraPermission || isCapturing}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
-            {isScanning ? (
+            {isCapturing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <ScanLine className="mr-2 h-4 w-4" />
+              <ImageUp className="mr-2 h-4 w-4" />
             )}
-            {isScanning ? "Scanning..." : "Capture & Scan"}
+            {isCapturing ? "Capturing..." : "Capture Image"}
           </Button>
         </DialogFooter>
       </DialogContent>

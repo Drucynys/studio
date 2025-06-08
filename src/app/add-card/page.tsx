@@ -5,9 +5,9 @@ import { useState, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { ManualCardInputForm } from "@/components/ManualCardInputForm";
 import { CardScannerButton } from "@/components/CardScannerButton";
-import { CardScannerDialog } from "@/components/CardScannerDialog"; // Import the dialog
+import { CardScannerDialog } from "@/components/CardScannerDialog";
 import type { PokemonCard } from "@/types";
-import type { ScanCardOutput } from "@/ai/flows/scan-card-flow"; // Import scan output type
+// Removed: import type { ScanCardOutput } from "@/ai/flows/scan-card-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { PlusCircle } from "lucide-react";
@@ -15,7 +15,9 @@ import { PlusCircle } from "lucide-react";
 export default function AddCardPage() {
   const { toast } = useToast();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannedCardDataForForm, setScannedCardDataForForm] = useState<Partial<ScanCardOutput> | null>(null);
+  // scannedCardDataForForm will no longer be set by the scanner dialog.
+  // It remains here in case of future reinstatement or alternative pre-fill methods.
+  const [scannedCardDataForForm, setScannedCardDataForForm] = useState<Partial<PokemonCard> | null>(null);
 
 
   const handleAddCardLocally = (newCard: PokemonCard) => {
@@ -29,7 +31,7 @@ export default function AddCardPage() {
                 item.cardNumber === newCard.cardNumber &&
                 item.variant === newCard.variant && 
                 item.condition === newCard.condition &&
-                item.language === newCard.language // Added language check
+                item.language === newCard.language
       );
 
       if (isDuplicate) {
@@ -40,7 +42,7 @@ export default function AddCardPage() {
             card.cardNumber === newCard.cardNumber &&
             card.variant === newCard.variant && 
             card.condition === newCard.condition &&
-            card.language === newCard.language // Added language check
+            card.language === newCard.language
           ) {
             return { ...card, quantity: card.quantity + (newCard.quantity || 1) };
           }
@@ -72,41 +74,22 @@ export default function AddCardPage() {
         description: "Could not save card to your collection.",
       });
     }
-     // Reset scanned data after adding to prevent re-filling for next manual entry
+    // Reset scanned data (though it's not being set from scanner anymore)
     setScannedCardDataForForm(null);
   };
 
-  const handleScanComplete = (data: ScanCardOutput) => {
+  // Changed from handleScanComplete to handleImageCaptured
+  const handleImageCaptured = (imageDataUri: string) => {
     setIsScannerOpen(false);
-    if (data.isPokemonCard && (data.name || data.set || data.cardNumber)) {
-      const dataForForm: Partial<ScanCardOutput> = {
-        name: data.name,
-        set: data.set,
-        cardNumber: data.cardNumber,
-        rarity: data.rarity,
-        language: data.language || "English", // Default to English if not provided
-      };
-      setScannedCardDataForForm(dataForForm);
-      toast({
-        title: "Scan Processed",
-        description: `Card details extracted. Language: ${data.language || 'English'}. Please verify and complete the form.`,
-        className: "bg-secondary text-secondary-foreground"
-      });
-    } else if (data.error) {
-      toast({
-        variant: "destructive",
-        title: "Scan Inconclusive",
-        description: data.error,
-      });
-       setScannedCardDataForForm(null); // Clear any previous scan data
-    } else {
-       toast({
-        variant: "destructive",
-        title: "Scan Inconclusive",
-        description: "Could not extract significant details from the card.",
-      });
-       setScannedCardDataForForm(null);
-    }
+    // We no longer get structured data from the scan, so no pre-filling.
+    setScannedCardDataForForm(null); 
+    toast({
+      title: "Image Captured!",
+      description: "Image captured successfully. Please fill in the card details manually.",
+      className: "bg-secondary text-secondary-foreground"
+    });
+    // Optional: You could display the captured image here for reference if needed
+    // e.g., setCapturedImagePreview(imageDataUri);
   };
 
 
@@ -123,14 +106,15 @@ export default function AddCardPage() {
             <div className="md:col-span-1 space-y-6">
               <ManualCardInputForm 
                 onAddCard={handleAddCardLocally} 
+                // initialScanData is now effectively always null or not used for pre-filling by scanner
                 initialScanData={scannedCardDataForForm} 
-                key={scannedCardDataForForm ? JSON.stringify(scannedCardDataForForm) : 'manual-form'} // Force re-render on new scan data
+                key={scannedCardDataForForm ? JSON.stringify(scannedCardDataForForm) : 'manual-form'}
               />
             </div>
             <div className="md:col-span-1 space-y-6 flex flex-col justify-start pt-[4.5rem]">
                <CardScannerButton onScanClick={() => setIsScannerOpen(true)} />
                <p className="text-sm text-muted-foreground text-center mt-2">
-                Use the form to manually enter card details, or try the scanner.
+                Use the form to manually enter card details, or use the camera to capture an image (manual entry still required).
               </p>
             </div>
           </div>
@@ -145,7 +129,7 @@ export default function AddCardPage() {
         <CardScannerDialog 
           isOpen={isScannerOpen} 
           onClose={() => setIsScannerOpen(false)} 
-          onScanComplete={handleScanComplete} 
+          onImageCaptured={handleImageCaptured} // Changed prop
         />
       )}
 
