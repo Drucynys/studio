@@ -82,10 +82,11 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
       setHasCameraPermission(null);
       setOcrProgress(0);
       setOcrStatus(null);
+      setError(null);
     }
 
     return () => {
-      if (tesseractWorkerRef.current && !isOpen) { // Ensure termination if dialog closes unexpectedly
+      if (tesseractWorkerRef.current && !isOpen) { 
         tesseractWorkerRef.current.terminate();
         tesseractWorkerRef.current = null;
       }
@@ -120,39 +121,140 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     getCameraPermission();
   }, [isOpen, toast]);
 
-  // Basic parsing - this will need significant improvement
   const parseOcrText = (text: string): Partial<OcrScanOutput> => {
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 2);
-    let name: string | undefined;
-    let set: string | undefined; // OCR is unlikely to get set name accurately without more context
-    let cardNumber: string | undefined;
+    const originalLines = text.split('\n');
+    const lines = originalLines.map(line => line.trim()).filter(line => line.length > 1); // Keep slightly shorter lines too
 
-    // Try to find card number (e.g., 123/456 or XY123)
-    const cardNumberRegex = /(\b\w*\d+[a-zA-Z]?\s*\/\s*\d+\w*\b|\b[A-Z]{0,3}\d{1,3}[a-zA-Z]?\b)/;
-    for (const line of lines) {
-      const match = line.match(cardNumberRegex);
-      if (match) {
-        cardNumber = match[0];
-        // Very naively assume the line before card number might be the set
-        // This is highly unreliable
-        const currentLineIndex = lines.indexOf(line);
-        if (currentLineIndex > 0 && lines[currentLineIndex-1].length > 3 && lines[currentLineIndex-1].length < 50) {
-           // set = lines[currentLineIndex-1]; // Commenting out for now as it's too unreliable
+    let name: string | undefined;
+    let cardNumber: string | undefined;
+    let rarity: string | undefined;
+    // Set parsing is too unreliable with OCR alone for now.
+
+    // Card Number Regex:
+    // - \b\d{1,3}\s*\/\s*\d{1,3}\b : Matches "## / ##" or "# / ##" etc. (e.g., 65/123)
+    // - \b[A-Za-z]{0,4}\s*\d{1,3}[a-zA-Z]?\b : Matches "XY123", "SM12", "SWSH001a", "123" (promo-like or simple numbers)
+    // - \bTG\d{1,2}\s*\/\s*TG\d{1,2}\b : Matches Trainer Gallery like "TG01/TG30"
+    // - \bGG\d{1,2}\s*\/\s*GG\d{1,2}\b : Matches Galarian Gallery like "GG01/GG70"
+    const cardNumberRegexPatterns = [
+        /\b\d{1,3}\s*\/\s*\d{1,3}\b/i,            // e.g., 65/123, 065/123
+        /\b[A-Za-z]{2,6}\s?\d{1,3}[a-zA-Z]?\b/i,   // e.g., SWSH001, SM123a, BSP123, MEW 001 (promo-like)
+        /\b(?:TG|GG)\d{1,2}\s*\/\s*(?:TG|GG)\d{1,2}\b/i, // TG01/TG30, GG01/GG70
+        /\b\d{3}\/\d{3}\b/i, // Specifically for xxx/yyy format
+    ];
+    
+    // Search for card number, prioritizing bottom lines
+    for (let i = lines.length - 1; i >= 0; i--) {
+        for (const regex of cardNumberRegexPatterns) {
+            const match = lines[i].match(regex);
+            if (match && match[0].length >= 2) { // Ensure match is not too short
+                cardNumber = match[0].replace(/\s+/g, ''); // Remove spaces
+                break;
+            }
         }
-        break;
-      }
+        if (cardNumber) break;
+    }
+    // Fallback: if no specific pattern matched, try a more general number pattern on bottom lines
+    if (!cardNumber) {
+        for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) { // Check last 5 lines
+            const generalNumberMatch = lines[i].match(/\b(?:\d{1,3}[a-zA-Z]?|[A-Za-z]+\d{1,3})\b/); // e.g. 123a or P123
+            if (generalNumberMatch && lines[i].length < 10) { // If it's a short line and looks like a number
+                cardNumber = generalNumberMatch[0];
+                break;
+            }
+        }
+    }
+
+
+    // Name Extraction
+    const commonNonNameKeywords = [
+        'basic', 'stage 1', 'stage 2', 'vmax', 'vstar', ' tera', 'radiant',
+        'hp', 'weakness', 'resistance', 'retreat cost', 
+        'pokémon tool', 'item', 'supporter', 'stadium', 'energy',
+        'evolves from', 'no.', 'illus.'
+    ];
+    const potentialNameLines: string[] = [];
+    for (let i = 0; i < Math.min(lines.length, 5); i++) { // Check top 5 lines
+        const line = lines[i];
+        const lowerLine = line.toLowerCase();
+        if (line.length >= 3 && line.length <= 40 && // Reasonable name length
+            !/\d/.test(line.substring(line.length - 3)) && // Doesn't end like an HP value or attack damage
+            !commonNonNameKeywords.some(keyword => lowerLine.includes(keyword)) &&
+            !cardNumberRegexPatterns.some(regex => regex.test(line)) // Not a card number
+        ) {
+            // Attempt to remove typical "HP XY" text from the end if it's there
+            let cleanedLine = line.replace(/\s*HP\s*\d+\s*$/, "").trim();
+            // Further clean if it's just a number after HP removal
+            if (/^\d+$/.test(cleanedLine)) continue;
+
+            potentialNameLines.push(cleanedLine);
+        }
+    }
+
+    if (potentialNameLines.length > 0) {
+        // Prefer lines that don't have " V" or " EX" or " GX" at the very end, unless it's part of a known pattern
+        potentialNameLines.sort((a, b) => {
+            const aEndsWithV = /\sV$/.test(a);
+            const bEndsWithV = /\sV$/.test(b);
+            if (aEndsWithV && !bEndsWithV) return 1;
+            if (!aEndsWithV && bEndsWithV) return -1;
+            return b.length - a.length; // Fallback to longest
+        });
+        name = potentialNameLines[0];
+
+        // Refine name: sometimes card type (Basic, Stage 1) is on the same line
+        if (name) {
+            const typeKeywords = ["Basic", "Stage 1", "Stage 2", "VMAX", "VSTAR", "Radiant", "Tera"];
+            for (const keyword of typeKeywords) {
+                if (name.toUpperCase().endsWith(" " + keyword.toUpperCase())) {
+                    name = name.substring(0, name.length - (keyword.length + 1)).trim();
+                    break;
+                }
+                 if (name.toUpperCase().startsWith(keyword.toUpperCase() + " ")) {
+                    name = name.substring(keyword.length +1).trim();
+                    break;
+                }
+            }
+        }
     }
     
-    // Assume the longest line (or one of the longest) is the name, if not clearly a number/set string
-    if (lines.length > 0) {
-        const potentialNames = lines.filter(l => !cardNumberRegex.test(l) && l.length > 5 && l.length < 40 && isNaN(parseFloat(l)));
-        potentialNames.sort((a,b) => b.length - a.length);
-        if (potentialNames.length > 0) {
-            name = potentialNames[0];
+    // Basic Rarity hints (very experimental)
+    // Look for common rarity symbols or text often found near the card number or bottom
+    const rarityKeywords: { [key: string]: string } = {
+        ' C ': 'Common', ' U ': 'Uncommon', ' R ': 'Rare', // Spaced to avoid matching in words
+        'COMMON': 'Common', 'UNCOMMON': 'Uncommon', 'RARE': 'Rare',
+        'Holo Rare': 'Holo Rare', 'Reverse Holo': 'Reverse Holo',
+        'Ultra Rare': 'Ultra Rare', 'Secret Rare': 'Secret Rare',
+        'Promo': 'Promo',
+        // Symbols are hard for Tesseract, but we can try
+        // '★': 'Rare Holo', // Example
+    };
+    for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
+        const lineUpper = lines[i].toUpperCase();
+        for (const keyword in rarityKeywords) {
+            if (lineUpper.includes(keyword)) {
+                rarity = rarityKeywords[keyword];
+                break;
+            }
+        }
+        if (rarity) break;
+    }
+    // If a card number was found, check that line specifically for isolated letters like C, U, R
+    if (cardNumber) {
+        const cardNumberLineIndex = lines.findIndex(line => line.includes(cardNumber!));
+        if (cardNumberLineIndex !== -1) {
+            const parts = lines[cardNumberLineIndex].split(/[\s/]+/); // Split by space or slash
+            const singleLetterRarity = parts.find(p => p.length === 1 && "CURS".includes(p.toUpperCase()));
+            if (singleLetterRarity) {
+                if (singleLetterRarity.toUpperCase() === 'C') rarity = 'Common';
+                else if (singleLetterRarity.toUpperCase() === 'U') rarity = 'Uncommon';
+                else if (singleLetterRarity.toUpperCase() === 'R') rarity = 'Rare';
+                // S could be shiny rare or other things, harder to map simply
+            }
         }
     }
 
-    return { name, set, cardNumber };
+
+    return { name, cardNumber, rarity };
   };
 
   const handleCaptureAndScan = async () => {
@@ -188,8 +290,8 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
 
       toast({
         title: "OCR Attempt Complete",
-        description: `Extracted text (raw): "${text.substring(0, 50)}..." Parsed: Name: ${parsedData.name || 'N/A'}, Num: ${parsedData.cardNumber || 'N/A'}. Please verify.`,
-        duration: 7000,
+        description: `Parsed: Name: ${parsedData.name || 'N/A'}, #: ${parsedData.cardNumber || 'N/A'}, Rarity: ${parsedData.rarity || 'N/A'}. Please verify.`,
+        duration: 8000,
       });
       
       onScanComplete({ ...parsedData, imageDataUri });
@@ -198,8 +300,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
       console.error("Error during OCR processing:", e);
       setError(e instanceof Error ? e.message : "An unknown error occurred during OCR.");
       toast({ variant: "destructive", title: "OCR Error", description: e instanceof Error ? e.message : "Failed to process image with OCR." });
-      // Fallback: send only image data if OCR fails hard
-      onScanComplete({ imageDataUri });
+      onScanComplete({ imageDataUri }); // Fallback: send only image data
     } finally {
       setIsCapturing(false);
       setOcrProgress(0);
@@ -252,7 +353,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-           {error && !isCapturing && hasCameraPermission && ( // OCR specific error display
+           {error && !isCapturing && hasCameraPermission && ( 
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>OCR Error</AlertTitle>
@@ -282,3 +383,5 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     </Dialog>
   );
 }
+
+    
