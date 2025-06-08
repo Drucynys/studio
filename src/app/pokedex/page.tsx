@@ -237,18 +237,27 @@ const PokedexPage: NextPage = () => {
                       <Link key={pokemon.id} href={`/pokedex/${encodeURIComponent(pokemon.name.toLowerCase())}`} passHref legacyBehavior>
                         <a className="block group">
                           <Card className={cn(
-                              "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-3 text-center h-full",
-                              "group-hover:z-10 relative" // Added relative for z-index context
+                              "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105",
+                              "group-hover:z-10 relative overflow-hidden aspect-square" 
                             )}>
-                            <div className={`relative w-24 h-24 mb-2 bg-muted/30 rounded-full overflow-hidden flex items-center justify-center ${!isCollected ? 'grayscale' : ''}`} data-ai-hint="pokemon sprite icon">
-                              <Image src={pokemon.spriteUrl} alt={pokemon.name} width={96} height={96} objectFit="contain" />
+                            <div className={cn(
+                                `w-full h-full transition-all duration-300`,
+                                !isCollected ? 'grayscale group-hover:grayscale-0' : ''
+                              )}
+                              data-ai-hint="pokemon sprite icon"
+                            >
+                              <Image 
+                                src={pokemon.spriteUrl} 
+                                alt={pokemon.name} 
+                                layout="fill" 
+                                objectFit="contain" 
+                                className="p-2" // Add some padding so sprite isn't edge-to-edge
+                              />
                             </div>
-                            <p className="font-semibold text-card-foreground group-hover:text-primary text-sm md:text-base">{pokemon.name}</p>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1"><Hash size={12}/> #{pokemon.id.toString().padStart(3, '0')}</p>
-                            <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin size={12}/> {pokemon.region}</p>
-                            <Button variant="outline" size="sm" className="mt-3 w-full text-xs group-hover:bg-primary group-hover:text-primary-foreground">
-                              View Details
-                            </Button>
+                            <div className="absolute bottom-1.5 right-1.5 bg-background/70 backdrop-blur-sm px-1.5 py-0.5 rounded text-xs text-foreground font-medium flex items-center">
+                              <Hash size={10} className="mr-0.5 opacity-70"/>
+                              {pokemon.id.toString().padStart(3, '0')}
+                            </div>
                           </Card>
                         </a>
                       </Link>
@@ -283,3 +292,4 @@ export default PokedexPage;
     
 
     
+
