@@ -2,21 +2,21 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Image from "next/image"; // Import next/image
+import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { ManualCardInputForm } from "@/components/ManualCardInputForm";
 import { CardScannerButton } from "@/components/CardScannerButton";
-import { CardScannerDialog } from "@/components/CardScannerDialog";
+import { CardScannerDialog, type OcrScanOutput } from "@/components/CardScannerDialog";
 import type { PokemonCard } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button"; // Import Button
+import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 
 export default function AddCardPage() {
   const { toast } = useToast();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannedCardDataForForm, setScannedCardDataForForm] = useState<Partial<PokemonCard> | null>(null);
+  const [scannedCardDataForForm, setScannedCardDataForForm] = useState<Partial<OcrScanOutput> | null>(null);
   const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
 
 
@@ -74,18 +74,31 @@ export default function AddCardPage() {
         description: "Could not save card to your collection.",
       });
     }
-    setScannedCardDataForForm(null);
-    setCapturedImagePreview(null); // Clear the image preview after adding
+    // Do not clear scannedCardDataForForm here, ManualCardInputForm might still need it
+    // if user wants to add multiple copies with different conditions for example.
+    // Clearing preview is fine.
+    setCapturedImagePreview(null);
   };
 
-  const handleImageCaptured = (imageDataUri: string) => {
+  const handleScanComplete = (ocrOutput: OcrScanOutput) => {
     setIsScannerOpen(false);
-    setScannedCardDataForForm(null); 
-    setCapturedImagePreview(imageDataUri); // Set the image for preview
+    setCapturedImagePreview(ocrOutput.imageDataUri); // Set the image for preview
+
+    // Use the OCR output (even if partial) to pre-fill the form
+    // The ManualCardInputForm's key depends on scannedCardDataForForm, so it will re-render and attempt to use this data
+    setScannedCardDataForForm({
+        name: ocrOutput.name,
+        set: ocrOutput.set,
+        cardNumber: ocrOutput.cardNumber,
+        rarity: ocrOutput.rarity,
+        // imageDataUri is not part of ScanCardOutput for form, but useful here
+    }); 
+
     toast({
-      title: "Image Captured!",
-      description: "Image captured successfully. Use it as a reference and fill in the card details manually.",
-      className: "bg-secondary text-secondary-foreground"
+      title: "OCR Scan Attempted!",
+      description: `Image captured. OCR tried to extract details. Please verify and complete the form. Name: ${ocrOutput.name || 'N/A'}, Set: ${ocrOutput.set || 'N/A'}, #: ${ocrOutput.cardNumber || 'N/A'}`,
+      className: "bg-secondary text-secondary-foreground",
+      duration: 7000,
     });
   };
 
@@ -103,7 +116,7 @@ export default function AddCardPage() {
             <div className="md:col-span-1 space-y-6">
               <ManualCardInputForm 
                 onAddCard={handleAddCardLocally} 
-                initialScanData={scannedCardDataForForm} 
+                initialScanData={scannedCardDataForForm} // Pass the OCR attempt data
                 key={scannedCardDataForForm ? JSON.stringify(scannedCardDataForForm) : 'manual-form'}
               />
             </div>
@@ -123,15 +136,18 @@ export default function AddCardPage() {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setCapturedImagePreview(null)} 
+                    onClick={() => {
+                        setCapturedImagePreview(null);
+                        setScannedCardDataForForm(null); // Clear scan data if image is cleared
+                    }} 
                     className="mt-3 w-full"
                   >
-                    Clear Image
+                    Clear Image & Scan Data
                   </Button>
                 </div>
               )}
                <p className="text-sm text-muted-foreground text-center mt-2">
-                Use the form to manually enter card details. The camera can capture an image for your reference.
+                Use the form to manually enter card details. The camera can capture an image and attempt OCR.
               </p>
             </div>
           </div>
@@ -146,7 +162,7 @@ export default function AddCardPage() {
         <CardScannerDialog 
           isOpen={isScannerOpen} 
           onClose={() => setIsScannerOpen(false)} 
-          onImageCaptured={handleImageCaptured}
+          onScanComplete={handleScanComplete}
         />
       )}
 
