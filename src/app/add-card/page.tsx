@@ -2,22 +2,22 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Image from "next/image"; // Import next/image
 import { AppHeader } from "@/components/AppHeader";
 import { ManualCardInputForm } from "@/components/ManualCardInputForm";
 import { CardScannerButton } from "@/components/CardScannerButton";
 import { CardScannerDialog } from "@/components/CardScannerDialog";
 import type { PokemonCard } from "@/types";
-// Removed: import type { ScanCardOutput } from "@/ai/flows/scan-card-flow";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button"; // Import Button
 import { PlusCircle } from "lucide-react";
 
 export default function AddCardPage() {
   const { toast } = useToast();
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  // scannedCardDataForForm will no longer be set by the scanner dialog.
-  // It remains here in case of future reinstatement or alternative pre-fill methods.
   const [scannedCardDataForForm, setScannedCardDataForForm] = useState<Partial<PokemonCard> | null>(null);
+  const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
 
 
   const handleAddCardLocally = (newCard: PokemonCard) => {
@@ -74,22 +74,19 @@ export default function AddCardPage() {
         description: "Could not save card to your collection.",
       });
     }
-    // Reset scanned data (though it's not being set from scanner anymore)
     setScannedCardDataForForm(null);
+    setCapturedImagePreview(null); // Clear the image preview after adding
   };
 
-  // Changed from handleScanComplete to handleImageCaptured
   const handleImageCaptured = (imageDataUri: string) => {
     setIsScannerOpen(false);
-    // We no longer get structured data from the scan, so no pre-filling.
     setScannedCardDataForForm(null); 
+    setCapturedImagePreview(imageDataUri); // Set the image for preview
     toast({
       title: "Image Captured!",
-      description: "Image captured successfully. Please fill in the card details manually.",
+      description: "Image captured successfully. Use it as a reference and fill in the card details manually.",
       className: "bg-secondary text-secondary-foreground"
     });
-    // Optional: You could display the captured image here for reference if needed
-    // e.g., setCapturedImagePreview(imageDataUri);
   };
 
 
@@ -106,15 +103,35 @@ export default function AddCardPage() {
             <div className="md:col-span-1 space-y-6">
               <ManualCardInputForm 
                 onAddCard={handleAddCardLocally} 
-                // initialScanData is now effectively always null or not used for pre-filling by scanner
                 initialScanData={scannedCardDataForForm} 
                 key={scannedCardDataForForm ? JSON.stringify(scannedCardDataForForm) : 'manual-form'}
               />
             </div>
             <div className="md:col-span-1 space-y-6 flex flex-col justify-start pt-[4.5rem]">
                <CardScannerButton onScanClick={() => setIsScannerOpen(true)} />
+               {capturedImagePreview && (
+                <div className="mt-4 p-4 border rounded-lg shadow-sm bg-card">
+                  <h3 className="text-lg font-semibold mb-3 text-center text-card-foreground">Captured Image Reference:</h3>
+                  <div className="relative aspect-[2.5/3.5] w-full max-w-xs mx-auto rounded-md overflow-hidden shadow-md border" data-ai-hint="pokemon card captured">
+                    <Image 
+                        src={capturedImagePreview} 
+                        alt="Captured card preview" 
+                        layout="fill" 
+                        objectFit="contain" 
+                    />
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setCapturedImagePreview(null)} 
+                    className="mt-3 w-full"
+                  >
+                    Clear Image
+                  </Button>
+                </div>
+              )}
                <p className="text-sm text-muted-foreground text-center mt-2">
-                Use the form to manually enter card details, or use the camera to capture an image (manual entry still required).
+                Use the form to manually enter card details. The camera can capture an image for your reference.
               </p>
             </div>
           </div>
@@ -129,7 +146,7 @@ export default function AddCardPage() {
         <CardScannerDialog 
           isOpen={isScannerOpen} 
           onClose={() => setIsScannerOpen(false)} 
-          onImageCaptured={handleImageCaptured} // Changed prop
+          onImageCaptured={handleImageCaptured}
         />
       )}
 
