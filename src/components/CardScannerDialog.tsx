@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Camera, ImageUp, AlertCircle, ScanText, ZoomIn, ZoomOut, Maximize } from "lucide-react";
+import { Loader2, Camera, ImageUp, AlertCircle, ScanText, ZoomIn, ZoomOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Tesseract from 'tesseract.js';
 import { cn } from "@/lib/utils";
@@ -65,20 +65,26 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
 
   const initializeTesseract = useCallback(async () => {
     if (!tesseractWorkerRef.current) {
-      const worker = await Tesseract.createWorker('eng', 1, {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-            setOcrStatus(m.status);
-          } else if(m.status) {
-            setOcrStatus(m.status);
-            setOcrProgress(0);
-          }
-        },
-      });
-      tesseractWorkerRef.current = worker;
+      try {
+        const worker = await Tesseract.createWorker('eng', 1, {
+          logger: m => {
+            if (m.status === 'recognizing text') {
+              setOcrProgress(Math.round(m.progress * 100));
+              setOcrStatus(m.status);
+            } else if(m.status) {
+              setOcrStatus(m.status);
+              setOcrProgress(0);
+            }
+          },
+        });
+        tesseractWorkerRef.current = worker;
+      } catch (e) {
+        console.error("Failed to initialize Tesseract worker:", e);
+        setError("Failed to initialize OCR engine. Please try refreshing.");
+        toast({ variant: "destructive", title: "OCR Initialization Error", description: "Could not load the OCR engine." });
+      }
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -96,7 +102,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     }
 
     return () => {
-      if (tesseractWorkerRef.current && !isOpen) {
+      if (tesseractWorkerRef.current && !isOpen) { // Ensure termination only if it was initialized for this open state
         tesseractWorkerRef.current.terminate();
         tesseractWorkerRef.current = null;
       }
@@ -109,12 +115,13 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
 
     const getCameraPermission = async () => {
       setError(null);
+      setHasCameraPermission(null); // Reset permission state on open
       try {
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: "environment",
             // @ts-ignore
-            focusMode: "continuous",
+            focusMode: "continuous", 
             width: { ideal: 1280 },
             height: { ideal: 720 }
           }
@@ -135,11 +142,12 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
           // @ts-ignore
           setMinZoom(capabilities.zoom.min || 1);
           // @ts-ignore
-          setMaxZoom(capabilities.zoom.max || 1);
+          setMaxZoom(capabilities.zoom.max || 10); // Cap max zoom for sanity
           // @ts-ignore
           setStepZoom(capabilities.zoom.step || 0.1);
           // @ts-ignore
-          setCurrentZoom(track.getSettings?.()?.zoom || 1);
+          const currentSettingsZoom = track.getSettings?.()?.zoom;
+          setCurrentZoom(typeof currentSettingsZoom === 'number' ? currentSettingsZoom : 1);
         } else {
           setZoomSupported(false);
         }
@@ -158,16 +166,16 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
                     videoRef.current.srcObject = fallbackStream;
                 }
                 videoTrackRef.current = fallbackStream.getVideoTracks()[0];
-                // No zoom check for fallback for simplicity, can be added if needed
-                setZoomSupported(false);
+                setZoomSupported(false); // No zoom check for fallback, assume not supported
                 toast({
                     variant: "default",
                     title: "Camera Initialized (Fallback)",
-                    description: "Using basic camera mode."
+                    description: "Using basic camera mode. Advanced features like zoom might be unavailable."
                 });
                 return;
             } catch (fallbackErr) {
                  console.error("Fallback camera access also failed:", fallbackErr);
+                 errorMessage = "Camera access denied. Please ensure permissions are enabled and no other app is using the camera.";
             }
         }
 
@@ -186,7 +194,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
   }, [isOpen, toast]);
 
   const handleZoom = async (direction: 'in' | 'out') => {
-    if (!videoTrackRef.current || !zoomSupported) return;
+    if (!videoTrackRef.current || !zoomSupported || isCapturing) return;
     let newZoom = currentZoom;
     if (direction === 'in') {
       newZoom = Math.min(maxZoom, currentZoom + stepZoom);
@@ -212,10 +220,10 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     let rarity: string | undefined;
 
     const cardNumberRegexPatterns = [
-        /\b\d{1,3}\s*\/\s*\d{1,3}\b/i, // e.g., 64/102
-        /\b[A-Za-z]{2,6}\s?\d{1,3}[a-zA-Z]?\b/i, // e.g., SM123a, SWSH001
-        /\b(?:TG|GG)\d{1,2}\s*\/\s*(?:TG|GG)\d{1,2}\b/i, // e.g., TG01/TG30
-        /\b\d{3}\/\d{3}\b/i, // Strict 3 digits / 3 digits for some sets
+        /\b\d{1,3}\s*\/\s*\d{1,3}\b/i, 
+        /\b[A-Za-z]{2,6}\s?\d{1,3}[a-zA-Z]?\b/i, 
+        /\b(?:TG|GG)\d{1,2}\s*\/\s*(?:TG|GG)\d{1,2}\b/i, 
+        /\b\d{3}\/\d{3}\b/i, 
     ];
 
     for (let i = lines.length - 1; i >= 0; i--) {
@@ -228,10 +236,10 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         }
         if (cardNumber) break;
     }
-    if (!cardNumber) { // Fallback for less specific numbers, typically near the bottom
+    if (!cardNumber) { 
         for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
             const generalNumberMatch = lines[i].match(/\b(?:\d{1,3}[a-zA-Z]?|[A-Za-z]+\d{1,3})\b/);
-            if (generalNumberMatch && lines[i].length < 10) { // Short lines are more likely card numbers
+            if (generalNumberMatch && lines[i].length < 10) { 
                 cardNumber = generalNumberMatch[0];
                 break;
             }
@@ -240,39 +248,36 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
 
     const commonNonNameKeywords = [
         'basic', 'stage 1', 'stage 2', 'vmax', 'vstar', ' tera', 'radiant', 'ex', 'gx',
-        'hp', 'weakness', 'resistance', 'retreat cost',
-        'pokémon tool', 'item', 'supporter', 'stadium', 'energy',
+        'hp', 'weakness', 'resistance', 'retreat cost', 'energy',
+        'pokémon tool', 'item', 'supporter', 'stadium',
         'evolves from', 'no.', 'illus.', 'ability:', 'poké-power', 'poké-body'
     ];
     const potentialNameLines: string[] = [];
-    for (let i = 0; i < Math.min(lines.length, 5); i++) { // Look in top lines for name
+    for (let i = 0; i < Math.min(lines.length, 5); i++) { 
         const line = lines[i];
         const lowerLine = line.toLowerCase();
-        // Basic checks: reasonable length, not just numbers, not a common non-name keyword
         if (line.length >= 3 && line.length <= 40 &&
-            !/\d/.test(line.substring(line.length - 3)) && // Doesn't end with numbers (like HP)
+            !/\d/.test(line.substring(line.length - 3)) && 
             !commonNonNameKeywords.some(keyword => lowerLine.includes(keyword)) &&
-            !cardNumberRegexPatterns.some(regex => regex.test(line)) // Not a card number pattern
+            !cardNumberRegexPatterns.some(regex => regex.test(line))
         ) {
-            let cleanedLine = line.replace(/\s*HP\s*\d+\s*$/, "").trim(); // Remove HP if it's at the end
-             cleanedLine = cleanedLine.replace(/^[A-Z\s]+ Energy$/i, "").trim(); // Remove "Fire Energy" etc.
-            if (/^\d+$/.test(cleanedLine) || cleanedLine.length < 2) continue; // Skip if only numbers or too short
+            let cleanedLine = line.replace(/\s*HP\s*\d+\s*$/, "").trim();
+            cleanedLine = cleanedLine.replace(/^[A-Z\s]+ Energy$/i, "").trim(); 
+            if (/^\d+$/.test(cleanedLine) || cleanedLine.length < 2) continue; 
             potentialNameLines.push(cleanedLine);
         }
     }
 
     if (potentialNameLines.length > 0) {
-      // Prefer longer lines, or lines ending with V, VMAX etc. as they are often part of name
         potentialNameLines.sort((a, b) => {
             const aSpecialSuffix = /\s(V|VMAX|VSTAR|GX|EX)$/i.test(a);
             const bSpecialSuffix = /\s(V|VMAX|VSTAR|GX|EX)$/i.test(b);
-            if (aSpecialSuffix && !bSpecialSuffix) return -1; // Prioritize A if it has suffix
-            if (!aSpecialSuffix && bSpecialSuffix) return 1;  // Prioritize B if it has suffix
-            return b.length - a.length; // Fallback to length
+            if (aSpecialSuffix && !bSpecialSuffix) return -1; 
+            if (!aSpecialSuffix && bSpecialSuffix) return 1; 
+            return b.length - a.length; 
         });
         name = potentialNameLines[0];
 
-        // Further clean name if known type keywords are appended/prepended
         if (name) {
             const typeKeywords = ["Basic", "Stage 1", "Stage 2", "VMAX", "VSTAR", "Radiant", "Tera", "ex", "GX"];
             for (const keyword of typeKeywords) {
@@ -295,19 +300,18 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         'Ultra Rare': 'Ultra Rare', 'Secret Rare': 'Secret Rare', 'Hyper Rare': 'Hyper Rare',
         'Amazing Rare': 'Amazing Rare', 'Radiant': 'Radiant Rare', 'Illustration Rare': 'Illustration Rare',
         'Special Illustration Rare': 'Special Illustration Rare', 'Double Rare': 'Double Rare',
-        'Promo': 'Promo',
+        'PROMO': 'Promo',
     };
-     // Attempt to find rarity symbol near card number if present
+     
     if (cardNumber) {
         const cardNumberLineIndex = lines.findIndex(line => line.includes(cardNumber!));
         if (cardNumberLineIndex !== -1) {
-            // Look for single character C, U, R, P (Promo), S (Shiny/Secret) near the number
             const lineWithNumber = lines[cardNumberLineIndex];
             const partsAroundNumber = lineWithNumber.split(cardNumber!);
             const textAfterNumber = partsAroundNumber[1] || "";
             const textBeforeNumber = partsAroundNumber[0] || "";
 
-            const symbolRegex = /\b([CURPSATH])\b/i; // Common, Uncommon, Rare, Promo, Shiny/Secret/Special, Trainer/Hyper, Holo
+            const symbolRegex = /\b([CURPSATH])\b/i; 
             let match = textAfterNumber.trim().match(symbolRegex) || textBeforeNumber.trim().match(symbolRegex);
             if (match && match[1]) {
                 const sym = match[1].toUpperCase();
@@ -315,17 +319,17 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
                 else if (sym === 'U') rarity = 'Uncommon';
                 else if (sym === 'R') rarity = 'Rare';
                 else if (sym === 'P') rarity = 'Promo';
-                else if (sym === 'S') rarity = 'Secret Rare'; // Or Special Art
+                else if (sym === 'S') rarity = 'Secret Rare'; 
                 else if (sym === 'H') rarity = 'Holo Rare';
             }
         }
     }
-    // If not found by symbol, check keywords in bottom lines
+    
     if (!rarity) {
         for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
             const lineUpper = lines[i].toUpperCase();
             for (const keyword in rarityKeywords) {
-                if (lineUpper.includes(keyword)) {
+                if (lineUpper.includes(keyword.toUpperCase())) { // Ensure keyword check is case-insensitive
                     rarity = rarityKeywords[keyword];
                     break;
                 }
@@ -379,7 +383,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
       console.error("Error during OCR processing:", e);
       setError(e instanceof Error ? e.message : "An unknown error occurred during OCR.");
       toast({ variant: "destructive", title: "OCR Error", description: e instanceof Error ? e.message : "Failed to process image with OCR." });
-      onScanComplete({ imageDataUri });
+      onScanComplete({ imageDataUri }); // Still pass image URI on OCR error
     } finally {
       setIsCapturing(false);
       setOcrProgress(0);
@@ -406,22 +410,19 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
           <div className="w-full aspect-video bg-muted rounded-md overflow-hidden relative group">
             <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
 
-            {/* Alignment Guide Overlay */}
             <div className={cn(
               "absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300",
               isCapturing ? "opacity-0" : "opacity-100"
             )}>
               <div
-                className="w-[60%] aspect-[2.5/3.5] border-2 border-dashed border-background/70 rounded-lg shadow-lg"
+                className="w-[60%] aspect-[2.5/3.5] border-2 border-dashed border-background/70 rounded-lg"
                 style={{
-                  // Standard Pokémon card aspect ratio is approx 2.5 x 3.5 inches
-                  // This overlay attempts to match that ratio
-                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.3)', // Creates the 'cutout' effect
+                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.3)', 
                 }}
               />
             </div>
 
-            {hasCameraPermission === null && (
+            {hasCameraPermission === null && !error && (
                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                     <Loader2 className="h-8 w-8 animate-spin text-white" />
                     <p className="ml-2 text-white">Initializing camera...</p>
@@ -438,9 +439,8 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
               </div>
             )}
 
-            {/* Zoom Controls - only show if camera is active and not capturing */}
             {zoomSupported && hasCameraPermission && !isCapturing && (
-              <div className="absolute bottom-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="absolute bottom-3 right-3 flex flex-col gap-2 opacity-20 group-hover:opacity-100 transition-opacity duration-300">
                 <Button
                   variant="secondary"
                   size="icon"
@@ -473,7 +473,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-           {error && !isCapturing && hasCameraPermission && (
+           {error && !isCapturing && hasCameraPermission && ( // Show OCR error if camera is fine but OCR fails
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>OCR Error</AlertTitle>
@@ -488,7 +488,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
           </Button>
           <Button
             onClick={handleCaptureAndScan}
-            disabled={!hasCameraPermission || isCapturing}
+            disabled={!hasCameraPermission || isCapturing || !!error && !isCapturing && hasCameraPermission === null }
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
             {isCapturing ? (
