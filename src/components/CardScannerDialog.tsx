@@ -102,7 +102,8 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     }
 
     return () => {
-      if (tesseractWorkerRef.current && !isOpen) { // Ensure termination only if it was initialized for this open state
+      // Ensure termination if component unmounts while open or if it was initialized for this open state
+      if (tesseractWorkerRef.current && (!isOpen || (isOpen && tesseractWorkerRef.current))) { 
         tesseractWorkerRef.current.terminate();
         tesseractWorkerRef.current = null;
       }
@@ -142,7 +143,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
           // @ts-ignore
           setMinZoom(capabilities.zoom.min || 1);
           // @ts-ignore
-          setMaxZoom(capabilities.zoom.max || 10); // Cap max zoom for sanity
+          setMaxZoom(Math.min(capabilities.zoom.max || 10, 10)); // Cap max zoom for sanity
           // @ts-ignore
           setStepZoom(capabilities.zoom.step || 0.1);
           // @ts-ignore
@@ -177,6 +178,8 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
                  console.error("Fallback camera access also failed:", fallbackErr);
                  errorMessage = "Camera access denied. Please ensure permissions are enabled and no other app is using the camera.";
             }
+        } else if (err instanceof Error && err.name === "NotAllowedError") {
+          errorMessage = "Camera access was denied. Please enable camera permissions in your browser settings to use this feature.";
         }
 
         setError(errorMessage);
@@ -201,6 +204,8 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     } else {
       newZoom = Math.max(minZoom, currentZoom - stepZoom);
     }
+    newZoom = parseFloat(newZoom.toFixed(2)); // Ensure newZoom is a reasonable number
+
     try {
       // @ts-ignore
       await videoTrackRef.current.applyConstraints({ advanced: [{ zoom: newZoom }] });
@@ -329,7 +334,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
             const lineUpper = lines[i].toUpperCase();
             for (const keyword in rarityKeywords) {
-                if (lineUpper.includes(keyword.toUpperCase())) { // Ensure keyword check is case-insensitive
+                if (lineUpper.includes(keyword.toUpperCase())) { 
                     rarity = rarityKeywords[keyword];
                     break;
                 }
@@ -503,3 +508,5 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     </Dialog>
   );
 }
+
+    
