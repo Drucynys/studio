@@ -17,8 +17,8 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-const INITIAL_ITEMS_TO_SHOW = 48; // e.g., 6 columns * 8 rows
-const ITEMS_PER_LOAD = 24;      // e.g., 6 columns * 4 rows
+const INITIAL_ITEMS_TO_SHOW = 48; 
+const ITEMS_PER_LOAD = 24;      
 
 const PokedexPage: NextPage = () => {
   const [pokemonList, setPokemonList] = useState<PokemonPokedexEntry[]>([]);
@@ -56,7 +56,6 @@ const PokedexPage: NextPage = () => {
   useEffect(() => {
     setIsClient(true);
     loadCollectionCards();
-    // Simulate API call for initial data
     setTimeout(() => {
       setPokemonList(allPokemonData);
       setRegions(pokedexRegions);
@@ -117,7 +116,7 @@ const PokedexPage: NextPage = () => {
 
     tempPokemon.sort((a,b) => a.id - b.id);
     setFilteredPokemon(tempPokemon);
-    setDisplayCount(INITIAL_ITEMS_TO_SHOW); // Reset display count when filters change
+    setDisplayCount(INITIAL_ITEMS_TO_SHOW);
   }, [pokemonList, searchTerm, selectedRegions, isClient, showOnlyCollected, collectedPokemonNames]);
 
   const handleScroll = useCallback(() => {
@@ -134,21 +133,17 @@ const PokedexPage: NextPage = () => {
   }, [handleScroll]);
 
   useEffect(() => {
-    // After displayCount updates and potentially new items are rendered
     if (isLoadingMore) {
-      // Simulate a brief loading period or wait for actual data fetching if it were async
       const timer = setTimeout(() => {
         setIsLoadingMore(false);
-      }, 300); // Adjust timeout as needed
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [displayCount, isLoadingMore]);
 
-
   const pokedexStats = useMemo(() => {
     if (!isClient) return { collected: 0, total: 0, percentage: 0, regionDisplayText: "All Regions" };
     
-    // Stats should be based on the total number of Pokémon matching the filters, not just the displayed ones.
     const totalPokemonInCurrentFilteredView = filteredPokemon.length;
     const collectedInCurrentFilteredView = filteredPokemon.filter(p => collectedPokemonNames.has(p.name.toLowerCase())).length;
     
@@ -158,7 +153,7 @@ const PokedexPage: NextPage = () => {
     if (selectedRegions.size === 1) {
       regionText = Array.from(selectedRegions)[0];
     } else if (selectedRegions.size > 1) {
-      regionText = `${selectedRegions.size} Regions`;
+      regionText = `${selectedRegions.size} Regions Selected`;
     }
 
     return {
@@ -171,7 +166,7 @@ const PokedexPage: NextPage = () => {
 
   const handleRegionButtonClick = (regionName: string | null) => {
     const newSelectedRegions = new Set(selectedRegions);
-    if (regionName === null) { // "All Regions" button
+    if (regionName === null) {
       newSelectedRegions.clear();
     } else {
       if (newSelectedRegions.has(regionName)) {
@@ -183,8 +178,7 @@ const PokedexPage: NextPage = () => {
     setSelectedRegions(newSelectedRegions);
   };
 
-
-  if (!isClient || isLoading) {
+  if (!isClient && isLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -200,33 +194,15 @@ const PokedexPage: NextPage = () => {
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto px-4 md:px-8 pt-4 pb-8">
-        <div className="sticky top-[calc(var(--header-height,4rem)+0.5rem)] md:top-[calc(var(--header-height,4rem)+1rem)] z-30 bg-background/95 backdrop-blur-sm p-4 mb-6 shadow-lg rounded-lg border border-border">
-          <div className="flex flex-col gap-4">
-            {/* Row 1: Title and Stats */}
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-4">
-              <h2 className="text-3xl font-headline font-semibold text-primary flex items-center gap-2">
-                <ListChecks className="h-8 w-8" /> Pokédex
-              </h2>
-              {isClient && (
-                <div className="flex flex-col items-start sm:items-end text-left sm:text-right space-y-1 w-full sm:w-auto max-w-xs sm:max-w-sm md:max-w-md">
-                    <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground w-full justify-start sm:justify-end">
-                    <Trophy className="h-4 w-4 text-accent flex-shrink-0" />
-                    <span className="truncate">
-                        Pokédex Completion ({pokedexStats.regionDisplayText}
-                        {showOnlyCollected && collectedPokemonNames.size > 0 && filteredPokemon.length > 0 ? ", Collected Only" : ""}):
-                    </span>
-                    <span className="font-semibold text-foreground ml-1 whitespace-nowrap">
-                        {pokedexStats.collected}/{pokedexStats.total} ({pokedexStats.percentage}%)
-                    </span>
-                    </div>
-                    <Progress value={pokedexStats.percentage} className="h-2 [&>div]:bg-accent w-full" />
-                </div>
-              )}
-            </div>
-
-            {/* Row 2: Search and "Show Collected" Switch */}
-            <div className="flex flex-col md:flex-row gap-4 items-center">
-              <div className="relative flex-grow w-full">
+        <div className="sticky top-[calc(var(--header-height,4rem)+0.5rem)] md:top-[calc(var(--header-height,4rem)+1rem)] z-30 bg-background/95 backdrop-blur-sm p-4 mb-6 shadow-lg rounded-lg border border-border flex flex-col gap-4">
+          {/* Row 1: Title, Search, and "Show Collected" Switch */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h2 className="text-3xl font-headline font-semibold text-primary flex items-center gap-2 whitespace-nowrap">
+              <ListChecks className="h-8 w-8" /> Pokédex
+            </h2>
+            {/* Combined Search and Switch */}
+            <div className="flex flex-col md:flex-row gap-4 items-center w-full flex-1 min-w-0">
+              <div className="relative flex-grow w-full md:max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
@@ -250,33 +226,52 @@ const PokedexPage: NextPage = () => {
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Row 3: Region Filters */}
-            <div>
-              <p className="mb-2 text-sm font-medium text-muted-foreground">Filter by Region:</p>
-              <div className="flex flex-wrap gap-2">
+          {/* Row 2: Region Filters */}
+          <div>
+            <p className="mb-2 text-sm font-medium text-muted-foreground">Filter by Region:</p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={selectedRegions.size === 0 ? "default" : "outline"}
+                onClick={() => handleRegionButtonClick(null)}
+                className={cn(selectedRegions.size === 0 && "ring-2 ring-primary-foreground dark:ring-primary ring-offset-1 ring-offset-background")}
+              >
+                All Regions
+              </Button>
+              {regions.map((region) => (
                 <Button
+                  key={region.name}
                   size="sm"
-                  variant={selectedRegions.size === 0 ? "default" : "outline"}
-                  onClick={() => handleRegionButtonClick(null)}
-                  className={cn(selectedRegions.size === 0 && "ring-2 ring-primary-foreground dark:ring-primary ring-offset-1 ring-offset-background")}
+                  variant={selectedRegions.has(region.name) ? "default" : "outline"}
+                  onClick={() => handleRegionButtonClick(region.name)}
+                  className={cn(selectedRegions.has(region.name) && "ring-2 ring-primary-foreground dark:ring-primary ring-offset-1 ring-offset-background")}
                 >
-                  All Regions
+                  {region.name}
                 </Button>
-                {regions.map((region) => (
-                  <Button
-                    key={region.name}
-                    size="sm"
-                    variant={selectedRegions.has(region.name) ? "default" : "outline"}
-                    onClick={() => handleRegionButtonClick(region.name)}
-                    className={cn(selectedRegions.has(region.name) && "ring-2 ring-primary-foreground dark:ring-primary ring-offset-1 ring-offset-background")}
-                  >
-                    {region.name}
-                  </Button>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
+
+          {/* Row 3 (Bottom): Pokédex Completion Stats */}
+          {isClient && (
+            <div className="w-full border-t border-border/50 pt-3 mt-1"> {/* Added mt-1 for slight separation from gap-4 of parent */}
+              <div className="flex flex-col items-start sm:items-end text-left sm:text-right space-y-1">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground w-full justify-start sm:justify-end">
+                  <Trophy className="h-4 w-4 text-accent flex-shrink-0" />
+                  <span className="truncate">
+                      Pokédex Completion ({pokedexStats.regionDisplayText}
+                      {showOnlyCollected && collectedPokemonNames.size > 0 && filteredPokemon.length > 0 ? ", Collected Only" : ""}):
+                  </span>
+                  <span className="font-semibold text-foreground ml-1 whitespace-nowrap">
+                      {pokedexStats.collected}/{pokedexStats.total} ({pokedexStats.percentage}%)
+                  </span>
+                </div>
+                <Progress value={pokedexStats.percentage} className="h-2 [&>div]:bg-accent w-full" />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-2 pb-4 px-1">
@@ -288,7 +283,7 @@ const PokedexPage: NextPage = () => {
                   <TooltipTrigger asChild>
                     <Link href={`/pokedex/${encodeURIComponent(pokemon.name.toLowerCase())}`} passHref legacyBehavior>
                       <a className="block group">
-                        <div // Changed from Card to div for simpler structure if Card isn't strictly needed
+                        <div
                           className={cn(
                             "bg-card hover:shadow-primary/20 hover:border-primary border border-border transition-all duration-300 ease-in-out transform hover:scale-105",
                             "group-hover:z-10 relative overflow-hidden aspect-square rounded-md"
@@ -358,5 +353,4 @@ const PokedexPage: NextPage = () => {
 };
 
 export default PokedexPage;
-
     
