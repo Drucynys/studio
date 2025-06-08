@@ -12,15 +12,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Camera, ImageUp, AlertCircle, ScanText } from "lucide-react";
+import { Loader2, Camera, ImageUp, AlertCircle, ScanText, ZoomIn, ZoomOut, Maximize } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Tesseract from 'tesseract.js';
+import { cn } from "@/lib/utils";
 
 export interface OcrScanOutput {
   name?: string;
   set?: string;
   cardNumber?: string;
-  rarity?: string; 
+  rarity?: string;
   imageDataUri: string;
 }
 
@@ -42,6 +43,13 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const tesseractWorkerRef = useRef<Tesseract.Worker | null>(null);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+
+  const [zoomSupported, setZoomSupported] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(1);
+  const [minZoom, setMinZoom] = useState(1);
+  const [maxZoom, setMaxZoom] = useState(1);
+  const [stepZoom, setStepZoom] = useState(0.1);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -51,6 +59,8 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+    videoTrackRef.current = null;
+    setZoomSupported(false);
   }, []);
 
   const initializeTesseract = useCallback(async () => {
@@ -62,7 +72,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
             setOcrStatus(m.status);
           } else if(m.status) {
             setOcrStatus(m.status);
-            setOcrProgress(0); // Reset progress for other statuses
+            setOcrProgress(0);
           }
         },
       });
@@ -86,7 +96,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     }
 
     return () => {
-      if (tesseractWorkerRef.current && !isOpen) { 
+      if (tesseractWorkerRef.current && !isOpen) {
         tesseractWorkerRef.current.terminate();
         tesseractWorkerRef.current = null;
       }
@@ -103,8 +113,10 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: "environment",
-            // @ts-ignore TS might not know about focusMode in default MediaTrackConstraints
-            focusMode: "continuous" 
+            // @ts-ignore
+            focusMode: "continuous",
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -113,12 +125,31 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+
+        const track = stream.getVideoTracks()[0];
+        videoTrackRef.current = track;
+        // @ts-ignore
+        const capabilities = track.getCapabilities?.();
+        if (capabilities?.zoom) {
+          setZoomSupported(true);
+          // @ts-ignore
+          setMinZoom(capabilities.zoom.min || 1);
+          // @ts-ignore
+          setMaxZoom(capabilities.zoom.max || 1);
+          // @ts-ignore
+          setStepZoom(capabilities.zoom.step || 0.1);
+          // @ts-ignore
+          setCurrentZoom(track.getSettings?.()?.zoom || 1);
+        } else {
+          setZoomSupported(false);
+        }
+
       } catch (err) {
         console.error("Error accessing camera:", err);
         let errorMessage = "Camera access denied. Please enable camera permissions in your browser settings.";
         if (err instanceof Error && err.name === "OverconstrainedError") {
-            errorMessage = "Could not apply advanced camera settings (e.g., focus). Trying with basic settings. If focus issues persist, your device might not support software-controlled focus for this camera."
-            console.warn("OverconstrainedError, attempting fallback without focusMode");
+            errorMessage = "Could not apply advanced camera settings. Trying with basic settings."
+            console.warn("OverconstrainedError, attempting fallback without focusMode/resolution");
             try {
                 const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }});
                 streamRef.current = fallbackStream;
@@ -126,15 +157,17 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
                 if (videoRef.current) {
                     videoRef.current.srcObject = fallbackStream;
                 }
+                videoTrackRef.current = fallbackStream.getVideoTracks()[0];
+                // No zoom check for fallback for simplicity, can be added if needed
+                setZoomSupported(false);
                 toast({
                     variant: "default",
                     title: "Camera Initialized (Fallback)",
-                    description: "Advanced focus settings not supported by device, using basic camera mode."
+                    description: "Using basic camera mode."
                 });
-                return; // Successfully got stream with fallback
+                return;
             } catch (fallbackErr) {
                  console.error("Fallback camera access also failed:", fallbackErr);
-                 // Let the original error message for permission be shown
             }
         }
 
@@ -152,6 +185,24 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     getCameraPermission();
   }, [isOpen, toast]);
 
+  const handleZoom = async (direction: 'in' | 'out') => {
+    if (!videoTrackRef.current || !zoomSupported) return;
+    let newZoom = currentZoom;
+    if (direction === 'in') {
+      newZoom = Math.min(maxZoom, currentZoom + stepZoom);
+    } else {
+      newZoom = Math.max(minZoom, currentZoom - stepZoom);
+    }
+    try {
+      // @ts-ignore
+      await videoTrackRef.current.applyConstraints({ advanced: [{ zoom: newZoom }] });
+      setCurrentZoom(newZoom);
+    } catch (e) {
+      console.error("Error applying zoom:", e);
+      toast({ variant: "destructive", title: "Zoom Error", description: "Could not change zoom level." });
+    }
+  };
+
   const parseOcrText = (text: string): Partial<OcrScanOutput> => {
     const originalLines = text.split('\n');
     const lines = originalLines.map(line => line.trim()).filter(line => line.length > 1);
@@ -161,12 +212,12 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     let rarity: string | undefined;
 
     const cardNumberRegexPatterns = [
-        /\b\d{1,3}\s*\/\s*\d{1,3}\b/i,
-        /\b[A-Za-z]{2,6}\s?\d{1,3}[a-zA-Z]?\b/i,
-        /\b(?:TG|GG)\d{1,2}\s*\/\s*(?:TG|GG)\d{1,2}\b/i,
-        /\b\d{3}\/\d{3}\b/i,
+        /\b\d{1,3}\s*\/\s*\d{1,3}\b/i, // e.g., 64/102
+        /\b[A-Za-z]{2,6}\s?\d{1,3}[a-zA-Z]?\b/i, // e.g., SM123a, SWSH001
+        /\b(?:TG|GG)\d{1,2}\s*\/\s*(?:TG|GG)\d{1,2}\b/i, // e.g., TG01/TG30
+        /\b\d{3}\/\d{3}\b/i, // Strict 3 digits / 3 digits for some sets
     ];
-    
+
     for (let i = lines.length - 1; i >= 0; i--) {
         for (const regex of cardNumberRegexPatterns) {
             const match = lines[i].match(regex);
@@ -177,10 +228,10 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         }
         if (cardNumber) break;
     }
-    if (!cardNumber) {
+    if (!cardNumber) { // Fallback for less specific numbers, typically near the bottom
         for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
             const generalNumberMatch = lines[i].match(/\b(?:\d{1,3}[a-zA-Z]?|[A-Za-z]+\d{1,3})\b/);
-            if (generalNumberMatch && lines[i].length < 10) {
+            if (generalNumberMatch && lines[i].length < 10) { // Short lines are more likely card numbers
                 cardNumber = generalNumberMatch[0];
                 break;
             }
@@ -188,38 +239,42 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     }
 
     const commonNonNameKeywords = [
-        'basic', 'stage 1', 'stage 2', 'vmax', 'vstar', ' tera', 'radiant',
-        'hp', 'weakness', 'resistance', 'retreat cost', 
+        'basic', 'stage 1', 'stage 2', 'vmax', 'vstar', ' tera', 'radiant', 'ex', 'gx',
+        'hp', 'weakness', 'resistance', 'retreat cost',
         'pokémon tool', 'item', 'supporter', 'stadium', 'energy',
-        'evolves from', 'no.', 'illus.'
+        'evolves from', 'no.', 'illus.', 'ability:', 'poké-power', 'poké-body'
     ];
     const potentialNameLines: string[] = [];
-    for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    for (let i = 0; i < Math.min(lines.length, 5); i++) { // Look in top lines for name
         const line = lines[i];
         const lowerLine = line.toLowerCase();
+        // Basic checks: reasonable length, not just numbers, not a common non-name keyword
         if (line.length >= 3 && line.length <= 40 &&
-            !/\d/.test(line.substring(line.length - 3)) && 
+            !/\d/.test(line.substring(line.length - 3)) && // Doesn't end with numbers (like HP)
             !commonNonNameKeywords.some(keyword => lowerLine.includes(keyword)) &&
-            !cardNumberRegexPatterns.some(regex => regex.test(line))
+            !cardNumberRegexPatterns.some(regex => regex.test(line)) // Not a card number pattern
         ) {
-            let cleanedLine = line.replace(/\s*HP\s*\d+\s*$/, "").trim();
-            if (/^\d+$/.test(cleanedLine)) continue;
+            let cleanedLine = line.replace(/\s*HP\s*\d+\s*$/, "").trim(); // Remove HP if it's at the end
+             cleanedLine = cleanedLine.replace(/^[A-Z\s]+ Energy$/i, "").trim(); // Remove "Fire Energy" etc.
+            if (/^\d+$/.test(cleanedLine) || cleanedLine.length < 2) continue; // Skip if only numbers or too short
             potentialNameLines.push(cleanedLine);
         }
     }
 
     if (potentialNameLines.length > 0) {
+      // Prefer longer lines, or lines ending with V, VMAX etc. as they are often part of name
         potentialNameLines.sort((a, b) => {
-            const aEndsWithV = /\sV$/.test(a);
-            const bEndsWithV = /\sV$/.test(b);
-            if (aEndsWithV && !bEndsWithV) return 1;
-            if (!aEndsWithV && bEndsWithV) return -1;
-            return b.length - a.length; 
+            const aSpecialSuffix = /\s(V|VMAX|VSTAR|GX|EX)$/i.test(a);
+            const bSpecialSuffix = /\s(V|VMAX|VSTAR|GX|EX)$/i.test(b);
+            if (aSpecialSuffix && !bSpecialSuffix) return -1; // Prioritize A if it has suffix
+            if (!aSpecialSuffix && bSpecialSuffix) return 1;  // Prioritize B if it has suffix
+            return b.length - a.length; // Fallback to length
         });
         name = potentialNameLines[0];
 
+        // Further clean name if known type keywords are appended/prepended
         if (name) {
-            const typeKeywords = ["Basic", "Stage 1", "Stage 2", "VMAX", "VSTAR", "Radiant", "Tera"];
+            const typeKeywords = ["Basic", "Stage 1", "Stage 2", "VMAX", "VSTAR", "Radiant", "Tera", "ex", "GX"];
             for (const keyword of typeKeywords) {
                 if (name.toUpperCase().endsWith(" " + keyword.toUpperCase())) {
                     name = name.substring(0, name.length - (keyword.length + 1)).trim();
@@ -232,37 +287,52 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
             }
         }
     }
-    
+
     const rarityKeywords: { [key: string]: string } = {
-        ' C ': 'Common', ' U ': 'Uncommon', ' R ': 'Rare', 
+        ' C ': 'Common', ' U ': 'Uncommon', ' R ': 'Rare',
         'COMMON': 'Common', 'UNCOMMON': 'Uncommon', 'RARE': 'Rare',
-        'Holo Rare': 'Holo Rare', 'Reverse Holo': 'Reverse Holo',
-        'Ultra Rare': 'Ultra Rare', 'Secret Rare': 'Secret Rare',
+        'Holo Rare': 'Holo Rare', 'Reverse Holo': 'Reverse Holo', 'Holo': 'Holo Rare',
+        'Ultra Rare': 'Ultra Rare', 'Secret Rare': 'Secret Rare', 'Hyper Rare': 'Hyper Rare',
+        'Amazing Rare': 'Amazing Rare', 'Radiant': 'Radiant Rare', 'Illustration Rare': 'Illustration Rare',
+        'Special Illustration Rare': 'Special Illustration Rare', 'Double Rare': 'Double Rare',
         'Promo': 'Promo',
     };
-    for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
-        const lineUpper = lines[i].toUpperCase();
-        for (const keyword in rarityKeywords) {
-            if (lineUpper.includes(keyword)) {
-                rarity = rarityKeywords[keyword];
-                break;
-            }
-        }
-        if (rarity) break;
-    }
+     // Attempt to find rarity symbol near card number if present
     if (cardNumber) {
         const cardNumberLineIndex = lines.findIndex(line => line.includes(cardNumber!));
         if (cardNumberLineIndex !== -1) {
-            const parts = lines[cardNumberLineIndex].split(/[\s\/]+/); 
-            const singleLetterRarity = parts.find(p => p.length === 1 && "CURS".includes(p.toUpperCase()));
-            if (singleLetterRarity) {
-                if (singleLetterRarity.toUpperCase() === 'C') rarity = 'Common';
-                else if (singleLetterRarity.toUpperCase() === 'U') rarity = 'Uncommon';
-                else if (singleLetterRarity.toUpperCase() === 'R') rarity = 'Rare';
+            // Look for single character C, U, R, P (Promo), S (Shiny/Secret) near the number
+            const lineWithNumber = lines[cardNumberLineIndex];
+            const partsAroundNumber = lineWithNumber.split(cardNumber!);
+            const textAfterNumber = partsAroundNumber[1] || "";
+            const textBeforeNumber = partsAroundNumber[0] || "";
+
+            const symbolRegex = /\b([CURPSATH])\b/i; // Common, Uncommon, Rare, Promo, Shiny/Secret/Special, Trainer/Hyper, Holo
+            let match = textAfterNumber.trim().match(symbolRegex) || textBeforeNumber.trim().match(symbolRegex);
+            if (match && match[1]) {
+                const sym = match[1].toUpperCase();
+                if (sym === 'C') rarity = 'Common';
+                else if (sym === 'U') rarity = 'Uncommon';
+                else if (sym === 'R') rarity = 'Rare';
+                else if (sym === 'P') rarity = 'Promo';
+                else if (sym === 'S') rarity = 'Secret Rare'; // Or Special Art
+                else if (sym === 'H') rarity = 'Holo Rare';
             }
         }
     }
-
+    // If not found by symbol, check keywords in bottom lines
+    if (!rarity) {
+        for (let i = Math.max(0, lines.length - 5); i < lines.length; i++) {
+            const lineUpper = lines[i].toUpperCase();
+            for (const keyword in rarityKeywords) {
+                if (lineUpper.includes(keyword)) {
+                    rarity = rarityKeywords[keyword];
+                    break;
+                }
+            }
+            if (rarity) break;
+        }
+    }
     return { name, cardNumber, rarity };
   };
 
@@ -294,7 +364,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
       const worker = tesseractWorkerRef.current;
       const { data: { text } } = await worker.recognize(imageDataUri);
       setOcrStatus("OCR Complete");
-      
+
       const parsedData = parseOcrText(text);
 
       toast({
@@ -302,21 +372,21 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         description: `Parsed: Name: ${parsedData.name || 'N/A'}, #: ${parsedData.cardNumber || 'N/A'}, Rarity: ${parsedData.rarity || 'N/A'}. Please verify.`,
         duration: 8000,
       });
-      
+
       onScanComplete({ ...parsedData, imageDataUri });
 
     } catch (e) {
       console.error("Error during OCR processing:", e);
       setError(e instanceof Error ? e.message : "An unknown error occurred during OCR.");
       toast({ variant: "destructive", title: "OCR Error", description: e instanceof Error ? e.message : "Failed to process image with OCR." });
-      onScanComplete({ imageDataUri }); // Fallback: send only image data
+      onScanComplete({ imageDataUri });
     } finally {
       setIsCapturing(false);
       setOcrProgress(0);
       setOcrStatus(null);
     }
   };
-  
+
   const handleDialogClose = () => {
     stopCamera();
     onClose();
@@ -328,14 +398,29 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><ScanText className="h-6 w-6 text-primary" /> Card Scanner (OCR)</DialogTitle>
           <DialogDescription>
-            Position your Pokémon card clearly in the frame. Good lighting and focus are key.
-            The app will attempt to read text from the card. Results may vary.
+            Position card in the guide. Use zoom if needed. Good lighting and focus are key.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 my-4">
-          <div className="w-full aspect-video bg-muted rounded-md overflow-hidden relative">
+          <div className="w-full aspect-video bg-muted rounded-md overflow-hidden relative group">
             <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
+
+            {/* Alignment Guide Overlay */}
+            <div className={cn(
+              "absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300",
+              isCapturing ? "opacity-0" : "opacity-100"
+            )}>
+              <div
+                className="w-[60%] aspect-[2.5/3.5] border-2 border-dashed border-background/70 rounded-lg shadow-lg"
+                style={{
+                  // Standard Pokémon card aspect ratio is approx 2.5 x 3.5 inches
+                  // This overlay attempts to match that ratio
+                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.3)', // Creates the 'cutout' effect
+                }}
+              />
+            </div>
+
             {hasCameraPermission === null && (
                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                     <Loader2 className="h-8 w-8 animate-spin text-white" />
@@ -352,6 +437,32 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
                 </div>
               </div>
             )}
+
+            {/* Zoom Controls - only show if camera is active and not capturing */}
+            {zoomSupported && hasCameraPermission && !isCapturing && (
+              <div className="absolute bottom-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => handleZoom('in')}
+                  disabled={currentZoom >= maxZoom}
+                  className="rounded-full h-10 w-10 shadow-md"
+                  aria-label="Zoom In"
+                >
+                  <ZoomIn className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => handleZoom('out')}
+                  disabled={currentZoom <= minZoom}
+                  className="rounded-full h-10 w-10 shadow-md"
+                  aria-label="Zoom Out"
+                >
+                  <ZoomOut className="h-5 w-5" />
+                </Button>
+              </div>
+            )}
           </div>
           <canvas ref={canvasRef} style={{ display: "none" }} />
 
@@ -362,7 +473,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-           {error && !isCapturing && hasCameraPermission && ( 
+           {error && !isCapturing && hasCameraPermission && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>OCR Error</AlertTitle>
@@ -375,8 +486,8 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
           <Button variant="outline" onClick={handleDialogClose} disabled={isCapturing}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleCaptureAndScan} 
+          <Button
+            onClick={handleCaptureAndScan}
             disabled={!hasCameraPermission || isCapturing}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
@@ -392,6 +503,3 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     </Dialog>
   );
 }
-    
-
-    
