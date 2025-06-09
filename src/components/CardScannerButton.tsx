@@ -1,6 +1,9 @@
 
 "use client";
 
+// This component is no longer used in the main card adding flow as of image upload feature.
+// Keeping the file for now in case direct camera scanning is revisited.
+
 import { Button } from "@/components/ui/button";
 import { ScanLine } from "lucide-react";
 
@@ -18,7 +21,7 @@ export function CardScannerButton({ onScanClick, disabled }: CardScannerButtonPr
       disabled={disabled}
     >
       <ScanLine className="mr-2 h-4 w-4" />
-      Scan Card with Camera
+      Scan Card with Camera (Legacy)
     </Button>
   );
 }

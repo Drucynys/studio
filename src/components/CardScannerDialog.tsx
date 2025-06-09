@@ -1,6 +1,10 @@
 
 "use client";
 
+// This component is no longer used in the main card adding flow as of image upload feature.
+// Keeping the file for now in case direct camera scanning is revisited, but its functionality
+// is replaced by the image upload and AI identification flow.
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Dialog,
@@ -12,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Camera, ImageUp, AlertCircle, ScanText, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, Camera, ImageUp, AlertCircle, ScanText, ZoomIn, ZoomOut, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Tesseract from 'tesseract.js';
 import { cn } from "@/lib/utils";
@@ -102,7 +106,6 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     }
 
     return () => {
-      // Ensure termination if component unmounts while open or if it was initialized for this open state
       if (tesseractWorkerRef.current && (!isOpen || (isOpen && tesseractWorkerRef.current))) { 
         tesseractWorkerRef.current.terminate();
         tesseractWorkerRef.current = null;
@@ -116,7 +119,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
 
     const getCameraPermission = async () => {
       setError(null);
-      setHasCameraPermission(null); // Reset permission state on open
+      setHasCameraPermission(null); 
       try {
         const constraints: MediaStreamConstraints = {
           video: {
@@ -143,7 +146,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
           // @ts-ignore
           setMinZoom(capabilities.zoom.min || 1);
           // @ts-ignore
-          setMaxZoom(Math.min(capabilities.zoom.max || 10, 10)); // Cap max zoom for sanity
+          setMaxZoom(Math.min(capabilities.zoom.max || 10, 10)); 
           // @ts-ignore
           setStepZoom(capabilities.zoom.step || 0.1);
           // @ts-ignore
@@ -167,7 +170,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
                     videoRef.current.srcObject = fallbackStream;
                 }
                 videoTrackRef.current = fallbackStream.getVideoTracks()[0];
-                setZoomSupported(false); // No zoom check for fallback, assume not supported
+                setZoomSupported(false); 
                 toast({
                     variant: "default",
                     title: "Camera Initialized (Fallback)",
@@ -204,7 +207,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
     } else {
       newZoom = Math.max(minZoom, currentZoom - stepZoom);
     }
-    newZoom = parseFloat(newZoom.toFixed(2)); // Ensure newZoom is a reasonable number
+    newZoom = parseFloat(newZoom.toFixed(2)); 
 
     try {
       // @ts-ignore
@@ -407,6 +410,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><ScanText className="h-6 w-6 text-primary" /> Card Scanner (OCR)</DialogTitle>
           <DialogDescription>
+            This component is no longer primary. Use image upload on the Add Card page. <br/>
             Position card in the guide. Use zoom if needed. Good lighting and focus are key.
           </DialogDescription>
         </DialogHeader>
@@ -422,7 +426,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
               <div
                 className="w-[60%] aspect-[2.5/3.5] border-2 border-dashed border-background/70 rounded-lg"
                 style={{
-                  boxShadow: '0 0 0 9999px rgba(0,0,0,0.3)', 
+                  boxShadow: '0 0 0 9999px hsla(0, 0%, 0%, 0.3)', 
                 }}
               />
             </div>
@@ -478,7 +482,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-           {error && !isCapturing && hasCameraPermission && ( // Show OCR error if camera is fine but OCR fails
+           {error && !isCapturing && hasCameraPermission && ( 
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>OCR Error</AlertTitle>
@@ -493,15 +497,15 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
           </Button>
           <Button
             onClick={handleCaptureAndScan}
-            disabled={!hasCameraPermission || isCapturing || !!error && !isCapturing && hasCameraPermission === null }
+            disabled={!hasCameraPermission || isCapturing || (!!error && !isCapturing && hasCameraPermission === null) }
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
           >
             {isCapturing ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <ImageUp className="mr-2 h-4 w-4" />
+              <Camera className="mr-2 h-4 w-4" /> // Changed icon
             )}
-            {isCapturing ? (ocrStatus || "Processing...") : "Capture & Scan Card"}
+            {isCapturing ? (ocrStatus || "Processing...") : "Capture & Scan Card (Legacy)"}
           </Button>
         </DialogFooter>
       </DialogContent>
