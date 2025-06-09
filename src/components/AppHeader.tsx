@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch, LayoutList, PlusSquare, ListChecks } from "lucide-react";
+import { PackageSearch, LayoutList, PlusSquare, Target } from "lucide-react"; // Changed ListChecks to Target
 
 export function AppHeader() {
   return (
@@ -37,7 +37,7 @@ export function AppHeader() {
           </Link>
            <Link href="/pokedex" passHref legacyBehavior>
             <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground px-2 md:px-3">
-              <ListChecks className="mr-0 md:mr-2 h-5 w-5" />
+              <Target className="mr-0 md:mr-2 h-5 w-5" /> {/* Changed ListChecks to Target */}
               <span className="hidden md:inline">Pokédex</span>
             </Button>
           </Link>
