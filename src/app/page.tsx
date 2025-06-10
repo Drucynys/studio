@@ -31,7 +31,7 @@ export default function Home() {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8 space-y-10">
         
-        <section id="welcome" aria-labelledby="welcome-heading" className="text-center py-12 bg-card shadow-lg rounded-lg">
+        <section id="welcome" aria-labelledby="welcome-heading" className="text-center p-10 bg-card shadow-lg rounded-lg">
           <h1 id="welcome-heading" className="text-4xl font-headline font-bold mb-4 text-primary">Welcome to Pokédex Tracker!</h1>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
             Your ultimate companion for managing your Pokémon card collection. Easily add, view, and browse sets.
