@@ -24,8 +24,8 @@ interface PokemonDetailPageProps {
 }
 
 const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
-  const resolvedParams = use(params); 
-  const rawPokemonNameFromParams = resolvedParams.pokemonName; 
+  // Directly destructure pokemonName from the resolved params
+  const { pokemonName: rawPokemonNameFromParams } = use(params); 
 
   const [pokemonName, setPokemonName] = useState<string>("");
   const [initializationError, setInitializationError] = useState<string | null>(null);
@@ -98,7 +98,7 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
         setPokemonDetails(null);
       }
       setIsLoadingDetails(false);
-    } else if (!rawPokemonNameFromParams) {
+    } else if (!rawPokemonNameFromParams) { // Changed from !params.pokemonName to check rawPokemonNameFromParams
         setIsLoadingDetails(false);
     }
   }, [pokemonName, initializationError, rawPokemonNameFromParams]);
@@ -162,6 +162,7 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
       value: valueForCollection,
       imageUrl: selectedApiCard.images.large,
       quantity: quantity,
+      language: "English", // Defaulting to English for cards from this page
     };
     try {
       const currentStoredCardsRaw = localStorage.getItem("pokemonCards");
@@ -171,7 +172,8 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
                 item.set === newCard.set &&
                 item.cardNumber === newCard.cardNumber &&
                 item.variant === newCard.variant &&
-                item.condition === newCard.condition
+                item.condition === newCard.condition &&
+                item.language === newCard.language
       );
       if (existingCardIndex > -1) {
          currentStoredCards[existingCardIndex].quantity += newCard.quantity;
@@ -337,7 +339,8 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
                             (collected) =>
                             collected.name === card.name &&
                             collected.set === card.set.name &&
-                            collected.cardNumber === card.number
+                            collected.cardNumber === card.number &&
+                            collected.language === "English" // Check language here
                         );
                         return (
                             <Card
@@ -407,3 +410,5 @@ const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
 };
 
 export default PokemonDetailPage;
+
+    
