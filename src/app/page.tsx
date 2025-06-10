@@ -36,14 +36,14 @@ export default function Home() {
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
             Your ultimate companion for managing your Pokémon card collection. Easily add, view, and browse sets.
           </p>
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
             <Link href="/my-collection" passHref legacyBehavior>
-              <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto">
                 <BookOpen className="mr-2" /> View My Collection
               </Button>
             </Link>
             <Link href="/add-card" passHref legacyBehavior>
-              <Button variant="outline" size="lg">
+              <Button variant="outline" size="lg" className="w-full sm:w-auto">
                 <PlusSquare className="mr-2" /> Add New Card
               </Button>
             </Link>
