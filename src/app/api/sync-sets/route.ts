@@ -79,12 +79,12 @@ export async function POST() {
     // Check 7: Perform a test read from Firestore
     logs.push("- Performing Final Pre-flight Check -");
     try {
-        await db.collection('__test_collection__').limit(1).get();
-        logs.push("✅ [Check 7] Successfully connected to Firestore and performed a test read.");
-    } catch (e: any) {
-        logs.push(`❌ [Check 7] FATAL: Test read from Firestore FAILED. This is the root cause. Error: ${e.message}`);
-        throw new Error(`Firestore test read failed: ${e.message}`);
-    }
+      await db.collection('pokemon-tcg-sets').limit(1).get();
+      logs.push("✅ [Check 7] Successfully connected to Firestore and performed a test read.");
+  } catch (e: any) {
+      logs.push(`❌ [Check 7] FATAL: Test read from Firestore FAILED. This is the root cause. Error: ${e.message}`);
+      throw new Error(`Firestore test read failed: ${e.message}`);
+  }
     
     logs.push("- Checklist Complete. Starting Main Operation -");
     
