@@ -22,7 +22,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input"; // Added Input
 import type { ApiPokemonCard as PokemonTcgApiCard } from "@/app/sets/[setId]/page";
-import { Tag, Gem, DollarSign, Layers, Eye } from "lucide-react"; // Added Layers, Eye
+import { Tag, Gem, DollarSign, Layers, Eye, Paintbrush, Hash } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,7 @@ type AddCardToCollectionDialogProps = {
   initialCardImageUrl?: string | null;
   availableConditions: string[];
   pokemonTcgApiCard: PokemonTcgApiCard | null;
-  onAddCard: (condition: string, value: number, variant?: string, quantity: number) => void; // Updated quantity type
+  onAddCard: (condition: string, value: number, variant?: string, quantity?: number) => void; // Updated quantity type
 };
 
 export function AddCardToCollectionDialog({
@@ -68,7 +68,6 @@ export function AddCardToCollectionDialog({
   const [quantityInput, setQuantityInput] = useState<number>(1); // Added quantity state
   const [finalDisplayImageUrl, setFinalDisplayImageUrl] = useState<string>("https://placehold.co/200x280.png");
   const [displayPrices, setDisplayPrices] = useState<DisplayPriceInfo[]>([]);
-  const [cardRarity, setCardRarity] = useState<string | null>(null);
   
   const [currentAvailableVariants, setCurrentAvailableVariants] = useState<string[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<string>("");
@@ -81,7 +80,6 @@ export function AddCardToCollectionDialog({
       setSelectedCondition("");
       setQuantityInput(1); // Reset quantity
       setDisplayPrices([]);
-      setCardRarity(null);
       setFinalDisplayImageUrl("https://placehold.co/200x280.png");
       setCurrentAvailableVariants([]);
       setSelectedVariant("");
@@ -92,11 +90,9 @@ export function AddCardToCollectionDialog({
     let imageUrlToSet = "https://placehold.co/200x280.png/CCCCCC/333333?text=Loading...";
     const newPrices: DisplayPriceInfo[] = [];
     const pricedVariants: string[] = [];
-    setCardRarity(null);
 
     if (pokemonTcgApiCard?.tcgplayer?.prices) {
       imageUrlToSet = pokemonTcgApiCard.images.large || initialCardImageUrl || "https://placehold.co/200x280.png";
-      setCardRarity(pokemonTcgApiCard.rarity || "N/A");
       
       const prices = pokemonTcgApiCard.tcgplayer.prices;
       const sortedPriceKeys = Object.keys(prices).sort((a,b) => {
@@ -170,7 +166,26 @@ export function AddCardToCollectionDialog({
         <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add "{cardName}" to Collection</DialogTitle>
-            {cardRarity && <DialogDescription>Rarity: <Badge variant="secondary">{cardRarity}</Badge></DialogDescription>}
+             <DialogDescription className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm pt-1">
+              {pokemonTcgApiCard?.rarity && (
+                <span className="flex items-center gap-1.5">
+                  <Gem className="h-4 w-4 text-amber-500" />
+                  <strong>Rarity:</strong> <Badge variant="secondary">{pokemonTcgApiCard.rarity}</Badge>
+                </span>
+              )}
+              {pokemonTcgApiCard?.number && pokemonTcgApiCard.set.printedTotal > 0 && (
+                <span className="flex items-center gap-1.5">
+                  <Hash className="h-4 w-4 text-slate-500" />
+                  <strong>Number:</strong> <Badge variant="outline">{pokemonTcgApiCard.number} / {pokemonTcgApiCard.set.printedTotal}</Badge>
+                </span>
+              )}
+              {pokemonTcgApiCard?.artist && (
+                <span className="flex items-center gap-1.5">
+                  <Paintbrush className="h-4 w-4 text-rose-500" />
+                  <strong>Artist:</strong> <Badge variant="outline">{pokemonTcgApiCard.artist}</Badge>
+                </span>
+              )}
+            </DialogDescription>
           </DialogHeader>
 
           <ScrollArea className="max-h-[75vh] md:max-h-[80vh] pr-6">

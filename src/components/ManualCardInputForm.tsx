@@ -23,11 +23,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { PokemonCard } from "@/types";
-import type { OcrScanOutput } from "@/components/CardScannerDialog"; // Changed from ScanCardOutput
+//import type { OcrScanOutput } from "@/components/CardScannerDialog"; // Changed from ScanCardOutput
 import { FilePlus, Loader2, Layers, Languages } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
+import type { FindCardOutput } from "@/ai/flows/find-card-by-image-flow";
 
 const formSchema = z.object({
   selectedSetId: z.string().min(1, "Set is required"),
@@ -39,7 +40,7 @@ const formSchema = z.object({
 
 type ManualCardInputFormProps = {
   onAddCard: (card: PokemonCard) => void;
-  initialScanData?: Partial<OcrScanOutput> | null; // Updated type for initialScanData
+  initialScanData?: Partial<FindCardOutput> | null; // Updated type for initialScanData
 };
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
@@ -67,6 +68,7 @@ interface ApiPokemonCard {
   };
   number: string;
   rarity?: string;
+  artist?: string;
   images: {
     small: string;
     large: string;
@@ -98,6 +100,7 @@ interface TcgDexApiCard {
   image?: string; // Base URL for image, append '/low.webp' or '/high.webp'
   number: string;
   rarity: string;
+  artist?: string; // TCGdex might not have this, so keep it optional
   set: { id: string; name: string; logo?: string; }; // Simplified set info within card
 }
 
@@ -346,17 +349,13 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
           }
         }
       }
-      // Pre-fill condition if available (though OCR is unlikely to get this)
-      if (initialScanData.condition && conditionOptions.includes(initialScanData.condition)) {
-        form.setValue("condition", initialScanData.condition);
-      }
 
 
       setIsPreFilling(false);
     };
 
     // Only run preFill if initialScanData is present and relevant sets are loaded or can be loaded.
-    if (initialScanData && initialScanData.imageDataUri) { // imageDataUri indicates it's new scan data
+    if (initialScanData && (initialScanData.name || initialScanData.cardNumber || initialScanData.set)) { // Check if we have actual scan data
         if ((watchedLanguage === "English" && (englishSets.length > 0 || !isLoadingEnglishSets)) ||
             (watchedLanguage === "Japanese" && (japaneseSets.length > 0 || !isLoadingJapaneseSets))) {
           preFillForm();
@@ -434,6 +433,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
         imageUrl: selectedEnglishCardData.images.large,
         value: cardValue,
         quantity: values.quantity,
+        artist: selectedEnglishCardData.artist,
       };
     } else { 
       const selectedSet = japaneseSets.find(s => s.id === values.selectedSetId);
@@ -453,6 +453,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
         imageUrl: selectedJapaneseCardData.image ? `${selectedJapaneseCardData.image}/high.webp` : undefined,
         value: 0, 
         quantity: values.quantity,
+        artist: selectedJapaneseCardData.artist,
       };
     }
     
@@ -612,6 +613,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
                   <div className="text-sm space-y-1">
                     <p><strong>Set:</strong> {watchedLanguage === 'English' ? (currentCardDisplayData as ApiPokemonCard).set.name : (currentCardDisplayData as TcgDexApiCard).set.name}</p>
                     <p><strong>Rarity:</strong> {currentCardDisplayData.rarity || "N/A"}</p>
+                    {currentCardDisplayData.artist && <p><strong>Artist:</strong> {currentCardDisplayData.artist}</p>}
                     {watchedLanguage === 'English' && (currentCardDisplayData as ApiPokemonCard).tcgplayer?.prices && (
                         <p><strong>Est. Value (English):</strong> ${getDefaultMarketPrice(currentCardDisplayData as ApiPokemonCard).value.toFixed(2)}</p>
                     )}

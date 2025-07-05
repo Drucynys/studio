@@ -1,10 +1,10 @@
 
-import type { PokemonCard, CardmarketProduct, CardmarketPriceGuide } from "@/types";
+import type { PokemonCard } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye, Languages } from "lucide-react";
+import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye, Languages, Paintbrush } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,6 @@ type CardItemProps = {
   onEdit: () => void;
   onRemove: () => void;
   onView: (cardIndex: number) => void; // Handler for viewing the card
-  cardmarketPriceGuide: CardmarketPriceGuide | null;
 };
 
 const formatDisplayVariant = (variantKey?: string): string | null => {
@@ -25,54 +24,12 @@ const formatDisplayVariant = (variantKey?: string): string | null => {
     .trim();
 };
 
-const normalizeString = (str: string = ""): string => {
-  return str.toLowerCase().replace(/[^a-z0-9]/gi, '');
-};
-
-export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarketPriceGuide }: CardItemProps) {
+export function CardItem({ card, cardIndex, onEdit, onRemove, onView }: CardItemProps) {
   const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant) : ''}&view=grid`;
   const displayVariant = formatDisplayVariant(card.variant);
 
-  const [cmPrices, setCmPrices] = useState<CardmarketProduct | null>(null);
-  const [cmStatus, setCmStatus] = useState<string | null>(null);
-
-  useEffect(() => {
-    setCmPrices(null);
-    setCmStatus(null);
-
-    if (cardmarketPriceGuide && card.name && card.set && card.language === 'English') { // Only fetch CM for English cards
-      const normalizedCardName = normalizeString(card.name);
-      const normalizedCardSet = normalizeString(card.set);
-      
-      const foundProduct = cardmarketPriceGuide.find(cmProduct => {
-        const normalizedCmName = normalizeString(cmProduct.Name);
-        const normalizedCmSet = normalizeString(cmProduct.Expansion);
-        
-        return normalizedCmName.includes(normalizedCardName) &&
-               normalizedCmSet.includes(normalizedCardSet);
-      });
-
-      if (foundProduct) {
-        setCmPrices(foundProduct);
-        if (!(foundProduct["Low Price"] || foundProduct["Trend Price"] || foundProduct["Average Sell Price"])) {
-          setCmStatus("(CM: Matched, no price data)");
-        }
-      } else {
-        if (cardmarketPriceGuide.length > 0) {
-            setCmStatus("(CM: No match in guide)");
-        }
-      }
-    } else if (card.language === 'Japanese') {
-      setCmStatus("(Cardmarket prices N/A for Japanese cards)");
-    } else if (cardmarketPriceGuide === null) {
-      setCmStatus(null);
-    } else if (cardmarketPriceGuide && cardmarketPriceGuide.length === 0){
-      setCmStatus("(CM: Price guide empty)");
-    }
-
-  }, [card, cardmarketPriceGuide]);
-
-  const hasDisplayableCmPrices = cmPrices && (typeof cmPrices["Low Price"] === 'number' || typeof cmPrices["Trend Price"] === 'number' || typeof cmPrices["Average Sell Price"] === 'number');
+  const cardValue = card.value || 0;
+  const cardQuantity = card.quantity || 1;
 
   return (
     <Card className={cn(
@@ -105,6 +62,13 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <strong>Rarity:</strong> <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{card.rarity}</Badge>
         </div>
+        {card.artist && (
+          <div className="flex items-center gap-2 text-xs">
+            <Paintbrush className="h-3.5 w-3.5 text-cyan-500" />
+            <strong className="flex-shrink-0">Artist:</strong>
+            <span className="truncate text-muted-foreground">{card.artist}</span>
+          </div>
+        )}
         {displayVariant && (
           <div className="flex items-center gap-2 text-xs">
             <Palette className="h-3.5 w-3.5 text-blue-500" />
@@ -121,13 +85,13 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
         </div>
          <div className="flex items-center gap-2 text-xs">
           <Layers className="h-3.5 w-3.5 text-purple-500" />
-          <strong>Quantity:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-purple-500/50 text-purple-600">{card.quantity}</Badge>
+          <strong>Quantity:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-purple-500/50 text-purple-600">{cardQuantity}</Badge>
         </div>
       </CardContent>
       <CardFooter className="flex-col items-start space-y-2 pt-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-primary">
           <Coins className="h-4 w-4" />
-          Value: ${card.value.toFixed(2)} (x{card.quantity} = ${(card.value * card.quantity).toFixed(2)})
+          Value: ${cardValue.toFixed(2)} (x{cardQuantity} = ${(cardValue * cardQuantity).toFixed(2)})
         </div>
         {card.name && card.language === 'English' && (
            <a
@@ -141,33 +105,6 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, cardmarket
         )}
         {card.language === 'Japanese' && (
             <p className="text-xs text-muted-foreground italic">(TCGPlayer link N/A for Japanese cards)</p>
-        )}
-
-
-        {hasDisplayableCmPrices && cmPrices && card.language === 'English' && (
-          <div className="mt-1 pt-1 border-t border-border/30 w-full">
-            <p className="text-xs font-semibold text-blue-600 flex items-center gap-1 my-1">
-              <ShoppingCart size={12}/> Cardmarket (EUR):
-            </p>
-            {typeof cmPrices["Average Sell Price"] === 'number' && <p className="text-xs">Avg Sell: €{cmPrices["Average Sell Price"].toFixed(2)}</p>}
-            {typeof cmPrices["Trend Price"] === 'number' && <p className="text-xs">Trend: €{cmPrices["Trend Price"].toFixed(2)}</p>}
-            {typeof cmPrices["Low Price"] === 'number' && <p className="text-xs">Low: €{cmPrices["Low Price"].toFixed(2)}</p>}
-            {cmPrices.idProduct &&
-                <a
-                    href={`https://www.cardmarket.com/en/Pokemon/Products/Singles/${cmPrices.Expansion}/${cmPrices.Name}?idProduct=${cmPrices.idProduct}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-muted-foreground hover:text-blue-600 hover:underline flex items-center gap-1 mt-0.5"
-                >
-                    View on Cardmarket <ExternalLink size={12} />
-                </a>
-            }
-          </div>
-        )}
-        {cmStatus && !hasDisplayableCmPrices && (
-             <p className="text-xs text-muted-foreground italic flex items-center gap-1 mt-1">
-                <Info size={12}/> {cmStatus}
-            </p>
         )}
         
         <div className="flex gap-2 w-full mt-2">

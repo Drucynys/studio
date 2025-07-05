@@ -1,10 +1,9 @@
 
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
-import dotenv from 'dotenv';
 
 // Load environment variables from .env file
-dotenv.config();
+// dotenv.config(); // Removed, Next.js handles this automatically
 
 export const ai = genkit({
   plugins: [

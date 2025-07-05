@@ -1,45 +1,47 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Dependencies
+node_modules/
+.next/
+out/
 
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+# Environment files
+.env
+.env.*
+!.env.example
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# testing
-/coverage
+# Firebase credentials
+firebase-service-account.json
+*firebase-service-account*.json
+firebase-adminsdk-*.json
+service-account-*.json
 
-# next.js
-/.next/
-/out/
+# Coverage and logs
+coverage/
+*.log
+*.seed
+*.gz
 
-# production
-/build
+# VS Code
+.vscode-test/
+.cache/
+.vscode/*.vsix
 
-# misc
+# Build outputs
+dist/
+build/
+
+# OS generated files
 .DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-.genkit/*
-.env*
-
-# firebase
-firebase-debug.log
-firestore-debug.log
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+# Workspace files that might contain secrets
+workspace/
+workspace/.env
+workspace/.env.*

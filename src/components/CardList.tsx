@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { PokemonCard, CardmarketPriceGuide } from "@/types";
+import type { PokemonCard } from "@/types";
 import { CardItem } from "./CardItem";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +12,9 @@ type CardListProps = {
   onEditCard: (card: PokemonCard) => void;
   onRemoveCard: (cardId: string) => void;
   onViewCard: (cardIndex: number) => void; // New prop for viewing card
-  cardmarketPriceGuide: CardmarketPriceGuide | null;
 };
 
-export function CardList({ cards, onEditCard, onRemoveCard, onViewCard, cardmarketPriceGuide }: CardListProps) {
+export function CardList({ cards, onEditCard, onRemoveCard, onViewCard }: CardListProps) {
   if (cards.length === 0) {
     return (
       <Card className="shadow-lg">
@@ -47,15 +46,14 @@ export function CardList({ cards, onEditCard, onRemoveCard, onViewCard, cardmark
       <CardContent className="flex-grow p-0">
         <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-24rem)]">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 p-4 md:p-6">
-            {cards.map((card, index) => ( // Added index here
+            {cards.map((card, index) => (
               <CardItem 
-                key={card.id} 
+                key={`${card.id}-${index}`} 
                 card={card} 
-                cardIndex={index} // Pass index to CardItem
+                cardIndex={index}
                 onEdit={() => onEditCard(card)} 
                 onRemove={() => onRemoveCard(card.id)}
-                onView={onViewCard} // Pass onViewCard handler
-                cardmarketPriceGuide={cardmarketPriceGuide}
+                onView={onViewCard}
               />
             ))}
           </div>

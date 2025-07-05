@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useEffect, useState, useCallback, use, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
@@ -10,12 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
-import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle, DollarSign, TrendingUp, CalendarDays, Hash, Palette } from "lucide-react";
+import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle, DollarSign, TrendingUp, CalendarDays, Hash, Palette, Paintbrush } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
+
 
 export interface ApiPokemonCard {
   id: string;
@@ -31,6 +31,7 @@ export interface ApiPokemonCard {
   };
   number: string;
   rarity?: string;
+  artist?: string;
   images: {
     small: string;
     large:string;
@@ -83,11 +84,21 @@ interface SetDetails {
   series: string;
 }
 
+// Updated interface for component props to handle async params
+interface SetDetailsPageProps {
+  params: Promise<{ setId: string }>;
+}
 
-const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string } }) => {
-  const resolvedParams = use(paramsFromProps);
-  const { setId } = resolvedParams;
+const SetDetailsPage = async ({ params }: SetDetailsPageProps) => {
+  // Await the params since they're now a Promise in Next.js 15
+  const { setId } = await params;
 
+  // Create a client component to handle the state and effects
+  return <SetDetailsPageClient setId={setId} />;
+};
+
+// Client component to handle state and effects
+const SetDetailsPageClient = ({ setId }: { setId: string }) => {
   const [setDetails, setSetDetails] = useState<SetDetails | null>(null);
   const [cardsInSet, setCardsInSet] = useState<ApiPokemonCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
@@ -127,20 +138,24 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
         headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
       }
 
-      const setDetailsResponse = await fetch(`https://api.pokemontcg.io/v2/sets/${setId}`, { headers });
-      if (!setDetailsResponse.ok) {
-        throw new Error(`Failed to fetch set details: ${setDetailsResponse.statusText} (status: ${setDetailsResponse.status})`);
+      // Fetch Set Details from API
+      const setResponse = await fetch(`https://api.pokemontcg.io/v2/sets/${setId}`, { headers });
+      if (!setResponse.ok) {
+        throw new Error(`Set with ID "${setId}" not found. It may be new or invalid.`);
       }
-      const setData = await setDetailsResponse.json();
+      const setData = await setResponse.json();
+      const setInfo = setData.data;
+
       setSetDetails({
-        id: setData.data.id,
-        name: setData.data.name,
-        logoUrl: setData.data.images?.logo,
-        releaseDate: setData.data.releaseDate,
-        totalCards: setData.data.printedTotal || setData.data.total || 0, // This remains the official printed total
-        series: setData.data.series,
+        id: setInfo.id,
+        name: setInfo.name,
+        logoUrl: setInfo.images?.logo,
+        releaseDate: setInfo.releaseDate,
+        totalCards: setInfo.printedTotal || setInfo.total || 0,
+        series: setInfo.series,
       });
-      
+
+      // Fetch cards for the set from the external API
       let allCards: ApiPokemonCard[] = [];
       let page = 1;
       let hasMore = true;
@@ -221,6 +236,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
       imageUrl: selectedApiCard.images.large,
       quantity: quantity,
       language: "English", 
+      artist: selectedApiCard.artist,
     };
 
     try {
@@ -316,7 +332,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
-        <Link href="/browse-sets" passHref legacyBehavior>
+        <Link href="/browse-sets">
           <Button variant="outline" className="mb-6">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sets
           </Button>
@@ -396,6 +412,7 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                                 <div className="flex-grow min-w-0"> 
                                 <p className="text-xs font-semibold truncate" title={card.name}>{index + 1}. {card.name}</p>
                                 <p className="text-xs text-muted-foreground">${getDefaultMarketPrice(card).value.toFixed(2)}</p>
+                                {card.artist && <p className="text-xs text-muted-foreground/80 truncate" title={card.artist}>by {card.artist}</p>}
                                 </div>
                             </div>
                             ))
@@ -448,18 +465,14 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
                                 className={cn(
                                     "p-2 cursor-pointer group flex flex-col relative bg-card",
                                     "transform transition-all duration-200 ease-out",
-                                    "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:border-primary group-hover:z-10"
+                                    "hover:scale-105 hover:-translate-y-1 hover:shadow-lg group-hover:z-10"
                                 )}
                             >
                               <div className={cn(
-                                  "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 group-hover:grayscale-0",
+                                  "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden group-hover:grayscale-0",
                                   !isCollected && "grayscale"
                               )}>
                                   <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
-                              </div>
-                              <div className="text-center mt-auto">
-                                  <p className="text-sm font-semibold truncate group-hover:text-primary">{card.name}</p>
-                                  <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity || "N/A"}</p>
                               </div>
                             </Card>
                         );
@@ -498,4 +511,3 @@ const SetDetailsPage = ({ params: paramsFromProps }: { params: { setId: string }
 };
 
 export default SetDetailsPage;
-

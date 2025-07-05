@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
-import { format, subMonths, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval } from "date-fns";
+import { format, subMonths, Interval, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval } from "date-fns";
 
 type TimeRange = "1M" | "3M" | "6M" | "1Y";
 

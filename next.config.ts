@@ -1,41 +1,46 @@
-
-import type {NextConfig} from 'next';
+// File: next.config.ts
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Updated syntax for external packages
+  serverExternalPackages: ['sharp', 'onnxruntime-node'],
+  
+  // Allow your Cloud Workstation domain
+  allowedDevOrigins: [
+    '3000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
+    '3001-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev'
+  ],
+  
+  // If you plan to use external images
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
+        hostname: 'images.pokemontcg.io',
       },
       {
         protocol: 'https',
-        hostname: 'images.pokemontcg.io',
-        port: '',
-        pathname: '/**',
+        hostname: 'assets.tcgdx.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'tcgdx.net',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.cloudfront.net',
       },
       {
         protocol: 'https',
         hostname: 'raw.githubusercontent.com',
-        port: '',
-        pathname: '/PokeAPI/sprites/master/sprites/pokemon/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
       }
     ],
   },
-  // Add the Firebase Studio preview origin to allowedDevOrigins
-  allowedDevOrigins: [
- 'https://6000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
- 'https://9003-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev'
- ],
+
 };
 
 export default nextConfig;

@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { CardList } from "@/components/CardList";
-import type { PokemonCard, CardmarketPriceGuide } from "@/types";
+import type { PokemonCard } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,9 +34,6 @@ export default function MyCollectionPage() {
   const [cardToDelete, setCardToDelete] = useState<PokemonCard | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const [cardmarketPriceGuide, setCardmarketPriceGuide] = useState<CardmarketPriceGuide | null>(null);
-  const [isLoadingCmPrices, setIsLoadingCmPrices] = useState(false);
-
   const [isFullScreenViewOpen, setIsFullScreenViewOpen] = useState(false);
   const [currentFullScreenCardIndex, setCurrentFullScreenCardIndex] = useState<number | null>(null);
 
@@ -51,45 +48,7 @@ export default function MyCollectionPage() {
   useEffect(() => {
     setIsClient(true);
     loadCards();
-
-    const fetchCmPrices = async () => {
-      setIsLoadingCmPrices(true);
-      try {
-        const response = await fetch('/api/cardmarket-prices');
-        if (!response.ok) {
-          let errorMessage = 'Failed to fetch Cardmarket prices';
-          try {
-            const errorData = await response.json();
-            if (errorData && errorData.message) {
-              errorMessage = `API Error: ${errorData.message}`;
-              if (errorData.error) {
-                 errorMessage += ` Details: ${errorData.error}`;
-              }
-            } else if (response.statusText) {
-              errorMessage = `Failed to fetch Cardmarket prices: ${response.statusText} (status: ${response.status})`;
-            }
-          } catch (e) {
-            if (response.statusText) {
-               errorMessage = `Failed to fetch Cardmarket prices: ${response.statusText} (status: ${response.status})`;
-            }
-          }
-          throw new Error(errorMessage);
-        }
-        const data: CardmarketPriceGuide = await response.json();
-        setCardmarketPriceGuide(data);
-      } catch (error) {
-        console.error("Error fetching Cardmarket prices:", error);
-        toast({
-          variant: "destructive",
-          title: "Cardmarket Price Error",
-          description: error instanceof Error ? error.message : "Could not load Cardmarket price data.",
-        });
-      } finally {
-        setIsLoadingCmPrices(false);
-      }
-    };
-    fetchCmPrices();
-  }, [loadCards, toast]);
+  }, [loadCards]);
 
 
   useEffect(() => {
@@ -285,11 +244,6 @@ export default function MyCollectionPage() {
                 <SelectItem value="quantityAsc">Quantity (Low-High)</SelectItem>
               </SelectContent>
             </Select>
-            {isLoadingCmPrices && (
-              <div className="flex items-center justify-center text-muted-foreground text-sm">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading CM Prices...
-              </div>
-            )}
           </div>
            <Button onClick={resetFilters} variant="ghost" size="sm" className="mt-4 text-sm text-muted-foreground hover:text-primary">
               <ListRestart className="mr-2 h-4 w-4"/> Reset Filters
@@ -300,8 +254,7 @@ export default function MyCollectionPage() {
             cards={filteredCards} 
             onEditCard={handleEditCard} 
             onRemoveCard={handleRemoveCard} 
-            onViewCard={openFullScreenView} // Pass handler to CardList
-            cardmarketPriceGuide={cardmarketPriceGuide}
+            onViewCard={openFullScreenView}
         />
         
         {filteredCards.length === 0 && searchTerm && (

@@ -1,7 +1,30 @@
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
 
+# Settings for Cloud Run
 runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
-  maxInstances: 1
+  minInstances: 0
+  maxInstances: 100
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+# Environment variables and secrets
+env:
+  - variable: FIREBASE_PROJECT_ID
+    value: pokdex-tracker-mjjbo
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: NEXT_PUBLIC_POKEMONTCG_API_KEY
+    value: 7103e7a6-cbff-48f9-afc7-ae83fd5d26b8
+    availability:
+      - BUILD
+      - RUNTIME
+  
+  - variable: GOOGLE_APPLICATION_CREDENTIALS_JSON
+    secret: google-creds-json
+    availability:
+      - BUILD
+      - RUNTIME

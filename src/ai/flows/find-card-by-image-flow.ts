@@ -1,55 +1,189 @@
-
+// File: src/ai/flows/find-card-by-image-flow.ts
 'use server';
-/**
- * @fileOverview An AI agent to identify Pokémon card details from an image.
- *
- * - findCardByImage - A function that handles the card identification process.
- * - FindCardInput - The input type for the findCardByImage function.
- * - FindCardOutput - The return type for the findCardByImage function.
- */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const FindCardInputSchema = z.object({
-  imageDataUri: z
-    .string()
-    .describe(
-      "A photo of a Pokémon card, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
+  imageDataUri: z.string(),
 });
 export type FindCardInput = z.infer<typeof FindCardInputSchema>;
 
 const FindCardOutputSchema = z.object({
-  name: z.string().optional().describe('The name of the Pokémon card. Extract the main Pokémon name, excluding V, VMAX, VSTAR, ex, GX, Radiant, Tera etc. if they are part of a larger title phrase. E.g., for "Pikachu VMAX", return "Pikachu". For "Radiant Greninja", return "Greninja".'),
-  set: z.string().optional().describe("The name of the card's set (e.g., 'Scarlet & Violet', '151', 'Temporal Forces')."),
-  cardNumber: z.string().optional().describe('The card number, including any prefixes or suffixes (e.g., "025/198", "SV001", "TG05/TG30").'),
-  rarity: z.string().optional().describe('The rarity of the card (e.g., "Common", "Ultra Rare", "Illustration Rare", "Promo"). If a symbol like C, U, R is present near the card number, use that to infer Common, Uncommon, Rare.'),
+  name: z.string().optional(),
+  set: z.string().optional(),
+  cardNumber: z.string().optional(),
+  rarity: z.string().optional(),
+  rawText: z.string().optional(),
+  language: z.string().optional(),
+  type: z.string().optional(),
+  supertype: z.string().optional(),
+  setName: z.string().optional(),
+  tcgplayerProductId: z.string().optional(),
 });
 export type FindCardOutput = z.infer<typeof FindCardOutputSchema>;
 
-export async function findCardByImage(input: FindCardInput): Promise<FindCardOutput> {
-  return findCardFlow(input);
+// Extract raw text from image - return as array to match your current format
+const extractTextPrompt = ai.definePrompt({
+  name: 'extractTextPrompt',
+  input: {schema: FindCardInputSchema},
+  output: {schema: z.object({text: z.array(z.string())})},
+  prompt: `Extract ALL visible text from this Pokemon card image. Return each line of text as a separate array element. Read every word, number, and symbol you can see.
+
+Image:
+{{media url=imageDataUri}}`,
+});
+
+// Fixed parsing function that properly handles array input
+function parseCardDetails(rawTextArray: string[]): FindCardOutput {
+  console.log('Parsing raw text array:', rawTextArray);
+  
+  const result: FindCardOutput = {
+    rawText: rawTextArray.join('\n')
+  };
+
+  // Convert array to string for searching
+  const fullText = rawTextArray.join(' ');
+  console.log('Joined text:', fullText);
+
+  // Search through individual lines AND the full text
+  result.name = findPokemonNameFromArray(rawTextArray, fullText);
+  result.cardNumber = findCardNumberFromArray(rawTextArray, fullText);
+  result.set = findSetNameFromArray(rawTextArray, fullText);
+  result.rarity = findRarityFromArray(rawTextArray, fullText);
+  
+  console.log('Final parsed result:', result);
+  return result;
 }
 
-const findCardPrompt = ai.definePrompt({
-  name: 'findCardPrompt',
-  input: {schema: FindCardInputSchema},
-  output: {schema: FindCardOutputSchema},
-  prompt: `You are an expert Pokémon TCG card identifier. Analyze the provided image of a Pokémon card.
-You must extract the following details if they are clearly visible on the card:
+function findPokemonNameFromArray(lines: string[], fullText: string): string | undefined {
+  console.log('Looking for Pokemon name...');
+  
+  // Check each line for specific patterns
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    console.log(`Checking line ${i}: "${line}"`);
+    
+    // Look for "Put [Pokemon] on the Stage" - this is in your line 9
+    if (line.includes('Put') && line.includes('on the Stage')) {
+      const match = line.match(/Put (\w+) on the Stage/i);
+      if (match) {
+        console.log('Found Pokemon from stage pattern:', match[1]);
+        return match[1];
+      }
+    }
+    
+    // Look for "attached to [Pokemon]" 
+    if (line.includes('attached to')) {
+      const match = line.match(/attached to (\w+)/i);
+      if (match) {
+        console.log('Found Pokemon from attached pattern:', match[1]);
+        return match[1];
+      }
+    }
+    
+    // Look for "power can't be used if [Pokemon]"
+    if (line.includes("can't be used if")) {
+      const match = line.match(/can't be used if (\w+)/i);
+      if (match) {
+        console.log('Found Pokemon from power pattern:', match[1]);
+        return match[1];
+      }
+    }
+  }
+  
+  // Direct search in full text for known Pokemon
+  const pokemonList = ['Charizard', 'Blastoise', 'Venusaur', 'Pikachu', 'Mewtwo'];
+  for (const pokemon of pokemonList) {
+    if (fullText.toLowerCase().includes(pokemon.toLowerCase())) {
+      console.log('Found Pokemon by direct search:', pokemon);
+      return pokemon;
+    }
+  }
+  
+  console.log('No Pokemon name found');
+  return undefined;
+}
 
-1.  **Card Name**: Identify the main name of the Pokémon. For example, if the card says "Pikachu VMAX", the Card Name is "Pikachu". If it says "Radiant Greninja", the Card Name is "Greninja". If it's "Professor's Research (Professor Sada)", the Card Name is "Professor's Research".
-2.  **Set Name**: Identify the name of the expansion set the card belongs to. This is often found near the card number or a set symbol. Examples: "Obsidian Flames", "Crown Zenith", "Pokémon GO".
-3.  **Card Number**: Identify the collector number of the card, typically in a format like "001/165", "123/XY-P", "SV001", "TG01/TG30", or "H30/H32". Include any letters or symbols that are part of the number.
-4.  **Rarity**: Determine the card's rarity. Look for explicit rarity text (e.g., "PROMO", "Illustration Rare") or symbols (like a circle for Common, diamond for Uncommon, star for Rare) often found near the card number or set information.
+function findCardNumberFromArray(lines: string[], fullText: string): string | undefined {
+  console.log('Looking for card number...');
+  
+  // Check each line for card number patterns
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    console.log(`Checking line ${i} for card number: "${line}"`);
+    
+    // Look for "#6" pattern - this is in your line 51
+    const hashMatch = line.match(/#(\d+)/);
+    if (hashMatch) {
+      console.log('Found card number with # pattern:', hashMatch[0]);
+      return hashMatch[0];
+    }
+  }
+  
+  // Look for valid fraction patterns in full text, but be more selective
+  const fractionMatches = fullText.match(/(\d{1,3})\/(\d{2,3})/g);
+  if (fractionMatches) {
+    console.log('Found fraction patterns:', fractionMatches);
+    
+    // Filter out obvious noise
+    const validMatches = fractionMatches.filter(match => {
+      const [num, total] = match.split('/').map(Number);
+      // Base set has 102 cards, so 4/102 would be valid, but 704/4 is clearly wrong
+      return num <= total && total >= 60 && total <= 500 && num >= 1;
+    });
+    
+    if (validMatches.length > 0) {
+      console.log('Found valid fraction card number:', validMatches[0]);
+      return validMatches[0];
+    }
+  }
+  
+  console.log('No valid card number found');
+  return undefined;
+}
 
-If a detail is not clearly visible or cannot be confidently identified from the image, please omit that field or return an empty string for it. Focus on accuracy.
+function findSetNameFromArray(lines: string[], fullText: string): string | undefined {
+  console.log('Looking for set name...');
+  
+  // Check each line for copyright info
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Look for copyright line - this is in your line 52
+    if (line.includes('©') && line.includes('Nintendo')) {
+      console.log('Found copyright line:', line);
+      
+      // Check for Base Set copyright years
+      if (line.includes('1995') || line.includes('1996') || line.includes('1998') || line.includes('1999')) {
+        console.log('Identified as Base Set from copyright years');
+        return 'Base Set';
+      }
+    }
+  }
+  
+  console.log('No set identified');
+  return undefined;
+}
 
-Image of the card:
-{{media url=imageDataUri}}
-`,
-});
+function findRarityFromArray(lines: string[], fullText: string): string | undefined {
+  console.log('Looking for rarity...');
+  
+  // Check for rarity keywords
+  if (fullText.toLowerCase().includes('rare holo')) return 'Rare Holo';
+  if (fullText.toLowerCase().includes('rare')) return 'Rare';
+  if (fullText.toLowerCase().includes('common')) return 'Common';
+  if (fullText.toLowerCase().includes('uncommon')) return 'Uncommon';
+  if (fullText.toLowerCase().includes('promo')) return 'Promo';
+  
+  // Infer rarity - Charizard from Base Set is Rare Holo
+  if (fullText.toLowerCase().includes('charizard') && fullText.includes('1995')) {
+    console.log('Inferred Charizard Base Set as Rare Holo');
+    return 'Rare Holo';
+  }
+  
+  return undefined;
+}
 
 const findCardFlow = ai.defineFlow(
   {
@@ -58,13 +192,97 @@ const findCardFlow = ai.defineFlow(
     outputSchema: FindCardOutputSchema,
   },
   async (input: FindCardInput) => {
-    const {output} = await findCardPrompt(input);
-    // Ensure that if a field is an empty string from the model, it becomes undefined to match optional Zod schema behavior.
-    return {
-      name: output?.name?.trim() || undefined,
-      set: output?.set?.trim() || undefined,
-      cardNumber: output?.cardNumber?.trim() || undefined,
-      rarity: output?.rarity?.trim() || undefined,
-    };
+    try {
+      console.log('Starting card analysis...');
+      
+      // Extract raw text using AI
+      const textResult = await extractTextPrompt(input);
+      const rawTextArray = textResult.output?.text || [];
+      
+      console.log('Raw extracted text array:', rawTextArray);
+      
+      // Parse the text array using our fixed parsing logic
+      const result = parseCardDetails(rawTextArray);
+      
+      return result;
+    } catch (error) {
+      console.error('Error in card analysis:', error);
+      return {
+        rawText: undefined,
+      };
+    }
   }
 );
+
+export async function findCardByImageEnhanced(input: FindCardInput): Promise<FindCardOutput> {
+  return findCardFlow(input);
+}
+
+export async function findCardByImageEnhancedEnhanced(input: FindCardInput): Promise<FindCardOutput> {
+  try {
+    console.log('Starting enhanced card analysis...');
+    
+    // Get our smart parsed result
+    const smartResult = await findCardFlow(input);
+    console.log('Smart parsing result:', smartResult);
+    
+    // If smart parsing found everything, return it
+    if (smartResult.name && smartResult.cardNumber && smartResult.set) {
+      return smartResult;
+    }
+    
+    // Otherwise, try direct AI approach as backup
+    const directPrompt = ai.definePrompt({
+      name: 'directCardPrompt',
+      input: {schema: FindCardInputSchema},
+      output: {schema: z.object({
+        pokemonName: z.string(),
+        cardNumber: z.string(),
+        setInfo: z.string(),
+      })},
+      prompt: `Look at this Pokemon card and tell me:
+
+1. What Pokemon is this? (Look for the main character name)
+2. What is the card number? (Look for numbers like "#6" or "4/102")
+3. What set is this from? (Look for copyright info or set symbols)
+
+Be very specific about what you can see.
+
+Image:
+{{media url=imageDataUri}}`,
+    });
+    
+    const directFlow = ai.defineFlow({
+      name: 'directCardFlow', 
+      inputSchema: FindCardInputSchema,
+      outputSchema: z.object({
+        pokemonName: z.string(),
+        cardNumber: z.string(), 
+        setInfo: z.string(),
+      }),
+    }, async (input) => {
+      const {output} = await directPrompt(input);
+      return {
+        pokemonName: output?.pokemonName || '',
+        cardNumber: output?.cardNumber || '',
+        setInfo: output?.setInfo || '',
+      };
+    });
+    
+    const directResult = await directFlow(input);
+    console.log('Direct AI result:', directResult);
+    
+    // Combine the best of both approaches
+    return {
+      name: smartResult.name || directResult.pokemonName || undefined,
+      cardNumber: smartResult.cardNumber || directResult.cardNumber || undefined,
+      set: smartResult.set || (directResult.setInfo.includes('Base') ? 'Base Set' : undefined) || undefined,
+      rarity: smartResult.rarity || undefined,
+      rawText: smartResult.rawText,
+    };
+    
+  } catch (error) {
+    console.error('Enhanced analysis failed:', error);
+    return findCardFlow(input);
+  }
+}

@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 68 78% 92%; /* Soft Cream #FAFDD7 */
+    --background: 68 78% 92%; /* Soft Cream #FAFDD7 (HSL derived from hex: ~65-68, ~78%, ~92%) - Kept existing as it matches common conversion */
     --foreground: 240 10% 3.9%; /* Dark Blue/Black */
 
     --card: 0 0% 100%; /* White */
@@ -22,7 +22,7 @@
     --muted: 68 50% 85%; /* Muted Cream */
     --muted-foreground: 60 25% 55%; /* Muted text on cream */
 
-    --accent: 25 100% 50%; /* Fiery Orange #FF6700 */
+    --accent: 24 100% 50%; /* Fiery Orange #FF6700 (HSL derived from hex: ~24.2, 100%, 50%) */
     --accent-foreground: 0 0% 100%; /* White for contrast on orange */
 
     --destructive: 0 84.2% 60.2%;
@@ -44,7 +44,7 @@
     --sidebar-foreground: 240 10% 10%; /* Dark text */
     --sidebar-primary: 54 100% 50%; /* Electric Yellow */
     --sidebar-primary-foreground: 54 100% 10%; /* Dark text on yellow */
-    --sidebar-accent: 25 100% 50%; /* Fiery Orange */
+    --sidebar-accent: 24 100% 50%; /* Fiery Orange (Updated to match main accent) */
     --sidebar-accent-foreground: 0 0% 100%; /* White text on orange */
     --sidebar-border: 68 40% 75%; /* Creamy Border for sidebar elements */
     --sidebar-ring: 54 100% 50%; /* Electric Yellow */
@@ -70,7 +70,7 @@
     --muted: 240 5% 18%;
     --muted-foreground: 0 0% 60%;
 
-    --accent: 25 100% 50%; /* Fiery Orange */
+    --accent: 24 100% 50%; /* Fiery Orange (Updated to match main accent) */
     --accent-foreground: 0 0% 100%; /* White */
 
     --destructive: 0 62.8% 30.6%;
@@ -91,7 +91,7 @@
     --sidebar-foreground: 0 0% 95%;
     --sidebar-primary: 54 100% 50%;
     --sidebar-primary-foreground: 54 100% 10%;
-    --sidebar-accent: 25 100% 50%;
+    --sidebar-accent: 24 100% 50%; /* Fiery Orange (Updated to match main accent) */
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 240 5% 15%;
     --sidebar-ring: 54 100% 50%;
