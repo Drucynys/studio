@@ -1,58 +1,72 @@
 import { NextResponse, NextRequest } from 'next/server';
 
-// Assuming a function exists or will be created to interact with an external API
-// For demonstration, this is a placeholder function.
-// You would replace this with actual API calls to TCGdex or another service.
-async function searchPokemonCards(query: { name?: string; set?: string; cardNumber?: string }): Promise<any[]> {
-  const queryParts: string[] = [];
-
-  if (query.name) {
-    queryParts.push(`name:"${query.name}"`); // Use exact match for name
-  }
-  if (query.set) {
-    // Search both set ID and set name for flexibility
-    queryParts.push(`(set.id:${query.set} OR set.name:"${query.set}")`);
-  }
-  if (query.cardNumber) {
-    queryParts.push(`number:${query.cardNumber}`);
+async function searchPokemonCards(rawQuery: string): Promise<any[]> {
+  const query = rawQuery.trim();
+  if (!query) {
+    return [];
   }
 
-  const queryString = queryParts.join(' '); // Combine query parts with space
+  // Split the query into parts that are numbers and parts that are words
+  const parts = query.toLowerCase().split(/\s+/);
+  const numbers = parts.filter(p => /^\d+$/.test(p) && p.length < 5); // Card numbers are not usually long
+  const words = parts.filter(p => !/^\d+$/.test(p) || p.length >= 5);
 
+  const apiQueryParts: string[] = [];
+
+  // Each word acts as a fuzzy match against name OR set name
+  if (words.length > 0) {
+    const wordQueries = words.map(word => `(name:"${word}*" OR set.name:"${word}*")`);
+    apiQueryParts.push(`(${wordQueries.join(' AND ')})`);
+  }
+  
+  // The last number found is treated as the card number
+  if (numbers.length > 0) {
+    apiQueryParts.push(`number:${numbers[numbers.length - 1]}`);
+  }
+
+  const queryString = apiQueryParts.join(' ');
+  
   if (!queryString) {
-    return []; // Return empty array if no search criteria
+    return [];
   }
 
-  const apiUrl = `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(queryString)}`;
+  // The API key is required for requests to pokemontcg.io
+  const apiKey = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
+  if (!apiKey) {
+    throw new Error("Pokémon TCG API key is missing from environment variables.");
+  }
+  const headers: HeadersInit = { 'X-Api-Key': apiKey };
 
-  const response = await fetch(apiUrl);
+  const apiUrl = `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(queryString)}&orderBy=set.releaseDate,number`;
+  
+  const response = await fetch(apiUrl, { headers });
+  if (!response.ok) {
+    console.error(`Pokemon TCG API Error: ${response.status} ${response.statusText}`);
+    // Do not throw, just return empty so the UI can handle it gracefully.
+    return [];
+  }
   const data = await response.json();
-
-  return data.data || []; // Return the data array, or an empty array if no data
-
+  return data.data || [];
 }
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const name = searchParams.get('name') || undefined;
-    const set = searchParams.get('set') || undefined;
-    const cardNumber = searchParams.get('cardNumber') || undefined;
+    const q = searchParams.get('q');
 
-    // Validate that at least one search parameter is provided
-    if (!name && !set && !cardNumber) {
+    if (!q) {
       return NextResponse.json(
-        { message: 'Please provide at least one search parameter (name, set, or cardNumber).' },
+        { message: 'Please provide a search query.' },
         { status: 400 }
       );
     }
 
-    const matchingCards = await searchPokemonCards({ name, set, cardNumber });
+    const matchingCards = await searchPokemonCards(q);
 
     return NextResponse.json(matchingCards);
 
   } catch (error) {
-    console.error('Error searching for cards:', error);
+    console.error('Error in search-cards API route:', error);
     return NextResponse.json(
       { message: 'Error searching for cards', error: (error instanceof Error ? error.message : String(error)) },
       { status: 500 }

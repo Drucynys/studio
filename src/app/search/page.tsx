@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
 export default function SearchPage() {
-  const [name, setName] = useState("");
-  const [set, setSet] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-
+  const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ApiPokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,25 +26,22 @@ export default function SearchPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const handleSearch = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!name && !set && !cardNumber) {
-      setError("Please enter at least one search term.");
+  const handleSearch = useCallback(async (currentQuery: string) => {
+    if (currentQuery.trim().length < 3) {
+      setSearchResults([]);
+      setHasSearched(false);
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
     setSearchResults([]);
 
     try {
-      const params = new URLSearchParams();
-      if (name) params.append("name", name);
-      if (set) params.append("set", set);
-      if (cardNumber) params.append("cardNumber", cardNumber);
-      
+      const params = new URLSearchParams({ q: currentQuery });
       const response = await fetch(`/api/search-cards?${params.toString()}`);
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `An error occurred: ${response.statusText}`);
@@ -61,7 +55,15 @@ export default function SearchPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      handleSearch(query);
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(debounceTimer);
+  }, [query, handleSearch]);
 
   const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string, quantity: number = 1) => {
     if (!selectedApiCard) return;
@@ -77,7 +79,7 @@ export default function SearchPage() {
       value: valueForCollection,
       imageUrl: selectedApiCard.images.large,
       quantity,
-      language: "English", // Assuming search is for English cards for now
+      language: "English",
       artist: selectedApiCard.artist,
     };
 
@@ -125,46 +127,21 @@ export default function SearchPage() {
               Search for Cards
             </CardTitle>
             <CardDescription>
-              Find specific Pokémon TCG cards by name, set, or number.
+              Find specific Pokémon TCG cards by name, set, or number. For example: <code className="bg-muted px-1 py-0.5 rounded">Charizard base 4</code>
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-8">
-              <div className="md:col-span-2">
-                <label htmlFor="name-search" className="block text-sm font-medium text-muted-foreground mb-1">Card Name</label>
-                <Input
-                  id="name-search"
-                  type="text"
-                  placeholder="e.g., Charizard"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div>
-                <label htmlFor="set-search" className="block text-sm font-medium text-muted-foreground mb-1">Set Name or ID</label>
-                <Input
-                  id="set-search"
-                  type="text"
-                  placeholder="e.g., Base Set or base1"
-                  value={set}
-                  onChange={(e) => setSet(e.target.value)}
-                />
-              </div>
-              <div>
-                <label htmlFor="number-search" className="block text-sm font-medium text-muted-foreground mb-1">Card Number</label>
-                <Input
-                  id="number-search"
-                  type="text"
-                  placeholder="e.g., 4"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value)}
-                />
-              </div>
-              <Button type="submit" disabled={isLoading} className="md:col-start-4">
-                {isLoading ? <Loader2 className="animate-spin" /> : <SearchIcon className="mr-2 h-4 w-4" />}
-                Search
-              </Button>
-            </form>
+            <div className="relative mb-8">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                id="search-bar"
+                type="text"
+                placeholder="Search by name, set, number..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-10 text-lg h-12"
+              />
+            </div>
             
             {error && (
               <div className="text-center py-10 text-destructive">
@@ -174,7 +151,7 @@ export default function SearchPage() {
               </div>
             )}
             
-            {!isLoading && hasSearched && searchResults.length === 0 && !error && (
+            {!isLoading && hasSearched && searchResults.length === 0 && !error && query.length > 2 && (
               <div className="text-center py-10 text-muted-foreground">
                 <Info className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg">No cards found matching your query.</p>
@@ -182,7 +159,7 @@ export default function SearchPage() {
               </div>
             )}
             
-            {!isLoading && searchResults.length > 0 && (
+            {searchResults.length > 0 && (
                <ScrollArea className="h-[calc(100vh-28rem)]">
                 <p className="text-sm text-muted-foreground mb-4">Found {searchResults.length} card(s). Click on a card to add it to your collection.</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
@@ -213,7 +190,7 @@ export default function SearchPage() {
             {isLoading && (
               <div className="flex justify-center items-center py-10">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="ml-4 text-lg text-muted-foreground">Searching for cards...</p>
+                <p className="ml-4 text-lg text-muted-foreground">Searching...</p>
               </div>
             )}
           </CardContent>
