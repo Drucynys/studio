@@ -1,24 +1,26 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library } from "lucide-react";
+import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error';
+type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error' | 'stopped';
+interface ApiSet {
+  id: string;
+  name: string;
+  total: number;
+}
 
 export default function SyncAdminPage() {
   const [setsSyncStatus, setSetsSyncStatus] = useState<SyncStatus>('idle');
   const [cardsSyncStatus, setCardsSyncStatus] = useState<SyncStatus>('idle');
-  
-  const [setsProgress, setSetsProgress] = useState(0);
-  const [cardsProgress, setCardsProgress] = useState(0);
   
   const [setsLogs, setSetsLogs] = useState<string[]>([]);
   const [cardsLogs, setCardsLogs] = useState<string[]>([]);
@@ -32,16 +34,19 @@ export default function SyncAdminPage() {
   const [setCount, setSetCount] = useState<number | null>(null);
   const [cardCount, setCardCount] = useState<number | null>(null);
   
-  const [isCheckingSetsStatus, setIsCheckingSetsStatus] = useState(true);
-  const [isCheckingCardsStatus, setIsCheckingCardsStatus] = useState(true);
-  
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   const { toast } = useToast();
 
+  // State for incremental card sync
+  const [allSetsToSync, setAllSetsToSync] = useState<ApiSet[]>([]);
+  const [currentSetIndex, setCurrentSetIndex] = useState(0);
+  const [totalCardsSynced, setTotalCardsSynced] = useState(0);
+  const isSyncStopped = useRef(false);
+
   const checkDbStatus = useCallback(async () => {
-    setIsCheckingSetsStatus(true);
-    setIsCheckingCardsStatus(true);
+    setIsCheckingStatus(true);
     setStatusError(null);
     try {
         const [setsResponse, cardsResponse] = await Promise.all([
@@ -62,8 +67,7 @@ export default function SyncAdminPage() {
         setSetCount(null);
         setCardCount(null);
     } finally {
-        setIsCheckingSetsStatus(false);
-        setIsCheckingCardsStatus(false);
+        setIsCheckingStatus(false);
     }
   }, []);
 
@@ -75,25 +79,19 @@ export default function SyncAdminPage() {
     setSetsSyncStatus('in-progress');
     setSetsLogs(['Starting set sync process...']);
     setSetsError(null);
-    setSetsProgress(0);
 
     try {
       const response = await fetch('/api/sync-sets', { method: 'POST' });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Server responded with ${response.status}` }));
-        throw new Error(errorData.message || 'An unknown error occurred during sync.');
-      }
-      
       const result = await response.json();
+      
       setSetsLogs(result.logs || []);
-      setSetsProgress(100);
 
-      if (result.status === 'success') {
+      if (response.ok && result.status === 'success') {
         setSetsSyncStatus('success');
         setSetsLogs(prev => [...prev, `✅ Successfully synced ${result.count} sets.`]);
         await checkDbStatus();
       } else {
-        throw new Error(result.message || 'The sync process reported a failure.');
+        throw new Error(result.message || `Server responded with status ${response.status}`);
       }
     } catch (err: any) {
       setSetsSyncStatus('error');
@@ -102,37 +100,81 @@ export default function SyncAdminPage() {
     }
   };
 
-  const handleCardsSync = async () => {
-    setCardsSyncStatus('in-progress');
-    setCardsLogs(['Starting full card sync process... This will take several minutes.']);
+  const stopCardSync = () => {
+    isSyncStopped.current = true;
+    setCardsSyncStatus('stopped');
+    setCardsLogs(prev => [...prev, '🛑 Sync process stopped by user.']);
+  };
+  
+  const resetCardSync = () => {
+    setCardsSyncStatus('idle');
+    setCardsLogs([]);
     setCardsError(null);
-    setCardsProgress(0);
+    setCurrentSetIndex(0);
+    setTotalCardsSynced(0);
+    setAllSetsToSync([]);
+    isSyncStopped.current = false;
+  };
 
+  const handleCardsSync = async () => {
+    resetCardSync();
+    setCardsSyncStatus('in-progress');
+    
+    // Step 1: Fetch the full list of sets to sync
+    setCardsLogs(prev => [...prev, 'Fetching list of all sets to sync...']);
     try {
-        const response = await fetch('/api/sync-cards', { method: 'POST' });
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: `Server responded with ${response.status}` }));
-            throw new Error(errorData.message || 'An unknown error occurred during card sync.');
-        }
+      const setsResponse = await fetch('/api/sets');
+      if (!setsResponse.ok) throw new Error(`Failed to fetch set list: ${setsResponse.statusText}`);
+      const sets: ApiSet[] = await setsResponse.json();
+      if (sets.length === 0) {
+        setCardsLogs(prev => [...prev, '⚠️ No sets found in database. Please sync sets first.']);
+        setCardsSyncStatus('error');
+        setCardsError('No sets found in database. Please sync sets first.');
+        return;
+      }
+      setAllSetsToSync(sets);
+      setCardsLogs(prev => [...prev, `Found ${sets.length} sets. Starting incremental sync...`]);
 
-        const result = await response.json();
-        setCardsLogs(result.logs || []);
-        setCardsProgress(100);
+      // Step 2: Loop through sets and sync one by one
+      let cumulativeCardCount = 0;
+      for (let i = 0; i < sets.length; i++) {
+        if (isSyncStopped.current) break;
 
-        if (result.status === 'success') {
-            setCardsSyncStatus('success');
-            setCardsLogs(prev => [...prev, `✅ Successfully synced ${result.count} cards.`]);
-            await checkDbStatus();
-        } else {
-            throw new Error(result.message || 'The card sync process reported a failure.');
+        setCurrentSetIndex(i);
+        const currentSet = sets[i];
+        setCardsLogs(prev => [...prev, `\n[${i + 1}/${sets.length}] Syncing set: ${currentSet.name} (${currentSet.id})`]);
+
+        const syncResponse = await fetch('/api/sync-cards', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ setId: currentSet.id }),
+        });
+        
+        const syncResult = await syncResponse.json();
+        setCardsLogs(prev => [...prev, ...(syncResult.logs || [])]);
+
+        if (!syncResponse.ok || syncResult.status !== 'success') {
+          throw new Error(syncResult.message || `Failed to sync set ${currentSet.id}`);
         }
+        
+        cumulativeCardCount += syncResult.count || 0;
+        setTotalCardsSynced(cumulativeCardCount);
+      }
+      
+      if (!isSyncStopped.current) {
+        setCardsSyncStatus('success');
+        setCardsLogs(prev => [...prev, `\n✅✅✅ Full sync complete! Total cards synced: ${cumulativeCardCount}.`]);
+        await checkDbStatus();
+      }
+
     } catch (err: any) {
         setCardsSyncStatus('error');
-        setCardsError(err.message || "An unknown client-side error occurred.");
+        setCardsError(err.message || "An unknown client-side error occurred during card sync.");
         setCardsLogs(prev => [...prev, `❌ Error: ${err.message}`]);
     }
   };
-
+  
+  const overallProgress = allSetsToSync.length > 0 ? ((currentSetIndex + 1) / allSetsToSync.length) * 100 : 0;
 
   const handleExport = async (type: 'sets' | 'cards') => {
     const isSets = type === 'sets';
@@ -203,7 +245,7 @@ export default function SyncAdminPage() {
                   </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                  {isCheckingSetsStatus || isCheckingCardsStatus ? (
+                  {isCheckingStatus ? (
                       <div className="flex items-center justify-center py-4 text-muted-foreground">
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Checking database status...
@@ -227,7 +269,7 @@ export default function SyncAdminPage() {
                       </div>
                   )}
                   <div className="text-center">
-                      <Button onClick={checkDbStatus} disabled={isCheckingSetsStatus || isCheckingCardsStatus} variant="outline" size="sm">
+                      <Button onClick={checkDbStatus} disabled={isCheckingStatus} variant="outline" size="sm">
                           <RefreshCcw className="mr-2 h-3 w-3" />
                           Refresh Status
                       </Button>
@@ -256,7 +298,6 @@ export default function SyncAdminPage() {
 
               {setsSyncStatus !== 'idle' && (
                 <div className="space-y-4">
-                  {setsSyncStatus === 'in-progress' && <Progress value={setsProgress} className="w-full" />}
                   {setsSyncStatus === 'success' && (
                     <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
                       <CheckCircle className="h-4 w-4 text-green-600" />
@@ -285,27 +326,45 @@ export default function SyncAdminPage() {
                 Full Card Database Sync
               </CardTitle>
               <CardDescription>
-                Fetch **all** cards from the API and store them in Firestore.
+                Fetch **all** cards from the API and store them in Firestore, one set at a time.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-               <Alert variant="destructive">
-                  <AlertTitle>Warning: Very Long & Large Operation</AlertTitle>
+               <Alert>
+                  <AlertTitle>Incremental Sync Process</AlertTitle>
                   <AlertDescription>
-                    This will sync over 15,000 cards and may take **5-10 minutes**. Please do not navigate away from this page. This will also increase your Firestore usage significantly.
+                    This tool syncs cards one set at a time to prevent server timeouts. The process may still take several minutes. You can stop the process at any time.
                   </AlertDescription>
                 </Alert>
-              <div className="text-center">
-                <Button onClick={handleCardsSync} disabled={cardsSyncStatus === 'in-progress'} size="lg">
-                  {cardsSyncStatus === 'in-progress' ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing All Cards...</>
-                  ) : 'Start Full Card Sync'}
-                </Button>
+              <div className="flex gap-4 justify-center">
+                 {cardsSyncStatus !== 'in-progress' ? (
+                    <Button onClick={handleCardsSync} disabled={cardsSyncStatus === 'in-progress'} size="lg">
+                        <Play className="mr-2 h-4 w-4"/> Start Full Card Sync
+                    </Button>
+                 ) : (
+                    <Button onClick={stopCardSync} variant="destructive" size="lg">
+                        <Square className="mr-2 h-4 w-4"/> Stop Sync
+                    </Button>
+                 )}
+                 {cardsSyncStatus === 'stopped' && (
+                    <Button onClick={resetCardSync} variant="outline" size="lg">
+                        <ListRestart className="mr-2 h-4 w-4"/> Reset
+                    </Button>
+                 )}
               </div>
 
               {cardsSyncStatus !== 'idle' && (
                 <div className="space-y-4">
-                  {cardsSyncStatus === 'in-progress' && <Progress value={cardsProgress} className="w-full" />}
+                  {cardsSyncStatus === 'in-progress' && (
+                    <div>
+                      <Progress value={overallProgress} className="w-full" />
+                      <p className="text-center text-sm text-muted-foreground mt-2">
+                        Overall Progress: Synced {currentSetIndex} of {allSetsToSync.length} sets ({overallProgress.toFixed(1)}%)
+                        <br/>
+                        Total Cards Added in this Session: {totalCardsSynced}
+                      </p>
+                    </div>
+                  )}
                   {cardsSyncStatus === 'success' && (
                     <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
                       <CheckCircle className="h-4 w-4 text-green-600" />
@@ -319,6 +378,14 @@ export default function SyncAdminPage() {
                       <AlertDescription>{cardsError}</AlertDescription>
                     </Alert>
                   )}
+                  {cardsSyncStatus === 'stopped' && (
+                    <Alert variant="default" className="border-yellow-300 bg-yellow-50 text-yellow-900">
+                        <CheckCircle className="h-4 w-4 text-yellow-600" />
+                        <AlertTitle>Sync Stopped</AlertTitle>
+                        <AlertDescription>The sync process was stopped. Click Reset to clear logs and start again.</AlertDescription>
+                    </Alert>
+                  )}
+
                   <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Card Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
                       <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{cardsLogs.join('\n')}</pre></ScrollArea>
                   </CardContent></Card>
