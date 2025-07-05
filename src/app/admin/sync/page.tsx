@@ -19,6 +19,7 @@ export default function SyncAdminPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingCards, setIsExportingCards] = useState(false);
   const { toast } = useToast();
 
   const handleSync = async () => {
@@ -119,6 +120,64 @@ export default function SyncAdminPage() {
       setIsExporting(false);
     }
   };
+  
+  const handleExportCards = async () => {
+    setIsExportingCards(true);
+    toast({
+      title: "Preparing Full Card Export...",
+      description: "This is a large operation and may take several minutes. Your download will begin when ready.",
+      duration: 10000,
+    });
+
+    try {
+      const response = await fetch('/api/export-cards');
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { message: `Server responded with ${response.status}: ${response.statusText}` };
+        }
+        throw new Error(errorData.message || 'An unknown error occurred during card export.');
+      }
+      
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = "pokemon_tcg_cards.zip";
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch && filenameMatch.length === 2) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Card Export Successful!",
+        description: `${filename} has been downloaded.`,
+        className: "bg-green-50 text-green-900 border-green-200",
+      });
+
+    } catch (err: any) {
+      console.error("Card Export Error:", err);
+      toast({
+        variant: "destructive",
+        title: "Card Export Failed",
+        description: err.message || "An unknown client-side error occurred during card export.",
+      });
+    } finally {
+      setIsExportingCards(false);
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -197,7 +256,7 @@ export default function SyncAdminPage() {
             <CardHeader>
                 <CardTitle className="font-headline text-2xl flex items-center gap-2">
                   <Download className="h-6 w-6 text-primary" />
-                  Export Data
+                  Export Sets Data
                 </CardTitle>
                 <CardDescription>
                   Download a zip archive of all Pokémon TCG set data directly from the API.
@@ -219,7 +278,39 @@ export default function SyncAdminPage() {
                  <Alert className="mt-6">
                   <AlertTitle>What's Included?</AlertTitle>
                   <AlertDescription>
-                    This will generate a zip file containing a single `pokemon_tcg_sets.json` file with the complete data for all sets. Exporting all individual cards is not supported due to the large amount of data.
+                    This will generate a zip file containing a single `pokemon_tcg_sets.json` file with the complete data for all sets.
+                  </AlertDescription>
+                </Alert>
+            </CardContent>
+          </Card>
+          
+          <Card className="shadow-lg">
+            <CardHeader>
+                <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                  <Download className="h-6 w-6 text-primary" />
+                  Export All Cards
+                </CardTitle>
+                <CardDescription>
+                  Download a zip archive of **all** individual Pokémon TCG cards from the API.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center">
+                  <Button onClick={handleExportCards} disabled={isExportingCards} size="lg">
+                    {isExportingCards ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Exporting Cards...
+                      </>
+                    ) : (
+                      'Download All Cards (ZIP)'
+                    )}
+                  </Button>
+                </div>
+                <Alert variant="destructive" className="mt-6">
+                  <AlertTitle>Warning: Large Operation</AlertTitle>
+                  <AlertDescription>
+                    This operation fetches over 15,000 cards from the API and may take several minutes to complete. The resulting file will be very large.
                   </AlertDescription>
                 </Alert>
             </CardContent>
