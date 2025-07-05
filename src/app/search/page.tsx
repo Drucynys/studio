@@ -127,7 +127,7 @@ export default function SearchPage() {
               Search for Cards
             </CardTitle>
             <CardDescription>
-              Find specific Pokémon TCG cards by name, set, or number. For example: <code className="bg-muted px-1 py-0.5 rounded">Charizard base 4</code>
+              Find specific Pokémon TCG cards by name, set, or number. For example: <code className="bg-muted px-1 py-0.5 rounded">Charizard base 4</code> or <code className="bg-muted px-1 py-0.5 rounded">135/165</code>.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -136,7 +136,7 @@ export default function SearchPage() {
               <Input
                 id="search-bar"
                 type="text"
-                placeholder="Search by name, set, number..."
+                placeholder="Search by name, set, number, or collector number..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="pl-10 text-lg h-12"

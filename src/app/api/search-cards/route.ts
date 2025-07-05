@@ -1,27 +1,42 @@
 import { NextResponse, NextRequest } from 'next/server';
 
 async function searchPokemonCards(rawQuery: string): Promise<any[]> {
-  const query = rawQuery.trim();
+  let query = rawQuery.trim();
   if (!query) {
     return [];
   }
 
-  // Split the query into parts that are numbers and parts that are words
-  const parts = query.toLowerCase().split(/\s+/);
-  const numbers = parts.filter(p => /^\d+$/.test(p) && p.length < 5); // Card numbers are not usually long
-  const words = parts.filter(p => !/^\d+$/.test(p) || p.length >= 5);
-
   const apiQueryParts: string[] = [];
-
-  // Each word acts as a fuzzy match against name OR set name
-  if (words.length > 0) {
-    const wordQueries = words.map(word => `(name:"${word}*" OR set.name:"${word}*")`);
-    apiQueryParts.push(`(${wordQueries.join(' AND ')})`);
-  }
   
-  // The last number found is treated as the card number
-  if (numbers.length > 0) {
-    apiQueryParts.push(`number:${numbers[numbers.length - 1]}`);
+  // 1. Check for the special "number/total" format
+  const collectorNumberMatch = query.match(/\b(\d+)\s*\/\s*(\d+)\b/);
+  if (collectorNumberMatch) {
+    const cardNumber = collectorNumberMatch[1];
+    const setTotal = collectorNumberMatch[2];
+    apiQueryParts.push(`number:${cardNumber}`);
+    // Using `printedTotal` is usually what's printed on the card itself.
+    apiQueryParts.push(`set.printedTotal:${setTotal}`);
+    
+    // Remove this part from the query to avoid it being processed as a word
+    query = query.replace(collectorNumberMatch[0], '').trim();
+  }
+
+  // 2. Process the rest of the query
+  if (query) {
+    const parts = query.toLowerCase().split(/\s+/);
+    // Don't treat parts of the collector number as separate numbers if they remain
+    const numbers = parts.filter(p => /^\d+$/.test(p) && p.length < 5);
+    const words = parts.filter(p => !/^\d+$/.test(p) || p.length >= 5);
+
+    if (words.length > 0) {
+      const wordQueries = words.map(word => `(name:"${word}*" OR set.name:"${word}*")`);
+      apiQueryParts.push(`(${wordQueries.join(' AND ')})`);
+    }
+    
+    // Only add a number search if it wasn't handled by the collector number match above.
+    if (numbers.length > 0 && !collectorNumberMatch) {
+      apiQueryParts.push(`number:${numbers[numbers.length - 1]}`);
+    }
   }
 
   const queryString = apiQueryParts.join(' ');
