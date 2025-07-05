@@ -24,7 +24,7 @@ env:
       - RUNTIME
   
   - variable: GOOGLE_APPLICATION_CREDENTIALS_JSON
-    secret: google-creds-clean
+    secret: google-creds-final
     availability:
       - BUILD
       - RUNTIME
