@@ -141,7 +141,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
         videoTrackRef.current = track;
         // @ts-ignore
         const capabilities = track.getCapabilities?.();
-        if (capabilities?.zoom) {
+        if ((capabilities as any)?.zoom) {
           setZoomSupported(true);
           // @ts-ignore
           setMinZoom(capabilities.zoom.min || 1);
