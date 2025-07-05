@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch, LayoutList, PlusSquare, Target, Paintbrush } from "lucide-react";
+import { PackageSearch, LayoutList, PlusSquare, Target, Paintbrush, Search } from "lucide-react";
 
 export function AppHeader() {
   return (
@@ -14,6 +14,12 @@ export function AppHeader() {
           </h1>
         </Link>
         <nav className="flex items-center gap-1 md:gap-2">
+          <Link href="/search">
+            <Button variant="ghost" className="hover:bg-primary-foreground/10 text-primary-foreground px-2 md:px-3">
+              <Search className="mr-0 md:mr-2 h-5 w-5" />
+              <span className="hidden md:inline">Search</span>
+            </Button>
+          </Link>
           <Link href="/my-collection">
             <Button variant="ghost" className="hover:bg-primary-foreground/10 text-primary-foreground px-2 md:px-3">
               <LayoutList className="mr-0 md:mr-2 h-5 w-5" />
