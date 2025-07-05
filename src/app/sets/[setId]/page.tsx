@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -11,6 +12,7 @@ import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialo
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle, DollarSign, TrendingUp, CalendarDays, Hash, Palette, Paintbrush } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -133,18 +135,13 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const headers: HeadersInit = {};
-      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
-        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-      }
-
-      // Fetch Set Details from API
-      const setResponse = await fetch(`https://api.pokemontcg.io/v2/sets/${setId}`, { headers });
+      // Fetch Set Details from our database via our API
+      const setResponse = await fetch(`/api/sets/${setId}`);
       if (!setResponse.ok) {
-        throw new Error(`Set with ID "${setId}" not found. It may be new or invalid.`);
+        const errorData = await setResponse.json().catch(() => ({ message: 'Failed to parse error response' }));
+        throw new Error(errorData.message || `Set with ID "${setId}" not found in database. It may not be synced yet.`);
       }
-      const setData = await setResponse.json();
-      const setInfo = setData.data;
+      const setInfo = await setResponse.json();
 
       setSetDetails({
         id: setInfo.id,
@@ -155,19 +152,25 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
         series: setInfo.series,
       });
 
-      // Fetch cards for the set from the external API
-      let allCards: ApiPokemonCard[] = [];
-      let page = 1;
-      let hasMore = true;
-      while(hasMore) {
-        const cardsResponse = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250&orderBy=number`, { headers });
-        if (!cardsResponse.ok) {
-          throw new Error(`Failed to fetch cards for set ${setId} (page ${page}): ${cardsResponse.statusText} (status: ${cardsResponse.status})`);
-        }
-        const cardsData = await cardsResponse.json();
-        allCards = allCards.concat(cardsData.data as ApiPokemonCard[]);
-        page++;
-        hasMore = cardsData.page * cardsData.pageSize < cardsData.totalCount;
+      // Fetch cards for the set from our database via our API
+      const cardsResponse = await fetch(`/api/cards/by-set/${setId}`);
+      if (!cardsResponse.ok) {
+           const errorData = await cardsResponse.json().catch(() => ({ message: 'Failed to parse error response' }));
+           throw new Error(errorData.message || `Failed to fetch cards for set ${setId}`);
+      }
+      let allCards: ApiPokemonCard[] = await cardsResponse.json();
+
+      if (allCards.length === 0) {
+           const countResponse = await fetch('/api/cards-count');
+           const countData = await countResponse.json();
+           if (countData.count === 0) {
+               toast({
+                   variant: "destructive",
+                   title: "No Cards in Database",
+                   description: "Please sync cards from the Admin page to view set details.",
+                   action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
+               });
+           }
       }
 
       allCards.sort((a, b) => {
@@ -183,12 +186,12 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
       setFilteredCards(allCards);
 
     } catch (err) {
-      console.error(`Error fetching data for set ${setId}:`, err);
+      console.error(`Error fetching data for set ${setId} from database:`, err);
       setError(err instanceof Error ? err.message : "An unknown error occurred");
     } finally {
       setIsLoading(false);
     }
-  }, [setId]);
+  }, [setId, toast]);
 
   useEffect(() => {
     fetchSetDetailsAndCards();
@@ -437,7 +440,7 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
             {isLoading && (
               <div className="flex justify-center items-center py-10">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="ml-4 text-lg text-muted-foreground">Loading cards...</p>
+                <p className="ml-4 text-lg text-muted-foreground">Loading cards from database...</p>
               </div>
             )}
             {error && (
@@ -481,7 +484,7 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
                 {(!isLoading && !error && filteredCards.length === 0) && (
                     <div className="text-center py-10 text-muted-foreground">
                         <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg">{searchTerm ? "No cards found matching your search." : "No cards found in this set, or the API returned no data."}</p>
+                        <p className="text-lg">{searchTerm ? "No cards found matching your search." : "No cards found in this set, or the database returned no data."}</p>
                     </div>
                 )}
               </ScrollArea>
@@ -511,3 +514,5 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
 };
 
 export default SetDetailsPage;
+
+    

@@ -18,8 +18,9 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ARTIST_DATA, type Artist } from "../browse-artists/artistData";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
-// For api.pokemontcg.io
+// This interface matches the data structure of sets stored in Firestore
 interface ApiSet {
   id: string;
   name: string;
@@ -39,7 +40,7 @@ interface DisplaySet {
   name: string;
   series?: string; 
   logoUrl?: string;
-  releaseDate: string; // Store as YYYY-MM-DD for consistency
+  releaseDate: string;
   totalCards: number;
   language: 'English' | 'Japanese';
 }
@@ -62,11 +63,9 @@ const BrowsePageContent: NextPage = () => {
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
 
-  // Load collection for stats, and static artist data
   useEffect(() => {
     setIsClient(true);
     
-    // Load collection from local storage
     const storedCardsRaw = localStorage.getItem("pokemonCards");
     if (storedCardsRaw) {
       try {
@@ -79,7 +78,6 @@ const BrowsePageContent: NextPage = () => {
       }
     }
 
-    // Load static artist data, ensuring it's unique
     const artistMap = new Map<string, Artist>();
     ARTIST_DATA.forEach(artist => {
       if (artist && artist.name) {
@@ -97,7 +95,6 @@ const BrowsePageContent: NextPage = () => {
 
   }, []);
 
-  // Listen for changes to collection in other tabs
   useEffect(() => {
     if (!isClient) return;
     const handleStorageChange = (event: StorageEvent) => {
@@ -118,22 +115,23 @@ const BrowsePageContent: NextPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const headers: HeadersInit = {};
-      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
-        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-      }
-      
-      const response = await fetch('https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate', { headers });
+      const response = await fetch('/api/sets');
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch sets from Pokémon TCG API: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ message: `Failed to fetch sets from the database. Status: ${response.statusText}` }));
+        throw new Error(errorData.message);
       }
       
-      const data = await response.json();
-      const fetchedSets: ApiSet[] = data.data;
+      const fetchedSets: ApiSet[] = await response.json();
 
       if (!fetchedSets || fetchedSets.length === 0) {
-        throw new Error("No sets data found from the API.");
+        const countResponse = await fetch('/api/sets-count');
+        const countData = await countResponse.json();
+        if (countData.count === 0) {
+            throw new Error("No sets found in the database. Please sync the sets in the Admin page first.");
+        } else {
+            throw new Error("No sets data found. The API returned an empty list but the database is not empty.");
+        }
       }
 
       const fetchedDisplaySets: DisplaySet[] = fetchedSets.map(apiSet => ({
@@ -150,7 +148,7 @@ const BrowsePageContent: NextPage = () => {
       setFilteredDisplaySets(fetchedDisplaySets);
 
     } catch (err) {
-      console.error(`Error fetching sets from Pokémon TCG API:`, err);
+      console.error(`Error fetching sets from database:`, err);
       let detailedError = err instanceof Error ? err.message : "An unknown error occurred while fetching sets.";
       setError(detailedError);
       toast({
@@ -158,6 +156,7 @@ const BrowsePageContent: NextPage = () => {
         title: "Could Not Load Sets",
         description: detailedError,
         duration: 10000,
+        action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
       });
     } finally {
       setIsLoading(false);
@@ -265,14 +264,14 @@ const BrowsePageContent: NextPage = () => {
                     {isLoading && (
                     <div className="flex justify-center items-center py-10">
                         <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                        <p className="ml-4 text-lg text-muted-foreground">Loading sets from API...</p>
+                        <p className="ml-4 text-lg text-muted-foreground">Loading sets from database...</p>
                     </div>
                     )}
                     {error && (
                     <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
                         <ServerCrash className="h-16 w-16 mx-auto mb-4" />
                         <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                        <p className="mt-2">Could not load sets: {error}</p>
+                        <p className="mt-2 max-w-md">{error}</p>
                          <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
                     </div>
                     )}
