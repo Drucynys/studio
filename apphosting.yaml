@@ -8,7 +8,7 @@ runConfig:
   concurrency: 80
   cpu: 1
   memoryMiB: 512
-  timeoutSeconds: 600
+  timeoutSeconds: 900
 
 # Environment variables and secrets
 env:
