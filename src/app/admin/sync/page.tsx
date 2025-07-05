@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download } from "lucide-react";
+import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error';
@@ -20,7 +20,40 @@ export default function SyncAdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingCards, setIsExportingCards] = useState(false);
+  
+  const [setCount, setSetCount] = useState<number | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(true);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
   const { toast } = useToast();
+
+  const checkDbStatus = useCallback(async () => {
+    setIsCheckingStatus(true);
+    setStatusError(null);
+    try {
+        const response = await fetch('/api/sets-count');
+        if (!response.ok) {
+            let errorData;
+            try {
+                errorData = await response.json();
+            } catch {
+                errorData = { message: `Server responded with ${response.status}: ${response.statusText}` };
+            }
+            throw new Error(errorData.message || "Failed to fetch status.");
+        }
+        const data = await response.json();
+        setSetCount(data.count);
+    } catch (err: any) {
+        setStatusError(err.message);
+        setSetCount(null);
+    } finally {
+        setIsCheckingStatus(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkDbStatus();
+  }, [checkDbStatus]);
 
   const handleSync = async () => {
     setStatus('in-progress');
@@ -53,6 +86,7 @@ export default function SyncAdminPage() {
       if (result.status === 'success') {
         setStatus('success');
         setLogs(prev => [...prev, `✅ Successfully synced ${result.count} sets.`]);
+        await checkDbStatus(); // Refresh status after successful sync
       } else {
         throw new Error(result.message || 'The sync process reported a failure.');
       }
@@ -184,6 +218,43 @@ export default function SyncAdminPage() {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <div className="max-w-2xl mx-auto space-y-8">
+           <Card className="shadow-lg">
+              <CardHeader>
+                  <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                      <Database className="h-6 w-6 text-primary" />
+                      Database Status
+                  </CardTitle>
+                  <CardDescription>
+                      A real-time check of the number of sets currently stored in your Firestore database.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  {isCheckingStatus ? (
+                      <div className="flex items-center justify-center py-4 text-muted-foreground">
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Checking database status...
+                      </div>
+                  ) : statusError ? (
+                      <Alert variant="destructive">
+                          <ServerCrash className="h-4 w-4" />
+                          <AlertTitle>Could Not Check Status</AlertTitle>
+                          <AlertDescription>{statusError}</AlertDescription>
+                      </Alert>
+                  ) : (
+                      <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Sets in Database</p>
+                          <p className="text-5xl font-bold text-primary">{setCount}</p>
+                      </div>
+                  )}
+                  <div className="text-center">
+                      <Button onClick={checkDbStatus} disabled={isCheckingStatus} variant="outline" size="sm">
+                          <RefreshCcw className="mr-2 h-3 w-3" />
+                          Refresh Status
+                      </Button>
+                  </div>
+              </CardContent>
+          </Card>
+        
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="font-headline text-2xl flex items-center gap-2">
