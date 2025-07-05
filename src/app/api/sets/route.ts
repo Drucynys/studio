@@ -34,7 +34,7 @@ export async function GET() {
         initializeFirebaseAdmin();
         const db = getFirestore();
         const setsCollection = db.collection('pokemon-tcg-sets');
-        const snapshot = await setsCollection.orderBy('releaseDate', 'asc').get();
+        const snapshot = await setsCollection.orderBy('releaseDate', 'desc').get();
 
         if (snapshot.empty) {
             return NextResponse.json([]);

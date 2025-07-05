@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ARTIST_DATA, type Artist } from "../browse-artists/artistData";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // This interface matches the data structure of sets stored in Firestore
 interface ApiSet {
@@ -55,6 +56,7 @@ const BrowsePageContent: NextPage = () => {
   const [filteredDisplaySets, setFilteredDisplaySets] = useState<DisplaySet[]>([]);
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -175,6 +177,13 @@ const BrowsePageContent: NextPage = () => {
         (item.series && item.series.toLowerCase().includes(lowercasedFilter)) ||
         item.id.toLowerCase().includes(lowercasedFilter)
       );
+
+      filteredData.sort((a, b) => {
+        const dateA = new Date(a.releaseDate).getTime();
+        const dateB = new Date(b.releaseDate).getTime();
+        return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      });
+
       setFilteredDisplaySets(filteredData);
     } else {
       const filteredData = allArtists.filter(artist =>
@@ -182,7 +191,7 @@ const BrowsePageContent: NextPage = () => {
       );
       setFilteredArtists(filteredData);
     }
-  }, [searchTerm, displaySets, allArtists, activeTab]);
+  }, [searchTerm, displaySets, allArtists, activeTab, sortOrder]);
 
   const getSetCompletion = (set: DisplaySet) => {
     if (!isClient) return { collected: 0, total: set.totalCards, percentage: 0 };
@@ -248,15 +257,30 @@ const BrowsePageContent: NextPage = () => {
                     ? 'Explore different Pokémon TCG sets from throughout history.' 
                     : 'Explore the entire catalog through the lens of its talented illustrators.'}
                 </CardDescription>
-                <div className="relative mt-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                    type="text"
-                    placeholder={activeTab === 'sets' ? "Search sets by name, series, or ID..." : "Search for an artist..."}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-full md:w-1/2"
-                />
+                <div className="flex flex-col md:flex-row gap-4 mt-4">
+                  <div className="relative flex-grow">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        placeholder={activeTab === 'sets' ? "Search sets by name..." : "Search for an artist..."}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 w-full"
+                    />
+                  </div>
+                  {activeTab === 'sets' && (
+                    <div className="flex-shrink-0">
+                      <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
+                          <SelectTrigger className="w-full md:w-[180px]">
+                              <SelectValue placeholder="Sort by year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="desc">Newest First</SelectItem>
+                              <SelectItem value="asc">Oldest First</SelectItem>
+                          </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
             </CardHeader>
             <CardContent>
@@ -390,5 +414,3 @@ const BrowsePage: NextPage = () => {
 };
 
 export default BrowsePage;
-
-    
