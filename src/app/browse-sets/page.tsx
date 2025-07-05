@@ -355,7 +355,7 @@ const BrowsePageContent: NextPage = () => {
                           {filteredArtists.map((artist) => {
                             const completion = getArtistCompletion(artist);
                             return (
-                              <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}?tab=artists`} className="block group">
+                              <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
                                 <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
                                   <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar">
                                     <User className="w-8 h-8 text-muted-foreground" />
