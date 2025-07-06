@@ -1,8 +1,12 @@
 
 "use client";
 
+interface TcgPlayerSetDetailsPageProps {
+  params: Promise<{ groupId: string }>;
+}
+
 // This page has been removed as TCGPlayer API integration is scrapped.
-export default function TcgPlayerSetDetailsPage() {
+export default async function TcgPlayerSetDetailsPage({ params }: TcgPlayerSetDetailsPageProps) {
    if (typeof window !== 'undefined') {
     // Optional: Redirect to home or another page if accessed directly
     // window.location.href = '/';

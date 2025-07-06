@@ -411,7 +411,7 @@ export default function SyncAdminPage() {
                 </Alert>
               <div className="flex gap-4 justify-center">
                  {cardsSyncStatus !== 'in-progress' ? (
-                    <Button onClick={handleCardsSync} disabled={cardsSyncStatus === 'in-progress'} size="lg">
+                    <Button onClick={handleCardsSync} size="lg">
                         <Play className="mr-2 h-4 w-4"/> Start Full Card Sync
                     </Button>
                  ) : (

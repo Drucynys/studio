@@ -45,11 +45,11 @@ const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Pla
 
 // Updated interface for component props
 interface ArtistDetailPageProps {
-  params: { artistName: string };
+  params: Promise<{ artistName: string }>;
 }
 
-const ArtistDetailPage = ({ params }: ArtistDetailPageProps) => {
-  const { artistName: rawArtistName } = params;
+const ArtistDetailPage = async ({ params }: ArtistDetailPageProps) => {
+  const { artistName: rawArtistName } = await params;
   const artistName = decodeURIComponent(rawArtistName);
 
   // Create a client component to handle the state and effects

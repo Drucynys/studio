@@ -54,12 +54,12 @@ const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Pla
 
 // Updated interface for component props
 interface PokemonDetailPageProps {
-  params: { pokemonName: string };
+  params: Promise<{ pokemonName: string }>;
 }
 
-const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
-  const { pokemonName: rawPokemonNameFromParams } = params;
-  const pokemonName = decodeURIComponent(rawPokemonNameFromParams);
+const PokemonDetailPage = async ({ params }: PokemonDetailPageProps) => {
+  const resolvedParams = await params;
+  const pokemonName = decodeURIComponent(resolvedParams.pokemonName);
 
   // Create a client component to handle the state and effects
   return <PokemonDetailPageClient pokemonName={pokemonName} />;

@@ -88,13 +88,12 @@ interface SetDetails {
 
 // Updated interface for component props
 interface SetDetailsPageProps {
-  params: { setId: string };
+  params: Promise<{ setId: string }>;
 }
 
-const SetDetailsPage = ({ params }: SetDetailsPageProps) => {
-  const { setId } = params;
+const SetDetailsPage = async ({ params }: SetDetailsPageProps) => {
+  const { setId } = await params;
 
-  // Create a client component to handle the state and effects
   return <SetDetailsPageClient setId={setId} />;
 };
 
