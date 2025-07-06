@@ -11,7 +11,8 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
-  getAdditionalUserInfo
+  getAdditionalUserInfo,
+  UserCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, writeBatch, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
@@ -51,70 +52,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
   
-  const migrateLocalCollectionToFirestore = useCallback(async (userId: string) => {
-    const localDataRaw = localStorage.getItem('pokemonCards');
-    if (!localDataRaw) return;
-
-    try {
-      const localCards: PokemonCard[] = JSON.parse(localDataRaw);
-      if (!Array.isArray(localCards) || localCards.length === 0) return;
-
-      toast({
-        title: "Migrating Collection...",
-        description: `Found ${localCards.length} cards in your browser. Moving them to your new account...`,
-      });
-
-      const batch = writeBatch(db);
-      const userCardsRef = collection(db, 'users', userId, 'cards');
-
-      localCards.forEach(card => {
-        const docRef = doc(userCardsRef); // Auto-generate ID
-        batch.set(docRef, { ...card, id: docRef.id, userId });
-      });
-
-      await batch.commit();
-
-      toast({
-        title: "Migration Successful!",
-        description: "Your local collection is now saved to your account.",
-        className: "bg-green-100 text-green-900",
-      });
-      
-      // Backup and clear local storage
-      localStorage.setItem('pokemonCards_backup', localDataRaw);
-      localStorage.removeItem('pokemonCards');
-
-    } catch (error) {
-      console.error("Failed to migrate local collection:", error);
-      toast({
-        variant: "destructive",
-        title: "Migration Failed",
-        description: "Could not move your local cards to your account. They are still saved in this browser.",
-      });
-    }
-  }, [toast]);
-
-  const handleAuthSuccess = useCallback(async (userCredential: any) => {
+  const handleAuthSuccess = useCallback(async (userCredential: UserCredential) => {
     const newUser = userCredential.user;
     const userDocRef = doc(db, "users", newUser.uid);
     const info = getAdditionalUserInfo(userCredential);
 
-    // If it's a new user, create their document and migrate data
-    if (info?.isNewUser) {
+    // If it's a new user, create their document.
+    // Also check if the document exists, to be safe.
+    const docSnap = await getDoc(userDocRef);
+    if (info?.isNewUser || !docSnap.exists()) {
+      console.log("Creating new user document for UID:", newUser.uid);
       await setDoc(userDocRef, {
         email: newUser.email,
         displayName: newUser.displayName || newUser.email?.split('@')[0] || 'New User',
         createdAt: new Date().toISOString(),
         uid: newUser.uid,
       });
-      await migrateLocalCollectionToFirestore(newUser.uid);
     } else {
-      // For existing users, we can just ensure their doc is there or update a lastLogin timestamp
-      await setDoc(userDocRef, { lastLogin: new Date().toISOString() }, { merge: true });
+        console.log("Existing user logged in:", newUser.uid);
     }
     
     closeAuthModal();
-  }, [migrateLocalCollectionToFirestore]);
+  }, []);
 
   const signUp = async (email: string, pass: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -124,19 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, pass: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-    // For regular sign-in, we can't reliably know if it's their "first" time
-    // without a DB read, so we ensure the doc exists here too.
-    const userDocRef = doc(db, "users", userCredential.user.uid);
-    const docSnap = await getDoc(userDocRef);
-    if (!docSnap.exists()) {
-        await setDoc(userDocRef, {
-            email: userCredential.user.email,
-            displayName: userCredential.user.displayName || userCredential.user.email?.split('@')[0],
-            createdAt: new Date().toISOString(),
-            uid: userCredential.user.uid,
-        });
-    }
-    closeAuthModal();
+    await handleAuthSuccess(userCredential); // Check on sign-in too, for robustness
     return userCredential;
   };
 
@@ -156,11 +103,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) throw new Error("You must be logged in to add cards.");
     
     const userCardsRef = collection(db, 'users', user.uid, 'cards');
-    
-    // TEMPORARILY SIMPLIFIED: Always add a new card without checking for duplicates.
-    // This helps isolate the permission issue.
     const newCardRef = doc(userCardsRef);
-    await setDoc(newCardRef, { ...card, id: newCardRef.id, userId: user.uid });
+    await setDoc(newCardRef, { ...card, id: newCardRef.id, userId: user.uid, timestamp: new Date() });
   };
 
   const updateCardInCollection = async (card: PokemonCard) => {
