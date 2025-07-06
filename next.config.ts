@@ -8,7 +8,8 @@ const nextConfig: NextConfig = {
   // Allow your Cloud Workstation domain
   allowedDevOrigins: [
     '3000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
-    '3001-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev'
+    '3001-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
+    '6000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev'
   ],
   
   // If you plan to use external images
@@ -39,6 +40,17 @@ const nextConfig: NextConfig = {
         hostname: 'placehold.co',
       }
     ],
+  },
+
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // Exclude 'async_hooks' from client-side bundle to fix build error
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        async_hooks: false,
+      };
+    }
+    return config;
   },
 
 };
