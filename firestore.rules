@@ -1,35 +1,29 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Public data: Allow anyone to read sets and cards for browsing
-    match /pokemon-tcg-sets/{setId} {
-      allow read: if true;
-      allow write: if false; // Only admin/server should write
-    }
-    match /pokemon-tcg-cards/{cardId} {
-      allow read: if true;
-      allow write: if false; // Only admin/server should write
-    }
-     match /pokemon-tcg-artists/{artistId} {
-      allow read: if true;
-      allow write: if false; // Only admin/server should write
-    }
-     match /pokedex/{pokemonId} {
-      allow read: if true;
-      allow write: if false; // Only admin/server should write
-    }
+    // Public data is read-only for anyone
+    match /pokemon-tcg-sets/{set=**} { allow read: if true; allow write: if false; }
+    match /pokemon-tcg-cards/{card=**} { allow read: if true; allow write: if false; }
+    match /pokemon-tcg-artists/{artist=**} { allow read: if true; allow write: if false; }
+    match /pokedex/{pokemon=**} { allow read: if true; allow write: if false; }
 
-    // User-specific data: Only the authenticated user can access their own data
-    
-    // Allow users to read and write their own profile data
-    match /users/{userId}/profile/{docId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
+    // User-specific data
+    match /users/{userId} {
+      // A user can read their own top-level user document, but not write to it directly.
+      allow get: if request.auth.uid == userId;
 
-    // Allow users to read, write, and delete their own cards
-    match /users/{userId}/cards/{cardId} {
-      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+      // Rules for the user's profile subcollection
+      match /profile/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Rules for the user's card collection
+      match /cards/{cardId} {
+        // A user can read, create, update, and delete cards in their own collection.
+        allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
+      }
     }
   }
 }
