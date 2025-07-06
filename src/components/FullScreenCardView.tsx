@@ -111,7 +111,7 @@ export function FullScreenCardView({
     return null;
   }
 
-  const displayVariant = formatDisplayVariant(currentCard.variant);
+  const displayVariant = formatDisplayVariant(currentCard.variant ?? '');
 
   let dynamicCardTransform = "scale(1.0) translateY(-10px)";
   let shineBackground = "transparent";

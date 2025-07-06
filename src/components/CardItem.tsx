@@ -25,8 +25,10 @@ const formatDisplayVariant = (variantKey?: string): string | null => {
 };
 
 export function CardItem({ card, cardIndex, onEdit, onRemove, onView }: CardItemProps) {
-  const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant) : ''}&view=grid`;
-  const displayVariant = formatDisplayVariant(card.variant);
+  if (!card) return null; // Add this null checknp
+
+  const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant || '') : ''}&view=grid`;
+  const displayVariant = formatDisplayVariant(card.variant as string | undefined);
 
   const cardValue = card.value || 0;
   const cardQuantity = card.quantity || 1;

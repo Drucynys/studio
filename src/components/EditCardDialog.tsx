@@ -112,7 +112,7 @@ export function EditCardDialog({
   if (!isOpen) return null; // Ensure dialog content isn't rendered when closed, prevents issues with initial editableCard state
 
   const currentCardToDisplay = editableCard || card; // Use card prop if editableCard is null (e.g. initial open)
-  const displayVariant = formatDisplayVariant(currentCardToDisplay?.variant);
+  const displayVariant = formatDisplayVariant(currentCardToDisplay?.variant as string | undefined);
 
 
   return (
