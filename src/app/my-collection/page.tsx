@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { FullScreenCardView } from "@/components/FullScreenCardView";
-import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User } from "lucide-react";
+import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +48,27 @@ export default function MyCollectionPage() {
   const [currentFullScreenCardIndex, setCurrentFullScreenCardIndex] = useState<number | null>(null);
 
   const { toast } = useToast();
+
+  const collectionStats = useMemo(() => {
+    if (!collection || collection.length === 0) {
+      return { totalValue: 0, totalCards: 0, uniqueCards: 0 };
+    }
+
+    const totalValue = collection.reduce((acc, card) => {
+      const value = card.value || 0;
+      const quantity = card.quantity || 1;
+      return acc + value * quantity;
+    }, 0);
+
+    const totalCards = collection.reduce((acc, card) => {
+      return acc + (card.quantity || 1);
+    }, 0);
+
+    const uniqueCards = collection.length;
+
+    return { totalValue, totalCards, uniqueCards };
+  }, [collection]);
+
 
   useEffect(() => {
     let tempCards = [...collection];
@@ -198,6 +220,35 @@ export default function MyCollectionPage() {
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8 space-y-6">
+        
+        <section id="collection-summary" aria-labelledby="collection-summary-heading">
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle id="collection-summary-heading" className="text-2xl font-headline font-semibold text-foreground flex items-center gap-2">
+                <TrendingUp className="h-6 w-6 text-primary" />
+                Collection Summary
+              </CardTitle>
+              <CardDescription>An at-a-glance overview of your entire collection.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div className="bg-muted p-4 rounded-lg">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><DollarSign className="h-4 w-4" />Total Estimated Value</h3>
+                  <p className="text-3xl font-bold text-primary">${collectionStats.totalValue.toFixed(2)}</p>
+                </div>
+                <div className="bg-muted p-4 rounded-lg">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Layers className="h-4 w-4" />Total Cards</h3>
+                  <p className="text-3xl font-bold text-primary">{collectionStats.totalCards}</p>
+                </div>
+                <div className="bg-muted p-4 rounded-lg">
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Library className="h-4 w-4" />Unique Cards</h3>
+                  <p className="text-3xl font-bold text-primary">{collectionStats.uniqueCards}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
         <section id="collection-controls" aria-labelledby="collection-controls-heading" className="bg-card p-4 md:p-6 rounded-lg shadow">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
             <h2 id="collection-controls-heading" className="text-3xl font-headline font-semibold text-foreground flex items-center">

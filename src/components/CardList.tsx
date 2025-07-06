@@ -41,7 +41,7 @@ export function CardList({ cards, onEditCard, onRemoveCard, onViewCard }: CardLi
       <CardHeader>
         <CardTitle className="font-headline text-2xl flex items-center gap-2">
           <List className="h-6 w-6 text-primary" />
-          My Collection ({cards.reduce((acc, card) => acc + card.quantity, 0)} Cards, {cards.length} Unique)
+          My Collection
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-grow p-0">
