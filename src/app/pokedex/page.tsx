@@ -196,7 +196,7 @@ export default function PokedexPage() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="w-full sm:w-auto justify-start">
-                      <span>Filter Generations</span>
+                      <span>Gen</span>
                       {selectedGenerations.length > 0 && (
                         <Badge variant="secondary" className="ml-2">{selectedGenerations.length} selected</Badge>
                       )}
@@ -282,4 +282,5 @@ export default function PokedexPage() {
     </div>
   );
 }
+
 
