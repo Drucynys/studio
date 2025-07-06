@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { PokedexIcon } from "@/components/icons/PokedexIcon";
+import { PokeballIcon } from "@/components/icons/PokeballIcon";
 
 export interface Pokemon {
   id: number;
@@ -228,6 +229,11 @@ export default function PokedexPage() {
                                     <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/10 text-xs font-mono text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
                                         #{String(pokemon.id).padStart(3, '0')}
                                     </div>
+                                    {user && isOwned && (
+                                        <div className="absolute top-2 left-2" title="Collected">
+                                            <PokeballIcon className="h-5 w-5 text-primary" />
+                                        </div>
+                                    )}
                                     <div className={cn(
                                         "relative w-24 h-24 transition-all",
                                         user && !isOwned && "grayscale group-hover:grayscale-0"
@@ -241,6 +247,7 @@ export default function PokedexPage() {
                                         data-ai-hint="pokemon sprite"
                                     />
                                     </div>
+                                    <p className="font-semibold text-card-foreground group-hover:text-primary capitalize mt-2 text-sm truncate w-full">{pokemon.name}</p>
                                 </Card>
                                 </Link>
                             )})}
