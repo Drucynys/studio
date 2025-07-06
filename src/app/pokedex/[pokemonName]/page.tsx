@@ -24,11 +24,11 @@ export interface Pokemon {
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
 interface PokemonDetailPageProps {
-  params: Promise<{ pokemonName: string }>;
+  params: { pokemonName: string };
 }
 
-const PokemonDetailPage = async ({ params }: PokemonDetailPageProps) => {
-  const { pokemonName } = await params;
+const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
+  const { pokemonName } = params;
 
   const [cardsForPokemon, setCardsForPokemon] = useState<ApiPokemonCard[]>([]);
   const [pokemonData, setPokemonData] = useState<Pokemon | null>(null);
