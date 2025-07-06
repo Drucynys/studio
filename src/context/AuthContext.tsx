@@ -60,24 +60,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (!docSnap.exists()) {
       console.log(`User document for ${newUser.uid} not found. Creating...`);
+      const userProfileData = {
+        uid: newUser.uid,
+        email: newUser.email,
+        displayName: newUser.displayName || newUser.email?.split('@')[0] || 'New User',
+        createdAt: new Date(), // Use a standard Date object
+      };
+
+      console.log("Attempting to write this user data to Firestore:", userProfileData);
+
       try {
-        await setDoc(userDocRef, {
-          uid: newUser.uid,
-          email: newUser.email,
-          displayName: newUser.displayName || newUser.email?.split('@')[0] || 'New User',
-          createdAt: new Date().toISOString(),
-        });
+        await setDoc(userDocRef, userProfileData);
         console.log(`User document for ${newUser.uid} created successfully.`);
-      } catch (error) {
-        console.error("Error creating user document:", error);
+        toast({
+          title: 'Welcome!',
+          description: 'Your user profile has been created.',
+        });
+      } catch (error: any) {
+        console.error("FATAL: Error creating user document in Firestore:", error);
+        
+        let description = 'Could not create your user profile in the database.';
+        if (error.message) {
+            description = error.message;
+        }
+
         toast({
           variant: 'destructive',
           title: 'Account Setup Failed',
-          description: 'Could not create your user profile in the database.',
+          description: description,
+          duration: 9000,
         });
-        // We probably should sign the user out if their profile can't be created
+
         await signOut(auth);
-        return; // Stop execution
+        return; 
       }
     } else {
       console.log(`User document for ${newUser.uid} already exists.`);
@@ -116,12 +131,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const userCardsRef = collection(db, 'users', user.uid, 'cards');
     const newCardRef = doc(userCardsRef); // Create a new document reference with a unique ID
     
-    await setDoc(newCardRef, { 
-      ...card, 
-      id: newCardRef.id, 
-      userId: user.uid, 
-      timestamp: new Date() 
-    });
+    const cardDataWithMetadata = {
+      ...card,
+      id: newCardRef.id,
+      userId: user.uid,
+      timestamp: new Date()
+    };
+    
+    await setDoc(newCardRef, cardDataWithMetadata);
   };
 
   const updateCardInCollection = async (card: PokemonCard) => {
