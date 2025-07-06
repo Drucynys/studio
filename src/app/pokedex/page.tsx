@@ -48,6 +48,18 @@ export default function PokedexPage() {
   const totalGenerations = 9;
   const generations = useMemo(() => Array.from({ length: totalGenerations }, (_, i) => i + 1), [totalGenerations]);
 
+  const generationRegions: { [key: number]: string } = {
+    1: "Kanto",
+    2: "Johto",
+    3: "Hoenn",
+    4: "Sinnoh",
+    5: "Unova",
+    6: "Kalos",
+    7: "Alola",
+    8: "Galar",
+    9: "Paldea",
+  };
+
   const ownedPokemonNames = useMemo(() => {
     if (!user) return new Set();
     return new Set(collection.map(card => card.name.toLowerCase()));
@@ -229,7 +241,7 @@ export default function PokedexPage() {
                         checked={selectedGenerations.includes(gen)}
                         onCheckedChange={() => handleGenerationToggle(gen)}
                       >
-                        Generation {gen}
+                        Generation {gen} ({generationRegions[gen]})
                       </DropdownMenuCheckboxItem>
                     ))}
                   </DropdownMenuContent>
@@ -261,7 +273,7 @@ export default function PokedexPage() {
                     <div key={genKey}>
                         <>
                             <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
-                                <Hash className="h-6 w-6 text-primary/80" /> Generation {genKey}
+                                <Hash className="h-6 w-6 text-primary/80" /> Generation {genKey} - {generationRegions[genKey]}
                             </h2>
                             <Separator className="mb-4 mx-4" />
                         </>
