@@ -243,10 +243,12 @@ export function AddCardToCollectionDialog({
                   Artist:
                   <Link
                     href={`/browse-artists/${encodeURIComponent(pokemonTcgApiCard.artist)}`}
-                    className="text-primary hover:underline"
                     onClick={onClose}
+                    className="hover:no-underline"
                   >
-                    {pokemonTcgApiCard.artist}
+                    <Badge variant="secondary" className="cursor-pointer">
+                      {pokemonTcgApiCard.artist}
+                    </Badge>
                   </Link>
                 </span>
               )}
