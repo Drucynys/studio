@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users, NotebookText } from "lucide-react";
+import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users, NotebookText, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -66,6 +66,14 @@ export default function SyncAdminPage() {
   const [showCardSyncConfirm, setShowCardSyncConfirm] = useState(false);
   const [isCheckingCardDiff, setIsCheckingCardDiff] = useState(false);
 
+  // States for the new Master Sync flow
+  const [masterSyncStatus, setMasterSyncStatus] = useState<SyncStatus>('idle');
+  const [masterSyncLogs, setMasterSyncLogs] = useState<string[]>([]);
+  const [masterSyncError, setMasterSyncError] = useState<string | null>(null);
+  const [masterSyncProgress, setMasterSyncProgress] = useState(0);
+  const [masterSyncCurrentStep, setMasterSyncCurrentStep] = useState("");
+
+
   const checkDbStatus = useCallback(async () => {
     setIsCheckingStatus(true);
     setStatusError(null);
@@ -107,6 +115,111 @@ export default function SyncAdminPage() {
   useEffect(() => {
     checkDbStatus();
   }, [checkDbStatus]);
+
+  const handleFullResync = async () => {
+    setMasterSyncStatus('in-progress');
+    setMasterSyncLogs(['🚀 Starting full data resynchronization...']);
+    setMasterSyncError(null);
+    setMasterSyncProgress(0);
+
+    try {
+        // Step 1: Check card counts
+        setMasterSyncCurrentStep("Checking for updates...");
+        setMasterSyncLogs(prev => [...prev, "\n[Step 1/4] Checking for new cards..."]);
+        const localCountResponse = await fetch('/api/cards-count');
+        const remoteCountResponse = await fetch('/api/tcg-api-stats');
+
+        if (!localCountResponse.ok || !remoteCountResponse.ok) {
+            throw new Error('Failed to fetch card counts to check for updates.');
+        }
+
+        const localData = await localCountResponse.json();
+        const remoteData = await remoteCountResponse.json();
+        setMasterSyncLogs(prev => [...prev, `Local card count: ${localData.count}`]);
+        setMasterSyncLogs(prev => [...prev, `Remote API card count: ${remoteData.totalCount}`]);
+
+        if (localData.count >= remoteData.totalCount) {
+             setMasterSyncLogs(prev => [...prev, "\n✅ Database is already up to date. No sync needed."]);
+             setMasterSyncStatus('success');
+             setMasterSyncProgress(100);
+             await checkDbStatus();
+             return;
+        }
+        setMasterSyncProgress(10);
+
+        // Step 2: Sync Sets
+        setMasterSyncCurrentStep("Syncing sets...");
+        setMasterSyncLogs(prev => [...prev, "\n[Step 2/4] Syncing latest set list..."]);
+        const setsResponse = await fetch('/api/sync-sets', { method: 'POST' });
+        const setsResult = await setsResponse.json();
+        setMasterSyncLogs(prev => [...prev, ...(setsResult.logs || [])]);
+        if (!setsResponse.ok || setsResult.status !== 'success') {
+             throw new Error(setsResult.message || `Set sync failed.`);
+        }
+        setMasterSyncLogs(prev => [...prev, `✅ Set sync complete. Found ${setsResult.count} sets.`]);
+        await checkDbStatus();
+        setMasterSyncProgress(25);
+
+        // Step 3: Sync All Cards
+        setMasterSyncCurrentStep("Syncing all cards...");
+        setMasterSyncLogs(prev => [...prev, "\n[Step 3/4] Starting full card database sync..."]);
+        const setsToSyncResponse = await fetch('/api/sets');
+        if (!setsToSyncResponse.ok) throw new Error(`Failed to fetch set list for card sync: ${setsToSyncResponse.statusText}`);
+        const setsToSync: ApiSet[] = await setsToSyncResponse.json();
+        if (setsToSync.length === 0) {
+            throw new Error('No sets found in database to sync cards from.');
+        }
+
+        let cumulativeCardCount = 0;
+        for (let i = 0; i < setsToSync.length; i++) {
+            const currentSet = setsToSync[i];
+            const progressPercentage = 25 + ((i + 1) / setsToSync.length) * 50; // Card sync is 25% to 75%
+            setMasterSyncProgress(progressPercentage);
+            setMasterSyncCurrentStep(`Syncing cards for set: ${currentSet.name}`);
+            setMasterSyncLogs(prev => [...prev, `\n[${i + 1}/${setsToSync.length}] Syncing set: ${currentSet.name} (${currentSet.id})`]);
+
+            const syncResponse = await fetch('/api/sync-cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ setId: currentSet.id }),
+            });
+            const syncResult = await syncResponse.json();
+            setMasterSyncLogs(prev => [...prev, ...(syncResult.logs || [])]);
+
+            if (!syncResponse.ok || syncResult.status !== 'success') {
+                throw new Error(syncResult.message || `Failed to sync cards for set ${currentSet.id}`);
+            }
+            cumulativeCardCount += syncResult.count || 0;
+        }
+        setMasterSyncLogs(prev => [...prev, `\n✅ Card sync complete! Total cards processed in this run: ${cumulativeCardCount}.`]);
+        await checkDbStatus();
+        setMasterSyncProgress(75);
+
+        // Step 4: Sync Artists
+        setMasterSyncCurrentStep("Generating artist database...");
+        setMasterSyncLogs(prev => [...prev, "\n[Step 4/4] Generating artist database..."]);
+        const artistsResponse = await fetch('/api/artists', { method: 'POST' });
+        const artistsResult = await artistsResponse.json();
+        setMasterSyncLogs(prev => [...prev, ...(artistsResult.logs || [])]);
+        if (!artistsResponse.ok || artistsResult.status !== 'success') {
+             throw new Error(artistsResult.message || `Artist database generation failed.`);
+        }
+        setMasterSyncLogs(prev => [...prev, `✅ Artist sync complete. Found ${artistsResult.count} artists.`]);
+        await checkDbStatus();
+        setMasterSyncProgress(100);
+
+        // All done
+        setMasterSyncCurrentStep("Completed!");
+        setMasterSyncLogs(prev => [...prev, "\n🎉🎉🎉 Full data resynchronization complete!"]);
+        setMasterSyncStatus('success');
+
+    } catch (err: any) {
+        setMasterSyncStatus('error');
+        setMasterSyncError(err.message || "An unknown error occurred during the sync process.");
+        setMasterSyncLogs(prev => [...prev, `❌ FATAL ERROR: ${err.message}`]);
+    }
+  };
+
 
   const handleSetsSync = async () => {
     setSetsSyncStatus('in-progress');
@@ -335,6 +448,53 @@ export default function SyncAdminPage() {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <div className="max-w-4xl mx-auto space-y-8">
+          <Card className="shadow-lg border-primary">
+            <CardHeader>
+                <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                    <Sparkles className="h-6 w-6 text-primary" />
+                    Full Data Resynchronization
+                </CardTitle>
+                <CardDescription>
+                    This will run the full data sync process in the correct order: check for updates, sync sets, sync all cards, then regenerate the artist database.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="text-center">
+                    <Button onClick={handleFullResync} disabled={masterSyncStatus === 'in-progress'} size="lg">
+                        {masterSyncStatus === 'in-progress' ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing ({masterSyncProgress.toFixed(0)}%)...</>
+                        ) : 'Start Full Resync'}
+                    </Button>
+                    {masterSyncStatus === 'in-progress' && (
+                        <p className="text-sm text-muted-foreground mt-2">{masterSyncCurrentStep}</p>
+                    )}
+                </div>
+
+                {masterSyncStatus !== 'idle' && (
+                    <div className="space-y-4">
+                        {masterSyncStatus === 'in-progress' && (
+                            <Progress value={masterSyncProgress} className="w-full" />
+                        )}
+                        {masterSyncStatus === 'success' && (
+                            <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <AlertTitle>Full Resync Successful!</AlertTitle>
+                            </Alert>
+                          )}
+                          {masterSyncStatus === 'error' && masterSyncError && (
+                            <Alert variant="destructive">
+                              <ServerCrash className="h-4 w-4" />
+                              <AlertTitle>Full Resync Failed</AlertTitle>
+                              <AlertDescription>{masterSyncError}</AlertDescription>
+                            </Alert>
+                          )}
+                          <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Master Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
+                              <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{masterSyncLogs.join('\n')}</pre></ScrollArea>
+                          </CardContent></Card>
+                    </div>
+                )}
+            </CardContent>
+          </Card>
            <Card className="shadow-lg">
               <CardHeader>
                   <CardTitle className="font-headline text-2xl flex items-center gap-2">
