@@ -98,8 +98,10 @@ export async function POST() {
             const batch = db.batch();
             const chunk = artistList.slice(i, i + BATCH_SIZE);
             chunk.forEach(artist => {
-                // Use the artist's name as the document ID for easy updates/retrieval
-                const docRef = artistsCollection.doc(artist.name);
+                // Sanitize the artist name to create a valid Firestore document ID.
+                // Firestore document IDs cannot contain forward slashes ('/').
+                const docId = artist.name.replace(/\//g, '_');
+                const docRef = artistsCollection.doc(docId);
                 batch.set(docRef, artist);
             });
             batchPromises.push(batch.commit());
