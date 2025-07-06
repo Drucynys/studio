@@ -166,25 +166,27 @@ export default function PokedexPage() {
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Card className="shadow-xl">
           <CardHeader>
-            <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
-              <Target className="h-8 w-8 text-primary"/>
-              Pokédex
-            </CardTitle>
-            <CardDescription>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
+                  <Target className="h-8 w-8 text-primary"/>
+                  Pokédex
+                </CardTitle>
+                <div className="relative w-full md:w-1/3">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search Pokémon by name or number..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-full"
+                    />
+                </div>
+            </div>
+            <CardDescription className="pt-2">
               Browse all Pokémon to see their TCG card appearances. Data is sourced from your local database.
             </CardDescription>
-            <div className="flex flex-col md:flex-row gap-4 mt-4">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search Pokémon by name or number..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-full"
-                />
-              </div>
-              <div className="flex-shrink-0">{renderGenerationFilters()}</div>
+            <div className="pt-4">
+              {renderGenerationFilters()}
             </div>
           </CardHeader>
           <CardContent>
