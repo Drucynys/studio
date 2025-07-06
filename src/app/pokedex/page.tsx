@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 
 export interface Pokemon {
@@ -107,6 +108,16 @@ export default function PokedexPage() {
     
     setFilteredPokemon(filtered);
   }, [searchTerm, allPokemon, selectedGenerations]);
+
+  const completionStats = useMemo(() => {
+    const total = filteredPokemon.length;
+    if (total === 0 || !user) {
+      return { collected: 0, total: 0, percentage: 0 };
+    }
+    const collected = filteredPokemon.filter(p => ownedPokemonNames.has(p.name.toLowerCase())).length;
+    const percentage = (collected / total) * 100;
+    return { collected, total, percentage };
+  }, [filteredPokemon, ownedPokemonNames, user]);
 
   const groupedPokemon = useMemo(() => {
     return filteredPokemon.reduce((acc, pokemon) => {
@@ -225,9 +236,23 @@ export default function PokedexPage() {
                 </DropdownMenu>
               </div>
             </div>
+            {user && (
+              <div className="space-y-2 pt-4">
+                  <div className="flex justify-between items-baseline">
+                      <h3 className="text-sm font-medium text-muted-foreground">
+                          {selectedGenerations.length > 0 || searchTerm ? 'Filtered Progress' : 'Overall Collection Progress'}
+                      </h3>
+                      <p className="text-sm font-semibold text-primary">
+                          {completionStats.collected} / {completionStats.total}
+                          <span className="text-muted-foreground font-normal"> owned</span>
+                      </p>
+                  </div>
+                  <Progress value={completionStats.percentage} className="h-2" />
+              </div>
+            )}
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-26rem)]">
+            <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-30rem)]">
               {filteredPokemon.length > 0 ? (
                 sortedGenerationKeys.map(genKey => (
                     <div key={genKey}>
@@ -285,8 +310,3 @@ export default function PokedexPage() {
     </div>
   );
 }
-
-
-
-
-    
