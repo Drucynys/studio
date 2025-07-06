@@ -3,7 +3,7 @@ import type { SVGProps } from 'react';
 export function PokedexIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 76 76"
+      viewBox="19 19 38 38"
       xmlns="http://www.w3.org/2000/svg"
       xmlnsXlink="http://www.w3.org/1999/xlink"
       version="1.1"
