@@ -251,12 +251,11 @@ const BrowsePageContent: NextPage = () => {
                                     <p className="font-semibold text-card-foreground group-hover:text-primary">{set.name}</p>
                                     {set.series && <p className="text-xs text-muted-foreground">{set.series} Series</p>}
                                     <p className="text-xs text-muted-foreground">{new Date(set.releaseDate).toLocaleDateString()}</p>
-                                    {user && <div className="w-full mt-2 mb-3 px-2">
+                                    {user && <div className="w-full mt-4 mb-3 px-2 flex-grow flex flex-col justify-end">
                                         <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
                                         <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
                                         {completion.percentage >= 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
                                     </div>}
-                                    <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Set</Button>
                                     </Card>
                                 </Link>
                             );
