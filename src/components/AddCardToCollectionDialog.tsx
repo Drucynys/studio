@@ -90,6 +90,7 @@ export function AddCardToCollectionDialog({
     const newPrices: DisplayPriceInfo[] = [];
     const pricedVariants: string[] = [];
 
+    // TCGPlayer Prices
     if (pokemonTcgApiCard?.tcgplayer?.prices) {
       imageUrlToSet = pokemonTcgApiCard.images.large || initialCardImageUrl || "https://placehold.co/200x280.png";
       const prices = pokemonTcgApiCard.tcgplayer.prices;
@@ -106,7 +107,12 @@ export function AddCardToCollectionDialog({
       for (const key of sortedPriceKeys) {
         const priceEntry = prices[key as keyof typeof prices];
         if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
-          newPrices.push({ variantKey: key, variantName: formatVariantKey(key), price: priceEntry.market, currencySymbol: '$' });
+          newPrices.push({ 
+            variantKey: `tcgplayer-${key}`, 
+            variantName: `TCGplayer - ${formatVariantKey(key)}`, 
+            price: priceEntry.market, 
+            currencySymbol: '$' 
+          });
           pricedVariants.push(key);
         }
       }
@@ -127,6 +133,31 @@ export function AddCardToCollectionDialog({
       imageUrlToSet = initialCardImageUrl;
       setCurrentAvailableVariants([]);
       setSelectedVariant("");
+    }
+    
+    // Cardmarket Prices
+    if (pokemonTcgApiCard?.cardmarket?.prices) {
+      if (!imageUrlToSet.startsWith('https')) { // if TCGPlayer didn't set image, maybe cardmarket can
+          imageUrlToSet = pokemonTcgApiCard.images.large || initialCardImageUrl || "https://placehold.co/200x280.png";
+      }
+      const cmPrices = pokemonTcgApiCard.cardmarket.prices;
+      const priceMap = {
+          'Trend Price': cmPrices.trendPrice,
+          'Average Sell Price': cmPrices.averageSellPrice,
+          'Low Price': cmPrices.lowPrice,
+          'Reverse Holo Trend': cmPrices.reverseHoloTrend,
+      };
+
+      for (const [name, price] of Object.entries(priceMap)) {
+          if (typeof price === 'number' && price > 0 && !isNaN(price)) {
+              newPrices.push({
+                  variantKey: `cardmarket-${name.toLowerCase().replace(/\s/g, '-')}`,
+                  variantName: `Cardmarket - ${name}`,
+                  price: price,
+                  currencySymbol: '€'
+              });
+          }
+      }
     }
     
     setFinalDisplayImageUrl(imageUrlToSet);
@@ -246,7 +277,7 @@ export function AddCardToCollectionDialog({
                         </SelectTrigger>
                         <SelectContent>
                           {currentAvailableVariants.map((variantKey) => {
-                            const priceInfo = displayPrices.find(p => p.variantKey === variantKey);
+                            const priceInfo = displayPrices.find(p => p.variantKey === `tcgplayer-${variantKey}`);
                             const priceDisplay = priceInfo && typeof priceInfo.price === 'number' ? `(${priceInfo.currencySymbol || '$'}${priceInfo.price.toFixed(2)})` : '';
                             return (
                               <SelectItem key={variantKey} value={variantKey}>
@@ -311,7 +342,7 @@ export function AddCardToCollectionDialog({
               
               {displayPrices.length > 0 && (
                 <div className="space-y-2 mt-4">
-                  <h4 className="font-semibold text-sm flex items-center gap-1"><Tag className="h-4 w-4 text-primary"/> Market Prices (PokemonTCG.io):</h4>
+                  <h4 className="font-semibold text-sm flex items-center gap-1"><Tag className="h-4 w-4 text-primary"/> Market Prices:</h4>
                   <ScrollArea className="h-[100px] border rounded-md p-2 bg-muted/30">
                     <ul className="space-y-1 text-xs">
                       {displayPrices.map((p) => (
