@@ -1,28 +1,35 @@
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read and write only their own data
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Public data (like sets, cards, artists) should be readable by anyone
+    // Public data: Allow anyone to read sets and cards for browsing
     match /pokemon-tcg-sets/{setId} {
       allow read: if true;
-      allow write: if false; // Only updatable via admin/server functions
+      allow write: if false; // Only admin/server should write
     }
     match /pokemon-tcg-cards/{cardId} {
       allow read: if true;
-      allow write: if false; // Only updatable via admin/server functions
+      allow write: if false; // Only admin/server should write
     }
-    match /pokemon-tcg-artists/{artistId} {
+     match /pokemon-tcg-artists/{artistId} {
       allow read: if true;
-      allow write: if false; // Only updatable via admin/server functions
+      allow write: if false; // Only admin/server should write
     }
-    match /pokedex/{pokemonId} {
+     match /pokedex/{pokemonId} {
       allow read: if true;
-      allow write: if false; // Only updatable via admin/server functions
+      allow write: if false; // Only admin/server should write
+    }
+
+    // User-specific data: Only the authenticated user can access their own data
+    
+    // Allow users to read and write their own profile data
+    match /users/{userId}/profile/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Allow users to read, write, and delete their own cards
+    match /users/{userId}/cards/{cardId} {
+      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
