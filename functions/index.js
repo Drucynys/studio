@@ -1,6 +1,5 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const { createWorker } = require('tesseract.js');
 const sharp = require('sharp'); // Import sharp for image processing
 const axios = require('axios'); // Keep axios, though currently not used for OCR
 
@@ -51,6 +50,8 @@ exports.processCardUpload = functions.storage.object().matches({
 
   let extractedText = '';
   let worker;
+  let pokemonName = null;
+  let cardNumber = null;
 
   try {
     // Download the image file buffer
@@ -70,14 +71,11 @@ exports.processCardUpload = functions.storage.object().matches({
       .toBuffer(); // Generate the processed buffer
 
     console.log('Image preprocessed (grayscale, cropped).');
-    // --- End Image Preprocessing ---
-
-    // Initialize Tesseract worker
-    worker = createWorker();
-    await worker.load();
-    // Assuming English text on cards. You might need to handle other languages.
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
+    
+    // --- OCR with Tesseract.js v5 ---
+    console.log('Initializing Tesseract worker...');
+    const { createWorker } = await import('tesseract.js');
+    worker = await createWorker('eng');
     console.log('Tesseract worker initialized.');
 
     // Perform OCR on the processed image buffer
@@ -86,7 +84,9 @@ exports.processCardUpload = functions.storage.object().matches({
     console.log('OCR complete. Extracted text:', extractedText);
 
     // --- Extract Pokémon name and card number using regex ---
-    const { pokemonName, cardNumber } = extractCardDetails(extractedText);
+    const details = extractCardDetails(extractedText);
+    pokemonName = details.pokemonName;
+    cardNumber = details.cardNumber;
     console.log(`Extracted details - Pokémon Name: ${pokemonName}, Card Number: ${cardNumber}`);
     // --- End Extraction ---
 
