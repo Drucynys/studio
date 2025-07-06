@@ -29,7 +29,7 @@ export default function PokedexPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   
-  const [selectedGeneration, setSelectedGeneration] = useState<number | 'all'>('all');
+  const [selectedGenerations, setSelectedGenerations] = useState<number[]>([]);
   const totalGenerations = 9;
 
   const fetchPokemon = useCallback(async () => {
@@ -73,8 +73,8 @@ export default function PokedexPage() {
   useEffect(() => {
     let filtered = [...allPokemon];
 
-    if (selectedGeneration !== 'all') {
-      filtered = filtered.filter(p => p.generation === selectedGeneration);
+    if (selectedGenerations.length > 0) {
+      filtered = filtered.filter(p => selectedGenerations.includes(p.generation));
     }
     
     if (searchTerm) {
@@ -86,14 +86,9 @@ export default function PokedexPage() {
     }
     
     setFilteredPokemon(filtered);
-  }, [searchTerm, allPokemon, selectedGeneration]);
+  }, [searchTerm, allPokemon, selectedGenerations]);
 
   const groupedPokemon = useMemo(() => {
-    if (selectedGeneration !== 'all') {
-        // If a specific generation is selected, don't group, just return the list.
-        return { [selectedGeneration]: filteredPokemon };
-    }
-    // Group by generation only when 'All' is selected
     return filteredPokemon.reduce((acc, pokemon) => {
         const gen = pokemon.generation;
         if (!acc[gen]) {
@@ -102,7 +97,7 @@ export default function PokedexPage() {
         acc[gen].push(pokemon);
         return acc;
     }, {} as Record<number, Pokemon[]>);
-  }, [filteredPokemon, selectedGeneration]);
+  }, [filteredPokemon]);
 
   const sortedGenerationKeys = useMemo(() => {
       return Object.keys(groupedPokemon).map(Number).sort((a, b) => a - b);
@@ -135,14 +130,29 @@ export default function PokedexPage() {
     );
   }
 
+  const handleGenerationToggle = (gen: number) => {
+    setSelectedGenerations(prev => {
+        const isSelected = prev.includes(gen);
+        if (isSelected) {
+            return prev.filter(g => g !== gen);
+        } else {
+            return [...prev, gen].sort((a,b) => a-b);
+        }
+    });
+  };
+
+  const handleSelectAllGens = () => {
+      setSelectedGenerations([]);
+  };
+
   const renderGenerationFilters = () => {
     const generations = Array.from({ length: totalGenerations }, (_, i) => i + 1);
     return (
         <div className="flex flex-wrap gap-2">
             <Button
                 size="sm"
-                variant={selectedGeneration === 'all' ? 'default' : 'outline'}
-                onClick={() => setSelectedGeneration('all')}
+                variant={selectedGenerations.length === 0 ? 'default' : 'outline'}
+                onClick={handleSelectAllGens}
             >
                 All Gens
             </Button>
@@ -150,8 +160,8 @@ export default function PokedexPage() {
                 <Button
                     key={gen}
                     size="sm"
-                    variant={selectedGeneration === gen ? 'default' : 'outline'}
-                    onClick={() => setSelectedGeneration(gen)}
+                    variant={selectedGenerations.includes(gen) ? 'default' : 'outline'}
+                    onClick={() => handleGenerationToggle(gen)}
                 >
                     Gen {gen}
                 </Button>
@@ -194,14 +204,12 @@ export default function PokedexPage() {
               {filteredPokemon.length > 0 ? (
                 sortedGenerationKeys.map(genKey => (
                     <div key={genKey}>
-                        {selectedGeneration === 'all' && (
-                            <>
-                                <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
-                                    <Hash className="h-6 w-6 text-primary/80" /> Generation {genKey}
-                                </h2>
-                                <Separator className="mb-4 mx-4" />
-                            </>
-                        )}
+                        <>
+                            <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
+                                <Hash className="h-6 w-6 text-primary/80" /> Generation {genKey}
+                            </h2>
+                            <Separator className="mb-4 mx-4" />
+                        </>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-12 px-4">
                             {groupedPokemon[genKey]?.map((pokemon) => (
                                 <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
