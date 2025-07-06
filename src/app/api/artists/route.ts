@@ -3,65 +3,119 @@ import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 
+const ARTISTS_COLLECTION = 'pokemon-tcg-artists';
+const CARDS_COLLECTION = 'pokemon-tcg-cards';
+const BATCH_SIZE = 450; // Firestore batch writes are limited to 500 operations
+
 function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) {
-        return;
-    }
+    if (admin.apps.length > 0) { return; }
     const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
     const projectId = process.env.FIREBASE_PROJECT_ID;
 
-    if (!serviceAccountJson) {
-        throw new Error("CRITICAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.");
+    if (!serviceAccountJson || !projectId) {
+        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
     }
-    if (!projectId) {
-        throw new Error("CRITICAL: The FIREBASE_PROJECT_ID environment variable is not set.");
-    }
-
+    
     const serviceAccount = JSON.parse(serviceAccountJson);
     if (serviceAccount.private_key) {
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
-
+    
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         projectId: projectId,
     });
 }
 
+/**
+ * GET handler: Fetches the pre-generated list of artists from the 'pokemon-tcg-artists' collection.
+ * This is used by the front-end browse pages.
+ */
 export async function GET() {
     try {
         initializeFirebaseAdmin();
         const db = getFirestore();
-        // Use .select('artist') to only fetch the artist field, which is much more efficient
-        const snapshot = await db.collection('pokemon-tcg-cards').select('artist').get();
+        const artistsCollection = db.collection(ARTISTS_COLLECTION);
+        // Order by card count descending, then alphabetically for artists with the same count
+        const snapshot = await artistsCollection.orderBy('cardCount', 'desc').orderBy('name', 'asc').get();
 
         if (snapshot.empty) {
-            return NextResponse.json({ message: "No cards found in the database. Cannot generate artist list." }, { status: 404 });
+            return NextResponse.json([]);
+        }
+
+        const artists = snapshot.docs.map(doc => doc.data());
+        return NextResponse.json(artists);
+
+    } catch (error: any) {
+        console.error('Error fetching artists:', error);
+        return NextResponse.json(
+            { message: error.message || 'An unknown server error occurred while fetching artists.' },
+            { status: 500 }
+        );
+    }
+}
+
+
+/**
+ * POST handler: Scans the entire 'pokemon-tcg-cards' collection, aggregates artist data,
+ * and populates the 'pokemon-tcg-artists' collection. Triggered from the admin page.
+ */
+export async function POST() {
+    const logs: string[] = ["- Starting Artist Database Generation -"];
+    try {
+        initializeFirebaseAdmin();
+        const db = getFirestore();
+        logs.push("✅ Firebase Admin SDK initialized.");
+
+        logs.push(`Scanning '${CARDS_COLLECTION}' collection for artists... This may take a moment.`);
+        // Use .select('artist') to only fetch the artist field, which is much more efficient
+        const snapshot = await db.collection(CARDS_COLLECTION).select('artist').get();
+        logs.push(`✅ Found ${snapshot.size} total card documents to scan.`);
+
+        if (snapshot.empty) {
+            throw new Error("No cards found in the database. Cannot generate artist list.");
         }
 
         const artistCounts = new Map<string, number>();
-
         snapshot.forEach(doc => {
             const artist = doc.data().artist;
             if (artist && typeof artist === 'string' && artist.trim() !== '') {
                 artistCounts.set(artist, (artistCounts.get(artist) || 0) + 1);
             }
         });
+        logs.push(`✅ Aggregated ${artistCounts.size} unique artists.`);
 
         const artistList = Array.from(artistCounts.entries()).map(([name, cardCount]) => ({
             name,
             cardCount,
         }));
         
-        // Sort alphabetically by artist name for a consistent output
-        artistList.sort((a, b) => a.name.localeCompare(b.name));
+        logs.push(`Writing ${artistList.length} artists to the '${ARTISTS_COLLECTION}' collection...`);
+        const artistsCollection = db.collection(ARTISTS_COLLECTION);
+        const batchPromises: Promise<any>[] = [];
 
-        return NextResponse.json(artistList);
+        for (let i = 0; i < artistList.length; i += BATCH_SIZE) {
+            const batch = db.batch();
+            const chunk = artistList.slice(i, i + BATCH_SIZE);
+            chunk.forEach(artist => {
+                // Use the artist's name as the document ID for easy updates/retrieval
+                const docRef = artistsCollection.doc(artist.name);
+                batch.set(docRef, artist);
+            });
+            batchPromises.push(batch.commit());
+            logs.push(`Committing a batch of ${chunk.length} artists...`);
+        }
+        
+        await Promise.all(batchPromises);
+        logs.push(`✅ Successfully stored ${artistList.length} artists in the database.`);
+        
+        return NextResponse.json({ status: 'success', count: artistList.length, logs });
 
     } catch (error: any) {
         console.error('Error generating artist list:', error);
+        logs.push(`❌ FATAL ERROR: ${error.message}`);
         return NextResponse.json(
-            { message: error.message || 'An unknown server error occurred while generating the artist list.' },
+            { status: 'error', message: error.message || 'An unknown server error occurred.', logs },
             { status: 500 }
         );
     }

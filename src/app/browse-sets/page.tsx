@@ -16,7 +16,6 @@ import { Progress } from "@/components/ui/progress";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ARTIST_DATA, type Artist } from "../browse-artists/artistData";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -35,16 +34,12 @@ interface ApiSet {
   };
 }
 
-// Unified structure for display
-interface DisplaySet {
-  id: string;
+// This interface matches the artists stored in our DB
+interface Artist {
   name: string;
-  series?: string; 
-  logoUrl?: string;
-  releaseDate: string;
-  totalCards: number;
-  language: 'English' | 'Japanese';
+  cardCount: number;
 }
+
 
 const BrowsePageContent: NextPage = () => {
   const searchParams = useSearchParams();
@@ -52,22 +47,25 @@ const BrowsePageContent: NextPage = () => {
   const initialTab = tabParam === 'artists' ? 'artists' : 'sets';
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  const [displaySets, setDisplaySets] = useState<DisplaySet[]>([]);
-  const [filteredDisplaySets, setFilteredDisplaySets] = useState<DisplaySet[]>([]);
+  const [allSets, setAllSets] = useState<ApiSet[]>([]);
+  const [filteredSets, setFilteredSets] = useState<ApiSet[]>([]);
+  
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
+  
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     setIsClient(true);
-    
     const storedCardsRaw = localStorage.getItem("pokemonCards");
     if (storedCardsRaw) {
       try {
@@ -79,22 +77,6 @@ const BrowsePageContent: NextPage = () => {
         console.error("Failed to parse collection cards from localStorage", error);
       }
     }
-
-    const artistMap = new Map<string, Artist>();
-    ARTIST_DATA.forEach(artist => {
-      if (artist && artist.name) {
-        const existing = artistMap.get(artist.name);
-        if (!existing || (artist.cardCount !== undefined && (!existing.cardCount || artist.cardCount > existing.cardCount))) {
-          artistMap.set(artist.name, artist);
-        }
-      }
-    });
-
-    const uniqueArtists = Array.from(artistMap.values());
-    const sortedArtists = uniqueArtists.sort((a, b) => a.name.localeCompare(b.name));
-    setAllArtists(sortedArtists);
-    setFilteredArtists(sortedArtists);
-
   }, []);
 
   useEffect(() => {
@@ -113,49 +95,52 @@ const BrowsePageContent: NextPage = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [isClient]);
 
-  const fetchSets = useCallback(async () => {
+  const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/sets');
+      const [setsResponse, artistsResponse] = await Promise.all([
+        fetch('/api/sets'),
+        fetch('/api/artists'),
+      ]);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Failed to fetch sets from the database. Status: ${response.statusText}` }));
+      if (!setsResponse.ok) {
+        const errorData = await setsResponse.json().catch(() => ({ message: `Failed to fetch sets from the database. Status: ${setsResponse.statusText}` }));
+        throw new Error(errorData.message);
+      }
+       if (!artistsResponse.ok) {
+        const errorData = await artistsResponse.json().catch(() => ({ message: `Failed to fetch artists from the database. Status: ${artistsResponse.statusText}` }));
         throw new Error(errorData.message);
       }
       
-      const fetchedSets: ApiSet[] = await response.json();
+      const fetchedSets: ApiSet[] = await setsResponse.json();
+      const fetchedArtists: Artist[] = await artistsResponse.json();
 
       if (!fetchedSets || fetchedSets.length === 0) {
-        const countResponse = await fetch('/api/sets-count');
-        const countData = await countResponse.json();
-        if (countData.count === 0) {
-            throw new Error("No sets found in the database. Please sync the sets in the Admin page first.");
-        } else {
-            throw new Error("No sets data found. The API returned an empty list but the database is not empty.");
-        }
+        throw new Error("No sets found in the database. Please sync the sets in the Admin page first.");
+      }
+      if (!fetchedArtists || fetchedArtists.length === 0) {
+        toast({
+            variant: "default",
+            title: "Artists Not Found",
+            description: "Please generate the artist database from the Admin page to enable artist browsing.",
+            duration: 10000,
+            action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
+        });
       }
 
-      const fetchedDisplaySets: DisplaySet[] = fetchedSets.map(apiSet => ({
-          id: apiSet.id,
-          name: apiSet.name,
-          series: apiSet.series,
-          logoUrl: apiSet.images.logo,
-          releaseDate: apiSet.releaseDate,
-          totalCards: apiSet.total > 0 ? apiSet.total : apiSet.printedTotal,
-          language: 'English',
-      }));
-      
-      setDisplaySets(fetchedDisplaySets);
-      setFilteredDisplaySets(fetchedDisplaySets);
+      setAllSets(fetchedSets);
+      setFilteredSets(fetchedSets);
+      setAllArtists(fetchedArtists);
+      setFilteredArtists(fetchedArtists);
 
     } catch (err) {
-      console.error(`Error fetching sets from database:`, err);
-      let detailedError = err instanceof Error ? err.message : "An unknown error occurred while fetching sets.";
+      console.error(`Error fetching data:`, err);
+      let detailedError = err instanceof Error ? err.message : "An unknown error occurred while fetching data.";
       setError(detailedError);
       toast({
         variant: "destructive",
-        title: "Could Not Load Sets",
+        title: "Could Not Load Data",
         description: detailedError,
         duration: 10000,
         action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
@@ -166,13 +151,13 @@ const BrowsePageContent: NextPage = () => {
   }, [toast]);
 
   useEffect(() => {
-    fetchSets();
-  }, [fetchSets]);
+    fetchAllData();
+  }, [fetchAllData]);
 
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
     if (activeTab === 'sets') {
-      const filteredData = displaySets.filter(item =>
+      const filteredData = allSets.filter(item =>
         item.name.toLowerCase().includes(lowercasedFilter) ||
         (item.series && item.series.toLowerCase().includes(lowercasedFilter)) ||
         item.id.toLowerCase().includes(lowercasedFilter)
@@ -184,26 +169,26 @@ const BrowsePageContent: NextPage = () => {
         return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
       });
 
-      setFilteredDisplaySets(filteredData);
+      setFilteredSets(filteredData);
     } else {
       const filteredData = allArtists.filter(artist =>
         artist.name.toLowerCase().includes(lowercasedFilter)
       );
       setFilteredArtists(filteredData);
     }
-  }, [searchTerm, displaySets, allArtists, activeTab, sortOrder]);
+  }, [searchTerm, allSets, allArtists, activeTab, sortOrder]);
 
-  const getSetCompletion = (set: DisplaySet) => {
-    if (!isClient) return { collected: 0, total: set.totalCards, percentage: 0 };
+  const getSetCompletion = (set: ApiSet) => {
+    if (!isClient) return { collected: 0, total: set.total, percentage: 0 };
     
     const collectedCardIdentifiersInSet = new Set<string>();
     collectionCards.forEach(card => {
-        if (card.language === set.language && card.set === set.name) {
+        if (card.set === set.name) {
             collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
         }
     });
     const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
-    const totalInSet = set.totalCards > 0 ? set.totalCards : 1; 
+    const totalInSet = set.printedTotal > 0 ? set.printedTotal : 1; 
     const percentage = totalInSet > 0 ? (uniqueCollectedCount / totalInSet) * 100 : 0;
     
     return { collected: uniqueCollectedCount, total: totalInSet, percentage };
@@ -296,14 +281,14 @@ const BrowsePageContent: NextPage = () => {
                         <ServerCrash className="h-16 w-16 mx-auto mb-4" />
                         <p className="text-xl font-semibold">Oops! Something went wrong.</p>
                         <p className="mt-2 max-w-md">{error}</p>
-                         <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
+                         <Button onClick={fetchAllData} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
                     </div>
                     )}
                     {!isLoading && !error && (
                     <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
-                        {filteredDisplaySets.length > 0 ? (
+                        {filteredSets.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
-                            {filteredDisplaySets.map((set) => {
+                            {filteredSets.map((set) => {
                             const completion = getSetCompletion(set);
                             const linkHref = `/sets/${set.id}`;
                             return (
@@ -312,9 +297,9 @@ const BrowsePageContent: NextPage = () => {
                                         "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full",
                                         "group-hover:z-10 relative"
                                     )}>
-                                    {set.logoUrl ? (
+                                    {set.images.logo ? (
                                         <div className="relative w-32 h-16 mb-3">
-                                        <Image src={set.logoUrl} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
+                                        <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
                                         </div>
                                     ) : (
                                         <div className="w-32 h-16 mb-3 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">

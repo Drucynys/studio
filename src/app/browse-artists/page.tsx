@@ -1,31 +1,56 @@
+
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Search, Paintbrush, User } from "lucide-react";
-import { ARTIST_DATA, Artist } from './artistData';
+import { Loader2, Search, Paintbrush, User, ServerCrash } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+interface Artist {
+  name: string;
+  cardCount: number;
+}
 
 export default function BrowseArtistsPage() {
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [isClient, setIsClient] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchArtists = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/artists');
+      if (!response.ok) {
+        throw new Error('Failed to fetch artists from the database.');
+      }
+      const data: Artist[] = await response.json();
+      setAllArtists(data);
+      setFilteredArtists(data);
+    } catch (err: any) {
+      setError(err.message);
+      toast({
+        variant: "destructive",
+        title: "Could Not Load Artists",
+        description: `${err.message} Please try syncing the artists in the admin page.`,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    setIsClient(true);
-    // Sort artists alphabetically, filtering any potentially malformed entries
-    const sortedArtists = [...ARTIST_DATA]
-      .filter(artist => artist && artist.name) // Add filter for safety
-      .sort((a, b) => a.name.localeCompare(b.name));
-    setAllArtists(sortedArtists);
-    setFilteredArtists(sortedArtists);
-  }, []);
+    fetchArtists();
+  }, [fetchArtists]);
+
 
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
@@ -35,13 +60,27 @@ export default function BrowseArtistsPage() {
     setFilteredArtists(filtered);
   }, [searchTerm, allArtists]);
 
-  if (!isClient) {
+  if (isLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
         <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="ml-4 text-lg text-muted-foreground">Loading Artists...</p>
+        </main>
+      </div>
+    );
+  }
+  
+  if (error) {
+     return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <AppHeader />
+        <main className="flex-grow container mx-auto p-4 md:p-8 flex flex-col items-center justify-center text-center">
+            <ServerCrash className="h-16 w-16 text-destructive mb-4" />
+            <h2 className="text-2xl font-bold text-destructive">Failed to Load Artists</h2>
+            <p className="text-muted-foreground mt-2">{error}</p>
+            <Button onClick={fetchArtists} className="mt-4">Try Again</Button>
         </main>
       </div>
     );

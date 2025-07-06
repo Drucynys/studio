@@ -8,9 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users, ClipboardCopy } from "lucide-react";
+import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Textarea } from "@/components/ui/textarea";
 
 type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error' | 'stopped';
 interface ApiSet {
@@ -18,52 +17,45 @@ interface ApiSet {
   name: string;
   total: number;
 }
-interface ArtistData {
-    name: string;
-    cardCount: number;
-}
-
 
 export default function SyncAdminPage() {
   const [setsSyncStatus, setSetsSyncStatus] = useState<SyncStatus>('idle');
   const [cardsSyncStatus, setCardsSyncStatus] = useState<SyncStatus>('idle');
+  const [artistsSyncStatus, setArtistsSyncStatus] = useState<SyncStatus>('idle');
   
   const [setsLogs, setSetsLogs] = useState<string[]>([]);
   const [cardsLogs, setCardsLogs] = useState<string[]>([]);
+  const [artistsLogs, setArtistsLogs] = useState<string[]>([]);
   
   const [setsError, setSetsError] = useState<string | null>(null);
   const [cardsError, setCardsError] = useState<string | null>(null);
+  const [artistsError, setArtistsError] = useState<string | null>(null);
 
   const [isExportingSets, setIsExportingSets] = useState(false);
   const [isExportingCards, setIsExportingCards] = useState(false);
   
   const [setCount, setSetCount] = useState<number | null>(null);
   const [cardCount, setCardCount] = useState<number | null>(null);
+  const [artistCount, setArtistCount] = useState<number | null>(null);
   
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   const { toast } = useToast();
 
-  // State for incremental card sync
   const [allSetsToSync, setAllSetsToSync] = useState<ApiSet[]>([]);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   const [totalCardsSynced, setTotalCardsSynced] = useState(0);
   const isSyncStopped = useRef(false);
 
-  // State for artist generation
-  const [isGeneratingArtists, setIsGeneratingArtists] = useState(false);
-  const [artistList, setArtistList] = useState<ArtistData[]>([]);
-  const [artistListOutput, setArtistListOutput] = useState<string>("");
-  const [artistError, setArtistError] = useState<string | null>(null);
-
   const checkDbStatus = useCallback(async () => {
     setIsCheckingStatus(true);
     setStatusError(null);
     try {
-        const [setsResponse, cardsResponse] = await Promise.all([
+        const [setsResponse, cardsResponse, artistsResponse] = await Promise.all([
             fetch('/api/sets-count'),
-            fetch('/api/cards-count')
+            fetch('/api/cards-count'),
+            fetch('/api/artists-count')
         ]);
         
         if (!setsResponse.ok) throw new Error(`Failed to fetch set count: ${setsResponse.statusText}`);
@@ -74,10 +66,15 @@ export default function SyncAdminPage() {
         const cardsData = await cardsResponse.json();
         setCardCount(cardsData.count);
 
+        if (!artistsResponse.ok) throw new Error(`Failed to fetch artist count: ${artistsResponse.statusText}`);
+        const artistsData = await artistsResponse.json();
+        setArtistCount(artistsData.count);
+
     } catch (err: any) {
         setStatusError(err.message);
         setSetCount(null);
         setCardCount(null);
+        setArtistCount(null);
     } finally {
         setIsCheckingStatus(false);
     }
@@ -132,7 +129,6 @@ export default function SyncAdminPage() {
     resetCardSync();
     setCardsSyncStatus('in-progress');
     
-    // Step 1: Fetch the full list of sets to sync
     setCardsLogs(prev => [...prev, 'Fetching list of all sets to sync...']);
     try {
       const setsResponse = await fetch('/api/sets');
@@ -147,7 +143,6 @@ export default function SyncAdminPage() {
       setAllSetsToSync(sets);
       setCardsLogs(prev => [...prev, `Found ${sets.length} sets. Starting incremental sync...`]);
 
-      // Step 2: Loop through sets and sync one by one
       let cumulativeCardCount = 0;
       for (let i = 0; i < sets.length; i++) {
         if (isSyncStopped.current) break;
@@ -183,6 +178,30 @@ export default function SyncAdminPage() {
         setCardsSyncStatus('error');
         setCardsError(err.message || "An unknown client-side error occurred during card sync.");
         setCardsLogs(prev => [...prev, `❌ Error: ${err.message}`]);
+    }
+  };
+  
+  const handleArtistsSync = async () => {
+    setArtistsSyncStatus('in-progress');
+    setArtistsLogs(['Starting artist database generation...']);
+    setArtistsError(null);
+    try {
+      const response = await fetch('/api/artists', { method: 'POST' });
+      const result = await response.json();
+
+      setArtistsLogs(result.logs || ['No logs returned from server.']);
+
+      if (response.ok && result.status === 'success') {
+        setArtistsSyncStatus('success');
+        setArtistsLogs(prev => [...prev, `✅ Successfully generated and stored ${result.count} artists.`]);
+        await checkDbStatus();
+      } else {
+        throw new Error(result.message || `Server responded with status ${response.status}`);
+      }
+    } catch (err: any) {
+      setArtistsSyncStatus('error');
+      setArtistsError(err.message || 'An unknown client-side error occurred.');
+      setArtistsLogs(prev => [...prev, `❌ Error: ${err.message}`]);
     }
   };
   
@@ -241,43 +260,6 @@ export default function SyncAdminPage() {
     }
   };
 
-  const handleGenerateArtists = async () => {
-    setIsGeneratingArtists(true);
-    setArtistList([]);
-    setArtistListOutput("");
-    setArtistError(null);
-    try {
-      const response = await fetch('/api/artists');
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to generate artist list');
-      }
-      const data: ArtistData[] = await response.json();
-      setArtistList(data);
-
-      const outputString = 'export const ARTIST_DATA: Artist[] = [\n' +
-        data.map(artist => ` { name: '${artist.name.replace(/'/g, "\\'")}', cardCount: ${artist.cardCount} },`).join('\n') +
-        '\n];';
-      setArtistListOutput(outputString);
-
-      toast({
-        title: "Artist List Generated!",
-        description: `Found ${data.length} unique artists.`,
-        className: "bg-green-50 text-green-900 border-green-200",
-      });
-
-    } catch (err: any) {
-      setArtistError(err.message);
-      toast({
-        variant: "destructive",
-        title: "Artist Generation Failed",
-        description: err.message,
-      });
-    } finally {
-      setIsGeneratingArtists(false);
-    }
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
@@ -290,7 +272,7 @@ export default function SyncAdminPage() {
                       Database Status
                   </CardTitle>
                   <CardDescription>
-                      A real-time check of the number of sets and cards currently stored in your Firestore database.
+                      A real-time check of the number of items currently stored in your Firestore database.
                   </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -306,14 +288,18 @@ export default function SyncAdminPage() {
                           <AlertDescription>{statusError}</AlertDescription>
                       </Alert>
                   ) : (
-                      <div className="grid grid-cols-2 divide-x divide-border text-center">
+                      <div className="grid grid-cols-3 divide-x divide-border text-center">
                           <div>
-                              <p className="text-sm text-muted-foreground">Sets in Database</p>
+                              <p className="text-sm text-muted-foreground">Sets</p>
                               <p className="text-5xl font-bold text-primary">{setCount}</p>
                           </div>
                           <div>
-                              <p className="text-sm text-muted-foreground">Cards in Database</p>
+                              <p className="text-sm text-muted-foreground">Cards</p>
                               <p className="text-5xl font-bold text-primary">{cardCount}</p>
+                          </div>
+                           <div>
+                              <p className="text-sm text-muted-foreground">Artists</p>
+                              <p className="text-5xl font-bold text-primary">{artistCount}</p>
                           </div>
                       </div>
                   )}
@@ -445,6 +431,48 @@ export default function SyncAdminPage() {
 
           <Card className="shadow-lg">
             <CardHeader>
+              <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                <Users className="h-6 w-6 text-primary" />
+                Artist Database Sync
+              </CardTitle>
+              <CardDescription>
+                Scan all cards in the database to generate a list of artists and their card counts. This populates the `pokemon-tcg-artists` collection for the browse page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-center">
+                <Button onClick={handleArtistsSync} disabled={artistsSyncStatus === 'in-progress'} size="lg">
+                  {artistsSyncStatus === 'in-progress' ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating & Storing Artists...</>
+                  ) : 'Generate Artist Database'}
+                </Button>
+              </div>
+
+              {artistsSyncStatus !== 'idle' && (
+                <div className="space-y-4">
+                  {artistsSyncStatus === 'success' && (
+                    <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertTitle>Artist Sync Successful!</AlertTitle>
+                    </Alert>
+                  )}
+                  {artistsSyncStatus === 'error' && artistsError && (
+                    <Alert variant="destructive">
+                      <ServerCrash className="h-4 w-4" />
+                      <AlertTitle>Artist Sync Failed</AlertTitle>
+                      <AlertDescription>{artistsError}</AlertDescription>
+                    </Alert>
+                  )}
+                  <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Artist Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
+                      <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{artistsLogs.join('\n')}</pre></ScrollArea>
+                  </CardContent></Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg">
+            <CardHeader>
                 <CardTitle className="font-headline text-2xl flex items-center gap-2">
                   <Download className="h-6 w-6 text-primary" />
                   Export Data as ZIP
@@ -467,84 +495,8 @@ export default function SyncAdminPage() {
                   <p className="text-xs text-muted-foreground">A zip file containing JSON data for all ~16,000+ cards.</p>
               </div>
             </CardContent>
-          </Card>
+          </Card>>
 
-           <Card className="shadow-lg">
-              <CardHeader>
-                  <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                      <Users className="h-6 w-6 text-primary" />
-                      Generate Artist Data
-                  </CardTitle>
-                  <CardDescription>
-                      Scan all cards in the database to generate a list of artists and their card counts. This can be used to update the static artist list for the browse page.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                  <div className="text-center">
-                      <Button onClick={handleGenerateArtists} disabled={isGeneratingArtists} size="lg">
-                          {isGeneratingArtists ? (
-                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
-                          ) : 'Generate Artist List'}
-                      </Button>
-                  </div>
-
-                  {artistError && (
-                      <Alert variant="destructive">
-                          <ServerCrash className="h-4 w-4" />
-                          <AlertTitle>Generation Failed</AlertTitle>
-                          <AlertDescription>{artistError}</AlertDescription>
-                      </Alert>
-                  )}
-
-                  {artistList.length > 0 && (
-                      <div className="space-y-4">
-                          <Alert>
-                              <AlertTitle>Generation Complete!</AlertTitle>
-                              <AlertDescription>Found {artistList.length} unique artists. You can copy the code below to update the static artist data file.</AlertDescription>
-                          </Alert>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                  <h4 className="font-semibold mb-2 text-sm">Artist Counts:</h4>
-                                  <ScrollArea className="h-64 border rounded-md p-2 bg-background">
-                                      <ul className="text-sm">
-                                          {artistList.map(artist => (
-                                              <li key={artist.name} className="flex justify-between py-0.5">
-                                                  <span className="truncate pr-4">{artist.name}</span>
-                                                  <span className="font-mono flex-shrink-0">{artist.cardCount}</span>
-                                              </li>
-                                          ))}
-                                      </ul>
-                                  </ScrollArea>
-                              </div>
-                              <div>
-                                  <h4 className="font-semibold mb-2 text-sm">Generated Code for `artistData.ts`:</h4>
-                                  <div className="relative">
-                                      <Textarea
-                                          readOnly
-                                          value={artistListOutput}
-                                          className="h-64 font-mono text-xs bg-muted"
-                                          aria-label="Generated artist data code"
-                                      />
-                                      <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="absolute top-2 right-2 h-7 w-7"
-                                          onClick={() => {
-                                              navigator.clipboard.writeText(artistListOutput);
-                                              toast({ title: "Copied to clipboard!" });
-                                          }}
-                                      >
-                                          <ClipboardCopy className="h-4 w-4" />
-                                          <span className="sr-only">Copy to clipboard</span>
-                                      </Button>
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
-                  )}
-              </CardContent>
-          </Card>
         </div>
       </main>
     </div>
