@@ -29,8 +29,8 @@ function initializeFirebaseAdmin() {
     });
 }
 
-export async function GET(request: Request, { params }: { params: { setId: string } }) {
-    const { setId } = params;
+export async function GET(request: Request, { params }: { params: Promise<{ setId: string }> }) {
+    const { setId } = await params;
     if (!setId) {
         return NextResponse.json({ message: 'Set ID is required' }, { status: 400 });
     }

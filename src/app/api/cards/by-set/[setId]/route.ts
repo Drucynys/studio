@@ -31,9 +31,9 @@ function initializeFirebaseAdmin() {
 
 export async function GET(
     request: Request,
-    { params }: { params: { setId: string } }
+    { params }: { params: Promise<{ setId: string }> }
   ) {
-    const { setId } = params;
+    const { setId } = await params;
     if (!setId) {
         return NextResponse.json({ message: 'Set ID is required' }, { status: 400 });
     }
