@@ -26,6 +26,12 @@ env:
       - BUILD
       - RUNTIME
 
+  # Secret for protecting the cron job endpoint. Create this in Secret Manager.
+  - variable: CRON_SECRET
+    secret: cron-secret-key
+    availability:
+      - RUNTIME
+
   # ADD THESE FIREBASE CLIENT VARIABLES:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: AIzaSyCs2IWCbkVY8Md1X0k6k12LCVuny4Nplc8
