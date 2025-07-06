@@ -13,7 +13,7 @@ import {
   signInWithPopup,
   getAdditionalUserInfo
 } from 'firebase/auth';
-import { doc, setDoc, getFirestore, collection, onSnapshot, writeBatch, getDocs, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, writeBatch, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { PokemonCard } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -96,18 +96,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleAuthSuccess = useCallback(async (userCredential: any) => {
     const newUser = userCredential.user;
-    const additionalInfo = getAdditionalUserInfo(userCredential);
+    const userDocRef = doc(db, "users", newUser.uid);
     
-    if (additionalInfo?.isNewUser) {
-      const userDocRef = doc(db, "users", newUser.uid);
+    // Check if user document already exists
+    const docSnap = await getDoc(userDocRef);
+
+    if (!docSnap.exists()) {
+      // Document doesn't exist, so create it
       await setDoc(userDocRef, {
         email: newUser.email,
         displayName: newUser.displayName || newUser.email,
         createdAt: new Date().toISOString(),
         uid: newUser.uid,
       });
+      // And migrate local data since this is their first time with a DB entry
       await migrateLocalCollectionToFirestore(newUser.uid);
     }
+    
     closeAuthModal();
   }, [migrateLocalCollectionToFirestore]);
 
@@ -172,7 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const removeCardFromCollection = async (cardId: string) => {
       if (!user) throw new Error("You must be logged in to remove cards.");
       const cardRef = doc(db, 'users', user.uid, 'cards', cardId);
-      await deleteDoc(cardRef); // Hard delete
+      await deleteDoc(cardRef);
   };
 
   useEffect(() => {
