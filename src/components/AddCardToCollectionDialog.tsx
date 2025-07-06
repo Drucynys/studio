@@ -28,7 +28,6 @@ import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { MarketPriceHistoryChart } from "@/components/MarketPriceHistoryChart"; 
 import { SingleCardTiltView } from "@/components/SingleCardTiltView";
 import { useToast } from "@/hooks/use-toast";
 
@@ -328,12 +327,6 @@ export function AddCardToCollectionDialog({
                 </div>
               )}
               
-              <Separator className="my-4"/>
-              <MarketPriceHistoryChart 
-                  variantName={formattedSelectedVariantName}
-                  variantMarketPrice={marketPriceForSelectedVariant}
-              />
-
             </div>
           </ScrollArea>
           <DialogFooter>
