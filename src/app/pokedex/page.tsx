@@ -1,17 +1,18 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Search, Target, ServerCrash } from "lucide-react";
+import { Loader2, Search, Target, ServerCrash, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 export interface Pokemon {
   id: number;
@@ -27,6 +28,9 @@ export default function PokedexPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  const [selectedGeneration, setSelectedGeneration] = useState<number | 'all'>('all');
+  const totalGenerations = 9;
 
   const fetchPokemon = useCallback(async () => {
     setIsLoading(true);
@@ -49,7 +53,6 @@ export default function PokedexPage() {
       }
 
       setAllPokemon(data);
-      setFilteredPokemon(data);
     } catch (err: any) {
       setError(err.message);
       toast({
@@ -68,13 +71,43 @@ export default function PokedexPage() {
 
 
   useEffect(() => {
-    const lowercasedFilter = searchTerm.toLowerCase();
-    const filtered = allPokemon.filter(p =>
-      p.name.toLowerCase().includes(lowercasedFilter) ||
-      String(p.id).includes(lowercasedFilter)
-    );
+    let filtered = [...allPokemon];
+
+    if (selectedGeneration !== 'all') {
+      filtered = filtered.filter(p => p.generation === selectedGeneration);
+    }
+    
+    if (searchTerm) {
+        const lowercasedFilter = searchTerm.toLowerCase();
+        filtered = filtered.filter(p =>
+          p.name.toLowerCase().includes(lowercasedFilter) ||
+          String(p.id).includes(lowercasedFilter)
+        );
+    }
+    
     setFilteredPokemon(filtered);
-  }, [searchTerm, allPokemon]);
+  }, [searchTerm, allPokemon, selectedGeneration]);
+
+  const groupedPokemon = useMemo(() => {
+    if (selectedGeneration !== 'all') {
+        // If a specific generation is selected, don't group, just return the list.
+        return { [selectedGeneration]: filteredPokemon };
+    }
+    // Group by generation only when 'All' is selected
+    return filteredPokemon.reduce((acc, pokemon) => {
+        const gen = pokemon.generation;
+        if (!acc[gen]) {
+            acc[gen] = [];
+        }
+        acc[gen].push(pokemon);
+        return acc;
+    }, {} as Record<number, Pokemon[]>);
+  }, [filteredPokemon, selectedGeneration]);
+
+  const sortedGenerationKeys = useMemo(() => {
+      return Object.keys(groupedPokemon).map(Number).sort((a, b) => a - b);
+  }, [groupedPokemon]);
+
 
   if (isLoading) {
     return (
@@ -102,6 +135,31 @@ export default function PokedexPage() {
     );
   }
 
+  const renderGenerationFilters = () => {
+    const generations = Array.from({ length: totalGenerations }, (_, i) => i + 1);
+    return (
+        <div className="flex flex-wrap gap-2">
+            <Button
+                size="sm"
+                variant={selectedGeneration === 'all' ? 'default' : 'outline'}
+                onClick={() => setSelectedGeneration('all')}
+            >
+                All Gens
+            </Button>
+            {generations.map(gen => (
+                <Button
+                    key={gen}
+                    size="sm"
+                    variant={selectedGeneration === gen ? 'default' : 'outline'}
+                    onClick={() => setSelectedGeneration(gen)}
+                >
+                    Gen {gen}
+                </Button>
+            ))}
+        </div>
+    );
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
@@ -115,45 +173,59 @@ export default function PokedexPage() {
             <CardDescription>
               Browse all Pokémon to see their TCG card appearances. Data is sourced from your local database.
             </CardDescription>
-            <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search Pokémon by name or Pokédex number..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full md:w-1/2"
-              />
+            <div className="flex flex-col md:flex-row gap-4 mt-4">
+              <div className="relative flex-grow">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search Pokémon by name or number..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
+              <div className="flex-shrink-0">{renderGenerationFilters()}</div>
             </div>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-25rem)]">
+            <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-28rem)]">
               {filteredPokemon.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
-                  {filteredPokemon.map((pokemon) => (
-                    <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
-                      <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                        <div className="relative w-24 h-24 mb-3">
-                          <Image
-                            src={pokemon.sprite}
-                            alt={pokemon.name}
-                            layout="fill"
-                            objectFit="contain"
-                            unoptimized // Sprites are small and don't need optimization
-                            data-ai-hint="pokemon sprite"
-                          />
+                sortedGenerationKeys.map(genKey => (
+                    <div key={genKey}>
+                        {selectedGeneration === 'all' && (
+                            <>
+                                <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
+                                    <Hash className="h-6 w-6 text-primary/80" /> Generation {genKey}
+                                </h2>
+                                <Separator className="mb-4 mx-4" />
+                            </>
+                        )}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-12 px-4">
+                            {groupedPokemon[genKey]?.map((pokemon) => (
+                                <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
+                                <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
+                                    <div className="relative w-24 h-24 mb-3">
+                                    <Image
+                                        src={pokemon.sprite}
+                                        alt={pokemon.name}
+                                        layout="fill"
+                                        objectFit="contain"
+                                        unoptimized // Sprites are small and don't need optimization
+                                        data-ai-hint="pokemon sprite"
+                                    />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">#{String(pokemon.id).padStart(3, '0')}</p>
+                                    <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{pokemon.name}</p>
+                                </Card>
+                                </Link>
+                            ))}
                         </div>
-                        <p className="text-xs text-muted-foreground">#{String(pokemon.id).padStart(3, '0')}</p>
-                        <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{pokemon.name}</p>
-                        {pokemon.generation && <p className="text-xs text-muted-foreground mt-1">Gen {pokemon.generation}</p>}
-                      </Card>
-                    </Link>
-                  ))}
-                </div>
+                    </div>
+                ))
               ) : (
                 <div className="text-center py-10 text-muted-foreground">
                   <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg">No Pokémon found matching your search.</p>
+                  <p className="text-lg">No Pokémon found matching your search or filter.</p>
                 </div>
               )}
             </ScrollArea>
