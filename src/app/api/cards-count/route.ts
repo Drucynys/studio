@@ -34,8 +34,8 @@ export async function GET() {
         initializeFirebaseAdmin();
         const db = getFirestore();
         const cardsCollection = db.collection('pokemon-tcg-cards');
-        const snapshot = await cardsCollection.get();
-        const count = snapshot.size;
+        const snapshot = await cardsCollection.count().get();
+        const count = snapshot.data().count;
 
         return NextResponse.json({ count });
     } catch (error: any) {

@@ -52,14 +52,13 @@ export interface ApiPokemonCard {
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-// Updated interface for component props to handle async params
+// Updated interface for component props
 interface PokemonDetailPageProps {
-  params: Promise<{ pokemonName: string }>;
+  params: { pokemonName: string };
 }
 
-const PokemonDetailPage = async ({ params }: PokemonDetailPageProps) => {
-  // Await the params since they're now a Promise in Next.js 15
-  const { pokemonName: rawPokemonNameFromParams } = await params;
+const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
+  const { pokemonName: rawPokemonNameFromParams } = params;
   const pokemonName = decodeURIComponent(rawPokemonNameFromParams);
 
   // Create a client component to handle the state and effects

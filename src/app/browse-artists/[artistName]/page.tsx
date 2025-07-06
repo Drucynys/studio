@@ -43,14 +43,13 @@ export interface ApiPokemonCard {
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-// Updated interface for component props to handle async params
+// Updated interface for component props
 interface ArtistDetailPageProps {
-  params: Promise<{ artistName: string }>;
+  params: { artistName: string };
 }
 
-const ArtistDetailPage = async ({ params }: ArtistDetailPageProps) => {
-  // Await the params since they're now a Promise in Next.js 15
-  const { artistName: rawArtistName } = await params;
+const ArtistDetailPage = ({ params }: ArtistDetailPageProps) => {
+  const { artistName: rawArtistName } = params;
   const artistName = decodeURIComponent(rawArtistName);
 
   // Create a client component to handle the state and effects

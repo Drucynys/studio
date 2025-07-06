@@ -86,14 +86,13 @@ interface SetDetails {
   series: string;
 }
 
-// Updated interface for component props to handle async params
+// Updated interface for component props
 interface SetDetailsPageProps {
-  params: Promise<{ setId: string }>;
+  params: { setId: string };
 }
 
-const SetDetailsPage = async ({ params }: SetDetailsPageProps) => {
-  // Await the params since they're now a Promise in Next.js 15
-  const { setId } = await params;
+const SetDetailsPage = ({ params }: SetDetailsPageProps) => {
+  const { setId } = params;
 
   // Create a client component to handle the state and effects
   return <SetDetailsPageClient setId={setId} />;
