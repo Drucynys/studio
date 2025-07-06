@@ -2,8 +2,9 @@
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch, LayoutList, Target, Search } from "lucide-react";
+import { PackageSearch, LayoutList, Search } from "lucide-react";
 import { AuthButton } from "./AuthButton";
+import { PokedexIcon } from "./icons/PokedexIcon";
 
 export function AppHeader() {
   return (
@@ -36,7 +37,7 @@ export function AppHeader() {
           </Link>
            <Link href="/pokedex">
             <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground px-2 md:px-3">
-              <Target className="mr-0 md:mr-2 h-5 w-5" />
+              <PokedexIcon className="mr-0 md:mr-2 h-5 w-5" />
               <span className="hidden md:inline">Pokédex</span>
             </Button>
           </Link>

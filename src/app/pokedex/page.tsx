@@ -8,13 +8,14 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Search, Target, ServerCrash, Hash } from "lucide-react";
+import { Loader2, Search, ServerCrash, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { PokedexIcon } from "@/components/icons/PokedexIcon";
 
 export interface Pokemon {
   id: number;
@@ -186,7 +187,7 @@ export default function PokedexPage() {
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
-                  <Target className="h-8 w-8 text-primary"/>
+                  <PokedexIcon className="h-8 w-8 text-primary"/>
                   Pokédex
                 </CardTitle>
                 <div className="relative w-full md:w-1/3">
