@@ -242,7 +242,10 @@ export default function PokedexPage() {
                                 const isOwned = ownedPokemonNames.has(pokemon.name.toLowerCase());
                                 return (
                                 <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
-                                <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center h-full relative">
+                                <Card className={cn(
+                                    "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center relative aspect-square",
+                                    user && isOwned && "border-green-500 border-2 hover:border-green-600"
+                                )}>
                                     <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/10 text-xs font-mono text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
                                         #{String(pokemon.id).padStart(3, '0')}
                                     </div>
@@ -282,5 +285,6 @@ export default function PokedexPage() {
     </div>
   );
 }
+
 
 
