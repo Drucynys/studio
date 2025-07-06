@@ -213,8 +213,8 @@ export default function PokedexPage() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-12 px-4">
                             {groupedPokemon[genKey]?.map((pokemon) => (
                                 <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
-                                <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                                    <div className="relative w-24 h-24 mb-3">
+                                <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center h-full">
+                                    <div className="relative w-24 h-24">
                                     <Image
                                         src={pokemon.sprite}
                                         alt={pokemon.name}
@@ -224,8 +224,6 @@ export default function PokedexPage() {
                                         data-ai-hint="pokemon sprite"
                                     />
                                     </div>
-                                    <p className="text-xs text-muted-foreground">#{String(pokemon.id).padStart(3, '0')}</p>
-                                    <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{pokemon.name}</p>
                                 </Card>
                                 </Link>
                             ))}
