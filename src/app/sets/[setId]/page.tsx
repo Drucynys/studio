@@ -65,11 +65,11 @@ interface SetDetails {
 }
 
 interface SetDetailsPageProps {
-  params: { setId: string };
+  params: Promise<{ setId: string }>;
 }
 
-const SetDetailsPage = ({ params }: SetDetailsPageProps) => {
-  const { setId } = params;
+const SetDetailsPage = async ({ params }: SetDetailsPageProps) => {
+  const { setId } = await params;
   const { collection } = useAuth();
   
   const [setDetails, setSetDetails] = useState<SetDetails | null>(null);

@@ -24,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import type { ApiPokemonCard as PokemonTcgApiCard } from "@/app/sets/[setId]/page";
 import { Tag, Gem, DollarSign, Layers, Eye, Paintbrush, Hash, LogIn } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";

@@ -15,11 +15,11 @@ import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
 interface ArtistDetailPageProps {
-  params: { artistName: string };
+  params: Promise<{ artistName: string }>;
 }
 
-const ArtistDetailPage = ({ params }: ArtistDetailPageProps) => {
-  const artistName = decodeURIComponent(params.artistName);
+const ArtistDetailPage = async ({ params }: ArtistDetailPageProps) => {
+  const { artistName: artistNameParam } = await params;
   
   const [cardsByArtist, setCardsByArtist] = useState<ApiPokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,6 +27,7 @@ const ArtistDetailPage = ({ params }: ArtistDetailPageProps) => {
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const artistName = decodeURIComponent(artistNameParam);
   const fetchCardsByArtist = useCallback(async () => {
     if (!artistName) return;
     setIsLoading(true);

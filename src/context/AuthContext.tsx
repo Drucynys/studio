@@ -13,7 +13,7 @@ import {
   signInWithPopup,
   getAdditionalUserInfo
 } from 'firebase/auth';
-import { doc, setDoc, getFirestore, collection, onSnapshot, writeBatch, getDocs, query, where } from 'firebase/firestore';
+import { doc, setDoc, getFirestore, collection, onSnapshot, writeBatch, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { PokemonCard } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -44,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [collection, setCollection] = useState<PokemonCard[]>([]);
+  const [userCollection, setUserCollection] = useState<PokemonCard[]>([]);
   const [loadingCollection, setLoadingCollection] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logOut = async () => {
     await signOut(auth);
-    setCollection([]);
+    setUserCollection([]);
   };
 
   const addCardToCollection = async (card: Omit<PokemonCard, 'id' | 'userId'>) => {
@@ -171,8 +171,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const removeCardFromCollection = async (cardId: string) => {
       if (!user) throw new Error("You must be logged in to remove cards.");
       const cardRef = doc(db, 'users', user.uid, 'cards', cardId);
-      await setDoc(cardRef, {}, { merge: true }); // This is a soft delete, we can change to hard delete later
-      await db.collection('users').doc(user.uid).collection('cards').doc(cardId).delete();
+      await deleteDoc(cardRef); // Hard delete
   };
 
   useEffect(() => {
@@ -189,7 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const collRef = collection(db, "users", user.uid, "cards");
       const unsubscribe = onSnapshot(collRef, (snapshot) => {
         const userCards = snapshot.docs.map(doc => doc.data() as PokemonCard);
-        setCollection(userCards.sort((a, b) => (b.timestamp as any) - (a.timestamp as any) || 0)); // Sort by timestamp if available
+        setUserCollection(userCards.sort((a, b) => (b.timestamp as any) - (a.timestamp as any) || 0)); // Sort by timestamp if available
         setLoadingCollection(false);
       }, (error) => {
         console.error("Error fetching collection:", error);
@@ -198,7 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       return () => unsubscribe();
     } else {
-      setCollection([]);
+      setUserCollection([]);
       setLoadingCollection(false);
     }
   }, [user, toast]);
@@ -206,7 +205,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     loading,
-    collection,
+    collection: userCollection,
     loadingCollection,
     isAuthModalOpen,
     openAuthModal,

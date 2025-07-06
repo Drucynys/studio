@@ -27,6 +27,7 @@ import type { PokemonCard } from "@/types";
 import { FilePlus, Loader2, Layers, Languages } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import Image from "next/image";
 import type { FindCardOutput } from "@/ai/flows/find-card-by-image-flow";
 
@@ -413,6 +414,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     let cardToSave: PokemonCard;
+    const { user } = useAuth();
 
     if (values.language === "English") {
       const selectedSet = englishSets.find(s => s.id === values.selectedSetId);
@@ -423,6 +425,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       const { value: cardValue, variant: cardVariant } = getDefaultMarketPrice(selectedEnglishCardData);
       cardToSave = {
         id: crypto.randomUUID(),
+        userId: user!.uid,
         set: selectedSet.name,
         cardNumber: selectedEnglishCardData.number,
         name: selectedEnglishCardData.name,
@@ -443,6 +446,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       }
       cardToSave = {
         id: crypto.randomUUID(),
+        userId: user!.uid,
         set: selectedSet.name, 
         cardNumber: selectedJapaneseCardData.number,
         name: selectedJapaneseCardData.name, 
