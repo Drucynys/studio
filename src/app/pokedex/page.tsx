@@ -241,7 +241,7 @@ export default function PokedexPage() {
                                         data-ai-hint="pokemon sprite"
                                     />
                                     </div>
-                                    <p className="font-semibold text-card-foreground group-hover:text-primary capitalize mt-2">{pokemon.name}</p>
+                                    
                                 </Card>
                                 </Link>
                             )})}
