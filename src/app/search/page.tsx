@@ -1,17 +1,15 @@
+// src/app/search/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
-import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { Loader2, ServerCrash, Search as SearchIcon, Info } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
@@ -24,7 +22,6 @@ export default function SearchPage() {
 
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { toast } = useToast();
 
   const handleSearch = useCallback(async (currentQuery: string) => {
     if (currentQuery.trim().length < 3) {
@@ -60,61 +57,10 @@ export default function SearchPage() {
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
       handleSearch(query);
-    }, 500); // Wait 500ms after user stops typing
+    }, 500);
 
     return () => clearTimeout(debounceTimer);
   }, [query, handleSearch]);
-
-  const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string, quantity: number = 1) => {
-    if (!selectedApiCard) return;
-
-    const newCard: CollectionPokemonCard = {
-      id: crypto.randomUUID(),
-      name: selectedApiCard.name,
-      set: selectedApiCard.set.name,
-      cardNumber: selectedApiCard.number,
-      rarity: selectedApiCard.rarity || "N/A",
-      variant,
-      condition,
-      value: valueForCollection,
-      imageUrl: selectedApiCard.images.large,
-      quantity,
-      language: "English",
-      artist: selectedApiCard.artist,
-    };
-
-    try {
-      const storedCardsRaw = localStorage.getItem("pokemonCards");
-      const storedCards: CollectionPokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
-
-      const existingCardIndex = storedCards.findIndex(
-        item => item.name === newCard.name &&
-                item.set === newCard.set &&
-                item.cardNumber === newCard.cardNumber &&
-                item.variant === newCard.variant &&
-                item.condition === newCard.condition
-      );
-
-      if (existingCardIndex > -1) {
-        storedCards[existingCardIndex].quantity += newCard.quantity;
-      } else {
-        storedCards.unshift(newCard);
-      }
-      
-      localStorage.setItem("pokemonCards", JSON.stringify(storedCards));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'pokemonCards' }));
-
-      toast({
-        title: existingCardIndex > -1 ? "Card Quantity Updated!" : "Card Added!",
-        description: `${newCard.name} from ${newCard.set} has been ${existingCardIndex > -1 ? 'updated' : 'added'}.`,
-        className: "bg-secondary text-secondary-foreground"
-      });
-
-    } catch (e) {
-      toast({ variant: "destructive", title: "Storage Error", description: "Could not save card." });
-    }
-    setIsDialogOpen(false);
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -204,7 +150,6 @@ export default function SearchPage() {
           initialCardImageUrl={selectedApiCard.images.small}
           pokemonTcgApiCard={selectedApiCard}
           availableConditions={conditionOptions}
-          onAddCard={handleAddCardToCollection}
         />
       )}
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">

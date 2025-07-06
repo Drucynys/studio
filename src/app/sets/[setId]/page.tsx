@@ -1,4 +1,4 @@
-
+// src/app/sets/[setId]/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
+import { useAuth } from "@/hooks/useAuth";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle, DollarSign, TrendingUp, CalendarDays, Hash, Palette, Paintbrush } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -17,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
-
 
 export interface ApiPokemonCard {
   id: string;
@@ -53,28 +53,6 @@ export interface ApiPokemonCard {
   types?: string[];
 }
 
-const getDefaultMarketPrice = (card: ApiPokemonCard | null): { value: number, variant?: string } => {
-  if (!card || !card.tcgplayer?.prices) return { value: 0 };
-  const prices = card.tcgplayer.prices;
-  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
-  for (const variant of variantPriority) {
-    const priceDetail = prices[variant as keyof typeof prices];
-    if (priceDetail?.market && typeof priceDetail.market === 'number') {
-      return { value: priceDetail.market, variant: variant };
-    }
-  }
-  for (const key in prices) {
-    if (Object.prototype.hasOwnProperty.call(prices, key)) {
-      const priceDetail = prices[key as keyof typeof prices];
-      if (priceDetail?.market && typeof priceDetail.market === 'number') {
-        return { value: priceDetail.market, variant: key };
-      }
-    }
-  }
-  return { value: 0 };
-};
-
-
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
 interface SetDetails {
@@ -86,19 +64,14 @@ interface SetDetails {
   series: string;
 }
 
-// Updated interface for component props
 interface SetDetailsPageProps {
-  params: Promise<{ setId: string }>;
+  params: { setId: string };
 }
 
-const SetDetailsPage = async ({ params }: SetDetailsPageProps) => {
-  const { setId } = await params;
-
-  return <SetDetailsPageClient setId={setId} />;
-};
-
-// Client component to handle state and effects
-const SetDetailsPageClient = ({ setId }: { setId: string }) => {
+const SetDetailsPage = ({ params }: SetDetailsPageProps) => {
+  const { setId } = params;
+  const { collection } = useAuth();
+  
   const [setDetails, setSetDetails] = useState<SetDetails | null>(null);
   const [cardsInSet, setCardsInSet] = useState<ApiPokemonCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
@@ -108,39 +81,20 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
-  const [isClient, setIsClient] = useState(false);
-
+  
   const { toast } = useToast();
-
-  useEffect(() => {
-    setIsClient(true);
-    const storedCards = localStorage.getItem("pokemonCards");
-    if (storedCards) {
-      try {
-        const parsedCards = JSON.parse(storedCards) as CollectionPokemonCard[];
-        if (Array.isArray(parsedCards)) {
-          setCollectionCards(parsedCards);
-        }
-      } catch (e) {
-        console.error("Failed to parse collection from localStorage", e);
-      }
-    }
-  }, []);
 
   const fetchSetDetailsAndCards = useCallback(async () => {
     if (!setId) return;
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch Set Details from our database via our API
       const setResponse = await fetch(`/api/sets/${setId}`);
       if (!setResponse.ok) {
         const errorData = await setResponse.json().catch(() => ({ message: 'Failed to parse error response' }));
         throw new Error(errorData.message || `Set with ID "${setId}" not found in database. It may not be synced yet.`);
       }
       const setInfo = await setResponse.json();
-
       setSetDetails({
         id: setInfo.id,
         name: setInfo.name,
@@ -150,7 +104,6 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
         series: setInfo.series,
       });
 
-      // Fetch cards for the set from our database via our API
       const cardsResponse = await fetch(`/api/cards/by-set/${setId}`);
       if (!cardsResponse.ok) {
            const errorData = await cardsResponse.json().catch(() => ({ message: 'Failed to parse error response' }));
@@ -205,86 +158,15 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
     setFilteredCards(filteredData);
   }, [searchTerm, cardsInSet]);
 
-  const { totalMarketValue, mostExpensiveCards } = useMemo(() => {
-    if (cardsInSet.length === 0) return { totalMarketValue: 0, mostExpensiveCards: [] };
-    
-    let currentTotalValue = 0;
-    const pricedCards = cardsInSet.map(card => {
-      const { value } = getDefaultMarketPrice(card);
-      currentTotalValue += value;
-      return { ...card, marketPrice: value };
-    }).sort((a, b) => b.marketPrice - a.marketPrice);
-    
-    return {
-      totalMarketValue: currentTotalValue,
-      mostExpensiveCards: pricedCards.slice(0, 3),
-    };
-  }, [cardsInSet]);
-
-
-  const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string, quantity: number = 1) => {
-    if (!selectedApiCard) return;
-
-    const newCard: CollectionPokemonCard = {
-      id: crypto.randomUUID(), 
-      name: selectedApiCard.name,
-      set: selectedApiCard.set.name,
-      cardNumber: selectedApiCard.number,
-      rarity: selectedApiCard.rarity || "N/A",
-      variant: variant,
-      condition: condition,
-      value: valueForCollection,
-      imageUrl: selectedApiCard.images.large,
-      quantity: quantity,
-      language: "English", 
-      artist: selectedApiCard.artist,
-    };
-
-    try {
-      const currentStoredCardsRaw = localStorage.getItem("pokemonCards");
-      let currentStoredCards: CollectionPokemonCard[] = currentStoredCardsRaw ? JSON.parse(currentStoredCardsRaw) : [];
-      const existingCardIndex = currentStoredCards.findIndex(
-        item => item.name === newCard.name &&
-                item.set === newCard.set &&
-                item.cardNumber === newCard.cardNumber &&
-                item.variant === newCard.variant &&
-                item.condition === newCard.condition &&
-                item.language === newCard.language
-      );
-      if (existingCardIndex > -1) {
-         currentStoredCards[existingCardIndex].quantity += newCard.quantity;
-         toast({
-          title: "Card Quantity Updated!",
-          description: `Quantity for ${newCard.name} ${newCard.variant ? '('+formatVariantKey(newCard.variant)+')' : ''} (${newCard.condition}) increased.`,
-          className: "bg-secondary text-secondary-foreground"
-        });
-      } else {
-        currentStoredCards = [newCard, ...currentStoredCards]; 
-         toast({
-          title: "Card Added!",
-          description: `${newCard.name} ${newCard.variant ? '('+formatVariantKey(newCard.variant)+')' : ''} (${newCard.condition}) x${newCard.quantity} from ${newCard.set} has been added.`,
-          className: "bg-secondary text-secondary-foreground"
-        });
-      }
-      localStorage.setItem("pokemonCards", JSON.stringify(currentStoredCards));
-      setCollectionCards(currentStoredCards);
-      window.dispatchEvent(new StorageEvent('storage', { key: 'pokemonCards', newValue: localStorage.getItem("pokemonCards") }));
-    } catch (e) {
-      console.error("Failed to save card to localStorage", e);
-      toast({ variant: "destructive", title: "Storage Error", description: "Could not save card to your collection." });
-    }
-    setIsDialogOpen(false);
-  };
-
   const openDialogForCard = (card: ApiPokemonCard) => {
     setSelectedApiCard(card);
     setIsDialogOpen(true);
   };
 
   const setCompletion = useMemo(() => {
-    if (!isClient || !setDetails?.name || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
+    if (!setDetails?.name || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
     const collectedCardIdentifiersInSet = new Set<string>();
-    collectionCards.forEach(card => {
+    collection.forEach(card => {
         if (card.set === setDetails.name && card.language === "English") { 
             collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
         }
@@ -293,31 +175,9 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
     const totalInThisSet = cardsInSet.length; 
     const percentage = totalInThisSet > 0 ? parseFloat(((uniqueCollectedCount / totalInThisSet) * 100).toFixed(1)) : 0;
     return { collected: uniqueCollectedCount, total: totalInThisSet, percentage };
-  }, [isClient, setDetails, cardsInSet, collectionCards]);
+  }, [setDetails, cardsInSet, collection]);
 
-
-  useEffect(() => {
-    if (!isClient) return;
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "pokemonCards" && event.newValue) {
-        try {
-          const updatedCards = JSON.parse(event.newValue) as CollectionPokemonCard[];
-           if (Array.isArray(updatedCards)) {
-             setCollectionCards(updatedCards);
-           }
-        } catch (error) { console.error("Error processing storage update:", error); }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [isClient]);
-
-  const formatVariantKey = (key: string): string => {
-    if (!key) return "N/A";
-    return key.replace(/([A-Z0-9])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
-  };
-
-  if (!isClient && isLoading) {
+  if (isLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -338,7 +198,6 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sets
           </Button>
         </Link>
-
         {setDetails && (
           <header className="mb-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -364,83 +223,8 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
             </div>
           </header>
         )}
-
-        {!isLoading && setDetails && cardsInSet.length > 0 && (
-            <section id="set-stats" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-primary flex items-center gap-2"><Hash size={20}/>Set Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                        <div>
-                            <p className="font-medium text-muted-foreground">Cards in Set (Unique)</p>
-                            <p className="font-semibold text-lg">{setCompletion.total}</p>
-                        </div>
-                        <div>
-                            <p className="font-medium text-muted-foreground">Release Date</p>
-                            <p className="font-semibold text-lg">{format(new Date(setDetails.releaseDate), "MMMM d, yyyy")}</p>
-                        </div>
-                        <div>
-                            <p className="font-medium text-muted-foreground">Total Market Value (USD)</p>
-                            <p className="font-semibold text-lg">${totalMarketValue.toFixed(2)}</p>
-                        </div>
-                        <div className="pt-1">
-                            <p className="font-medium text-muted-foreground">Set Completion (Unique Cards)</p>
-                             <div className="flex items-center justify-between mt-0.5">
-                                <p className="font-semibold text-base">
-                                    {setCompletion.collected} / {setCompletion.total}
-                                </p>
-                                <p className="font-semibold text-base">
-                                    {setCompletion.percentage}%
-                                    {setCompletion.percentage >= 99.9 && <CheckCircle className="inline-block ml-1 h-4 w-4 text-green-500 align-text-bottom" />}
-                                </p>
-                            </div>
-                            <Progress value={setCompletion.percentage} className="h-2 [&>div]:bg-primary mt-1" />
-                        </div>
-                    </CardContent>
-                </Card>
-                 <Card className="sm:col-span-1 xl:col-span-1">
-                    <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-primary flex items-center gap-2"><TrendingUp size={20}/>Most Expensive</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2 pt-3">
-                        {mostExpensiveCards.length > 0 ? (
-                            mostExpensiveCards.map((card, index) => (
-                            <div key={card.id} className="flex items-center gap-3">
-                                <div className="relative w-10 h-14 flex-shrink-0 rounded overflow-hidden shadow-sm" data-ai-hint="pokemon card front small">
-                                <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" />
-                                </div>
-                                <div className="flex-grow min-w-0"> 
-                                <p className="text-xs font-semibold truncate" title={card.name}>{index + 1}. {card.name}</p>
-                                <p className="text-xs text-muted-foreground">${getDefaultMarketPrice(card).value.toFixed(2)}</p>
-                                {card.artist && <p className="text-xs text-muted-foreground/80 truncate" title={card.artist}>by {card.artist}</p>}
-                                </div>
-                            </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">No pricing data available.</p>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card className="bg-muted/30 border-dashed">
-                    <CardHeader><CardTitle className="text-lg font-semibold text-muted-foreground/70 flex items-center gap-2"><Palette size={20}/>Distribution by Kind</CardTitle></CardHeader>
-                    <CardContent><p className="text-sm text-muted-foreground/70 text-center py-4">Chart coming soon!</p></CardContent>
-                </Card>
-                <Card className="bg-muted/30 border-dashed">
-                    <CardHeader><CardTitle className="text-lg font-semibold text-muted-foreground/70">Rarity Distribution</CardTitle></CardHeader>
-                    <CardContent><p className="text-sm text-muted-foreground/70 text-center py-4">Chart coming soon!</p></CardContent>
-                </Card>
-            </section>
-        )}
-
         <Card className="shadow-xl">
-          <CardContent className="pt-6"> {/* Added pt-6 as CardHeader is removed */}
-            {isLoading && (
-              <div className="flex justify-center items-center py-10">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="ml-4 text-lg text-muted-foreground">Loading cards from database...</p>
-              </div>
-            )}
+          <CardContent className="pt-6">
             {error && (
               <div className="flex flex-col items-center justify-center py-10 text-destructive">
                 <ServerCrash className="h-16 w-16 mb-4" />
@@ -449,10 +233,10 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
               </div>
             )}
             {!isLoading && !error && (
-              <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-26rem)]"> {/* Adjusted height due to removed header */}
+              <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-26rem)]">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                     {filteredCards.map((card) => {
-                        const isCollected = collectionCards.some(
+                        const isCollected = collection.some(
                             (collected) =>
                             collected.name === card.name &&
                             collected.set === card.set.name &&
@@ -501,7 +285,6 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
           initialCardImageUrl={selectedApiCard.images.small}
           pokemonTcgApiCard={selectedApiCard}
           availableConditions={conditionOptions}
-          onAddCard={handleAddCardToCollection}
         />
       )}
        <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
@@ -512,5 +295,3 @@ const SetDetailsPageClient = ({ setId }: { setId: string }) => {
 };
 
 export default SetDetailsPage;
-
-    

@@ -1,7 +1,9 @@
+// src/components/AppHeader.tsx
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch, LayoutList, PlusSquare, Target, Paintbrush, Search } from "lucide-react";
+import { PackageSearch, LayoutList, Target, Search } from "lucide-react";
+import { AuthButton } from "./AuthButton";
 
 export function AppHeader() {
   return (
@@ -38,6 +40,9 @@ export function AppHeader() {
               <span className="hidden md:inline">Pokédex</span>
             </Button>
           </Link>
+          <div className="ml-2 md:ml-4">
+            <AuthButton />
+          </div>
         </nav>
       </div>
     </header>

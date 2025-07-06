@@ -1,4 +1,4 @@
-
+// src/app/pokedex/[pokemonName]/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
-import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Loader2, ServerCrash, ArrowLeft, Target, Images } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+
 
 // Interface for a single Pokémon entry from our DB
 export interface Pokemon {
@@ -21,66 +21,27 @@ export interface Pokemon {
   generation: number;
 }
 
-// Re-defining the API card type here for this page
-export interface ApiPokemonCard {
-  id: string;
-  name: string;
-  set: {
-    id: string;
-    name: string;
-    series: string;
-    logo?: string;
-    releaseDate: string;
-    printedTotal: number;
-    total: number;
-  };
-  number: string;
-  rarity?: string;
-  artist?: string;
-  images: {
-    small: string;
-    large: string;
-  };
-  tcgplayer?: {
-    prices?: {
-      [key: string]: {
-        market?: number | null;
-      };
-    };
-  };
-}
-
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-// Updated interface for component props
 interface PokemonDetailPageProps {
-  params: Promise<{ pokemonName: string }>;
+  params: { pokemonName: string };
 }
 
-const PokemonDetailPage = async ({ params }: PokemonDetailPageProps) => {
-  const resolvedParams = await params;
-  const pokemonName = decodeURIComponent(resolvedParams.pokemonName);
+const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
+  const pokemonName = decodeURIComponent(params.pokemonName);
 
-  // Create a client component to handle the state and effects
-  return <PokemonDetailPageClient pokemonName={pokemonName} />;
-};
-
-// Client component to handle state and effects
-const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
   const [cardsForPokemon, setCardsForPokemon] = useState<ApiPokemonCard[]>([]);
   const [pokemonData, setPokemonData] = useState<Pokemon | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { toast } = useToast();
 
   const fetchPageData = useCallback(async () => {
     if (!pokemonName) return;
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch Pokémon details (for sprite) and card list in parallel
       const [pokemonDetailsResponse, cardsResponse] = await Promise.all([
         fetch(`/api/pokedex/${pokemonName}`),
         fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${pokemonName}"&orderBy=set.releaseDate`, {
@@ -111,57 +72,6 @@ const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
   useEffect(() => {
     fetchPageData();
   }, [fetchPageData]);
-
-  const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string, quantity: number = 1) => {
-    if (!selectedApiCard) return;
-
-    const newCard: CollectionPokemonCard = {
-      id: crypto.randomUUID(),
-      name: selectedApiCard.name,
-      set: selectedApiCard.set.name,
-      cardNumber: selectedApiCard.number,
-      rarity: selectedApiCard.rarity || "N/A",
-      variant,
-      condition,
-      value: valueForCollection,
-      imageUrl: selectedApiCard.images.large,
-      quantity,
-      language: "English",
-      artist: selectedApiCard.artist
-    };
-
-    try {
-      const storedCardsRaw = localStorage.getItem("pokemonCards");
-      const storedCards: CollectionPokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
-
-      const existingCardIndex = storedCards.findIndex(
-        item => item.name === newCard.name &&
-                item.set === newCard.set &&
-                item.cardNumber === newCard.cardNumber &&
-                item.variant === newCard.variant &&
-                item.condition === newCard.condition
-      );
-
-      if (existingCardIndex > -1) {
-        storedCards[existingCardIndex].quantity += newCard.quantity;
-      } else {
-        storedCards.unshift(newCard);
-      }
-      
-      localStorage.setItem("pokemonCards", JSON.stringify(storedCards));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'pokemonCards' }));
-
-      toast({
-        title: existingCardIndex > -1 ? "Card Quantity Updated!" : "Card Added!",
-        description: `${newCard.name} from ${newCard.set} has been ${existingCardIndex > -1 ? 'updated' : 'added'}.`,
-        className: "bg-secondary text-secondary-foreground"
-      });
-
-    } catch (e) {
-      toast({ variant: "destructive", title: "Storage Error", description: "Could not save card." });
-    }
-    setIsDialogOpen(false);
-  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -249,7 +159,6 @@ const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
           initialCardImageUrl={selectedApiCard.images.small}
           pokemonTcgApiCard={selectedApiCard}
           availableConditions={conditionOptions}
-          onAddCard={handleAddCardToCollection}
         />
       )}
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">

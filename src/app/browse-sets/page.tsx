@@ -1,8 +1,8 @@
-
+// src/app/browse-sets/page.tsx
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw } from "lucide-react";
 import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
+import { useAuth } from "@/hooks/useAuth";
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,29 +21,28 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// This interface matches the data structure of sets stored in Firestore
 interface ApiSet {
   id: string;
   name: string;
   series: string;
   printedTotal: number;
   total: number;
-  releaseDate: string; // YYYY-MM-DD
+  releaseDate: string;
   images: {
     symbol: string;
     logo: string;
   };
 }
 
-// This interface matches the artists stored in our DB
 interface Artist {
   name: string;
   cardCount: number;
 }
 
-
 const BrowsePageContent: NextPage = () => {
   const searchParams = useSearchParams();
+  const { collection, loading, user } = useAuth();
+
   const tabParam = searchParams.get('tab');
   const initialTab = tabParam === 'artists' ? 'artists' : 'sets';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -54,46 +54,12 @@ const BrowsePageContent: NextPage = () => {
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
   
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-
-  const [collectionCards, setCollectionCards] = useState<CollectionPokemonCard[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    setIsClient(true);
-    const storedCardsRaw = localStorage.getItem("pokemonCards");
-    if (storedCardsRaw) {
-      try {
-        const parsedCards = JSON.parse(storedCardsRaw) as CollectionPokemonCard[];
-        if (Array.isArray(parsedCards)) {
-          setCollectionCards(parsedCards);
-        }
-      } catch (error) {
-        console.error("Failed to parse collection cards from localStorage", error);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isClient) return;
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "pokemonCards") {
-         const storedCardsRaw = localStorage.getItem("pokemonCards");
-        if (storedCardsRaw) {
-          setCollectionCards(JSON.parse(storedCardsRaw));
-        } else {
-          setCollectionCards([]);
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [isClient]);
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
@@ -178,40 +144,33 @@ const BrowsePageContent: NextPage = () => {
     }
   }, [searchTerm, allSets, allArtists, activeTab, sortOrder]);
 
-  const getSetCompletion = (set: ApiSet) => {
-    if (!isClient) return { collected: 0, total: set.total, percentage: 0 };
-    
-    const collectedCardIdentifiersInSet = new Set<string>();
-    collectionCards.forEach(card => {
-        if (card.set === set.name) {
-            collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
-        }
+  const setCompletions = useMemo(() => {
+    if (!user) return new Map();
+    const map = new Map<string, { collected: number; total: number; percentage: number }>();
+    allSets.forEach(set => {
+      const collectedInSet = new Set(collection.filter(c => c.set === set.name).map(c => `${c.name}-${c.cardNumber}`));
+      const uniqueCollectedCount = collectedInSet.size;
+      const totalInSet = set.printedTotal > 0 ? set.printedTotal : 1; 
+      const percentage = totalInSet > 0 ? (uniqueCollectedCount / totalInSet) * 100 : 0;
+      map.set(set.id, { collected: uniqueCollectedCount, total: totalInSet, percentage });
     });
-    const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
-    const totalInSet = set.printedTotal > 0 ? set.printedTotal : 1; 
-    const percentage = totalInSet > 0 ? (uniqueCollectedCount / totalInSet) * 100 : 0;
-    
-    return { collected: uniqueCollectedCount, total: totalInSet, percentage };
-  };
-  
-  const getArtistCompletion = (artist: Artist) => {
-    if (!isClient || artist.cardCount === undefined) return { collected: 0, total: 0, percentage: 0 };
-    
-    const collectedCardIdentifiersByArtist = new Set<string>();
-    collectionCards.forEach(card => {
-        if (card.artist === artist.name) {
-            collectedCardIdentifiersByArtist.add(`${card.name}-${card.cardNumber}-${card.set}`);
-        }
+    return map;
+  }, [collection, allSets, user]);
+
+  const artistCompletions = useMemo(() => {
+    if (!user) return new Map();
+    const map = new Map<string, { collected: number; total: number; percentage: number }>();
+    allArtists.forEach(artist => {
+      const collectedByArtist = new Set(collection.filter(c => c.artist === artist.name).map(c => `${c.name}-${c.cardNumber}-${c.set}`));
+      const uniqueCollectedCount = collectedByArtist.size;
+      const totalForArtist = artist.cardCount > 0 ? artist.cardCount : 1;
+      const percentage = totalForArtist > 0 ? (uniqueCollectedCount / totalForArtist) * 100 : 0;
+      map.set(artist.name, { collected: uniqueCollectedCount, total: artist.cardCount, percentage });
     });
-    const uniqueCollectedCount = collectedCardIdentifiersByArtist.size;
-    const totalForArtist = artist.cardCount > 0 ? artist.cardCount : 1;
-    const percentage = totalForArtist > 0 ? (uniqueCollectedCount / totalForArtist) * 100 : 0;
-    
-    return { collected: uniqueCollectedCount, total: artist.cardCount, percentage };
-  };
+    return map;
+  }, [collection, allArtists, user]);
 
-
-  if (!isClient && isLoading) {
+  if (isLoading || loading) {
      return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -270,12 +229,6 @@ const BrowsePageContent: NextPage = () => {
             </CardHeader>
             <CardContent>
                 <TabsContent value="sets">
-                    {isLoading && (
-                    <div className="flex justify-center items-center py-10">
-                        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                        <p className="ml-4 text-lg text-muted-foreground">Loading sets from database...</p>
-                    </div>
-                    )}
                     {error && (
                     <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
                         <ServerCrash className="h-16 w-16 mx-auto mb-4" />
@@ -289,47 +242,27 @@ const BrowsePageContent: NextPage = () => {
                         {filteredSets.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
                             {filteredSets.map((set) => {
-                            const completion = getSetCompletion(set);
+                            const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
                             const linkHref = `/sets/${set.id}`;
                             return (
                                 <Link key={set.id} href={linkHref} className="block group">
-                                    <Card className={cn(
-                                        "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full",
-                                        "group-hover:z-10 relative"
-                                    )}>
-                                    {set.images.logo ? (
-                                        <div className="relative w-32 h-16 mb-3">
-                                        <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
-                                        </div>
-                                    ) : (
-                                        <div className="w-32 h-16 mb-3 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
-                                        <span className="text-xs text-muted-foreground">No Logo</span>
-                                        </div>
-                                    )}
+                                    <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full", "group-hover:z-10 relative")}>
+                                    {set.images.logo ? (<div className="relative w-32 h-16 mb-3"><Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/></div>) : (<div className="w-32 h-16 mb-3 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder"><span className="text-xs text-muted-foreground">No Logo</span></div>)}
                                     <p className="font-semibold text-card-foreground group-hover:text-primary">{set.name}</p>
                                     {set.series && <p className="text-xs text-muted-foreground">{set.series} Series</p>}
                                     <p className="text-xs text-muted-foreground">{new Date(set.releaseDate).toLocaleDateString()}</p>
-                                    
-                                    <div className="w-full mt-2 mb-3 px-2">
+                                    {user && <div className="w-full mt-2 mb-3 px-2">
                                         <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                        {completion.collected} / {completion.total} unique cards
-                                        {completion.percentage >= 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}
-                                        </p>
-                                    </div>
-                                    
+                                        <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
+                                        {completion.percentage >= 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
+                                    </div>}
                                     <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Set</Button>
                                     </Card>
                                 </Link>
                             );
                             })}
                             </div>
-                        ) : (
-                            <div className="text-center py-10 text-muted-foreground">
-                                <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                <p className="text-lg">No sets found matching your search criteria.</p>
-                            </div>
-                        )}
+                        ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No sets found matching your search criteria.</p></div> )}
                     </ScrollArea>
                     )}
                 </TabsContent>
@@ -338,37 +271,24 @@ const BrowsePageContent: NextPage = () => {
                       {filteredArtists.length > 0 ? (
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
                           {filteredArtists.map((artist) => {
-                            const completion = getArtistCompletion(artist);
+                            const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
                             return (
                               <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
                                 <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                                  <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar">
-                                    <User className="w-8 h-8 text-muted-foreground" />
-                                  </div>
+                                  <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
                                   <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
-                                  
-                                  {artist.cardCount !== undefined && (
-                                    <div className="w-full mt-2 mb-3 px-2">
+                                  {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
                                       <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        {completion.collected} / {completion.total} unique cards
-                                        {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}
-                                      </p>
-                                    </div>
-                                  )}
-                                  
+                                      <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
+                                        {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
+                                    </div>)}
                                   <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
                                 </Card>
                               </Link>
                             );
                           })}
                           </div>
-                      ) : (
-                          <div className="text-center py-10 text-muted-foreground">
-                              <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                              <p className="text-lg">No artists found matching your search.</p>
-                          </div>
-                      )}
+                      ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No artists found matching your search.</p></div> )}
                   </ScrollArea>
                 </TabsContent>
             </CardContent>
@@ -382,20 +302,18 @@ const BrowsePageContent: NextPage = () => {
   );
 };
 
-const BrowsePage: NextPage = () => {
-  return (
-    <Suspense fallback={
-      <div className="flex flex-col min-h-screen bg-background">
-        <AppHeader />
-        <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary" />
-           <p className="ml-4 text-lg text-muted-foreground">Loading...</p>
-        </main>
-      </div>
-    }>
-      <BrowsePageContent />
-    </Suspense>
-  );
-};
+const BrowsePage: NextPage = () => (
+  <Suspense fallback={
+    <div className="flex flex-col min-h-screen bg-background">
+      <AppHeader />
+      <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+         <p className="ml-4 text-lg text-muted-foreground">Loading...</p>
+      </main>
+    </div>
+  }>
+    <BrowsePageContent />
+  </Suspense>
+);
 
 export default BrowsePage;

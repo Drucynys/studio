@@ -1,15 +1,17 @@
-
+// src/types/index.ts
 export interface PokemonCard {
-  id: string;
+  id: string; // Firestore document ID
+  userId: string; // ID of the user who owns the card
   set: string;
   cardNumber: string;
-  name?: string; // Optional, could be auto-fetched or manually entered
+  name?: string; 
   rarity: string;
   variant?: string;
   condition: string;
-  language: 'English' | 'Japanese'; // Added language field
-  value: number; // This is typically TCGPlayer value in USD
-  imageUrl?: string; // Optional: for displaying card image if available
+  language: 'English' | 'Japanese';
+  value: number; 
+  imageUrl?: string;
   quantity: number;
   artist?: string;
+  timestamp?: any; // Firestore ServerTimestamp
 }

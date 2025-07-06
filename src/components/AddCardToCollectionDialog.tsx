@@ -1,8 +1,9 @@
-
+// src/components/AddCardToCollectionDialog.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
   DialogContent,
@@ -20,22 +21,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // Added Input
+import { Input } from "@/components/ui/input";
 import type { ApiPokemonCard as PokemonTcgApiCard } from "@/app/sets/[setId]/page";
-import { Tag, Gem, DollarSign, Layers, Eye, Paintbrush, Hash } from "lucide-react";
+import { Tag, Gem, DollarSign, Layers, Eye, Paintbrush, Hash, LogIn } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { MarketPriceHistoryChart } from "@/components/MarketPriceHistoryChart"; 
-import { SingleCardTiltView } from "@/components/SingleCardTiltView"; // Import the new component
+import { SingleCardTiltView } from "@/components/SingleCardTiltView";
+import { useToast } from "@/hooks/use-toast";
 
-// Helper to format variant keys for display
 const formatVariantKey = (key: string): string => {
   if (!key) return "N/A";
-  return key
-    .replace(/([A-Z0-9])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase())
-    .trim();
+  return key.replace(/([A-Z0-9])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
 };
 
 type DisplayPriceInfo = {
@@ -52,7 +50,7 @@ type AddCardToCollectionDialogProps = {
   initialCardImageUrl?: string | null;
   availableConditions: string[];
   pokemonTcgApiCard: PokemonTcgApiCard | null;
-  onAddCard: (condition: string, value: number, variant?: string, quantity?: number) => void; // Updated quantity type
+  // onAddCard is now handled by the context
 };
 
 export function AddCardToCollectionDialog({
@@ -62,28 +60,29 @@ export function AddCardToCollectionDialog({
   initialCardImageUrl,
   availableConditions,
   pokemonTcgApiCard,
-  onAddCard,
 }: AddCardToCollectionDialogProps) {
+  const { user, addCardToCollection, openAuthModal } = useAuth();
+  const { toast } = useToast();
+
   const [selectedCondition, setSelectedCondition] = useState<string>("");
-  const [quantityInput, setQuantityInput] = useState<number>(1); // Added quantity state
+  const [quantityInput, setQuantityInput] = useState<number>(1);
   const [finalDisplayImageUrl, setFinalDisplayImageUrl] = useState<string>("https://placehold.co/200x280.png");
   const [displayPrices, setDisplayPrices] = useState<DisplayPriceInfo[]>([]);
-  
   const [currentAvailableVariants, setCurrentAvailableVariants] = useState<string[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<string>("");
-
-  const [isImageZoomed, setIsImageZoomed] = useState(false); // State for full-screen image view
-
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setSelectedCondition("");
-      setQuantityInput(1); // Reset quantity
+      setQuantityInput(1);
       setDisplayPrices([]);
       setFinalDisplayImageUrl("https://placehold.co/200x280.png");
       setCurrentAvailableVariants([]);
       setSelectedVariant("");
-      setIsImageZoomed(false); // Reset zoom state
+      setIsImageZoomed(false);
+      setIsAdding(false);
       return;
     }
 
@@ -93,7 +92,6 @@ export function AddCardToCollectionDialog({
 
     if (pokemonTcgApiCard?.tcgplayer?.prices) {
       imageUrlToSet = pokemonTcgApiCard.images.large || initialCardImageUrl || "https://placehold.co/200x280.png";
-      
       const prices = pokemonTcgApiCard.tcgplayer.prices;
       const sortedPriceKeys = Object.keys(prices).sort((a,b) => {
         const order = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
@@ -106,12 +104,10 @@ export function AddCardToCollectionDialog({
       });
 
       for (const key of sortedPriceKeys) {
-        if (Object.prototype.hasOwnProperty.call(prices, key)) {
-          const priceEntry = prices[key as keyof typeof prices];
-          if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
-            newPrices.push({ variantKey: key, variantName: formatVariantKey(key), price: priceEntry.market, currencySymbol: '$' });
-            pricedVariants.push(key);
-          }
+        const priceEntry = prices[key as keyof typeof prices];
+        if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
+          newPrices.push({ variantKey: key, variantName: formatVariantKey(key), price: priceEntry.market, currencySymbol: '$' });
+          pricedVariants.push(key);
         }
       }
       setCurrentAvailableVariants(pricedVariants);
@@ -127,7 +123,6 @@ export function AddCardToCollectionDialog({
       } else {
         setSelectedVariant("");
       }
-
     } else if (initialCardImageUrl) {
       imageUrlToSet = initialCardImageUrl;
       setCurrentAvailableVariants([]);
@@ -136,8 +131,7 @@ export function AddCardToCollectionDialog({
     
     setFinalDisplayImageUrl(imageUrlToSet);
     setDisplayPrices(newPrices);
-    setQuantityInput(1); // Ensure quantity is reset when dialog opens or card changes
-
+    setQuantityInput(1);
   }, [isOpen, pokemonTcgApiCard, initialCardImageUrl]);
 
   const marketPriceForSelectedVariant = useMemo(() => {
@@ -146,10 +140,39 @@ export function AddCardToCollectionDialog({
     return priceEntry?.market || 0;
   }, [selectedVariant, pokemonTcgApiCard]);
 
-  const handleSubmit = () => {
-    if (selectedCondition && (currentAvailableVariants.length === 0 || selectedVariant)) {
-       onAddCard(selectedCondition, marketPriceForSelectedVariant, currentAvailableVariants.length > 0 ? selectedVariant : undefined, quantityInput); // Pass quantityInput
+  const handleSubmit = async () => {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    if (!pokemonTcgApiCard) return;
+
+    setIsAdding(true);
+    try {
+      await addCardToCollection({
+        name: pokemonTcgApiCard.name,
+        set: pokemonTcgApiCard.set.name,
+        cardNumber: pokemonTcgApiCard.number,
+        rarity: pokemonTcgApiCard.rarity || 'N/A',
+        condition: selectedCondition,
+        value: marketPriceForSelectedVariant,
+        variant: selectedVariant,
+        quantity: quantityInput,
+        imageUrl: pokemonTcgApiCard.images.large,
+        language: 'English', // Assuming English for now
+        artist: pokemonTcgApiCard.artist,
+        timestamp: new Date()
+      });
+      toast({
+        title: "Card Added!",
+        description: `${pokemonTcgApiCard.name} has been added to your collection.`,
+        className: "bg-secondary text-secondary-foreground"
+      });
       onClose();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -157,7 +180,7 @@ export function AddCardToCollectionDialog({
     setFinalDisplayImageUrl("https://placehold.co/200x280.png/CCCCCC/333333?text=Image+Error");
   };
   
-  const isAddButtonDisabled = !selectedCondition || (currentAvailableVariants.length > 0 && !selectedVariant) || quantityInput < 1;
+  const isAddButtonDisabled = !selectedCondition || (currentAvailableVariants.length > 0 && !selectedVariant) || quantityInput < 1 || isAdding;
   const formattedSelectedVariantName = useMemo(() => selectedVariant ? formatVariantKey(selectedVariant) : undefined, [selectedVariant]);
 
   return (
@@ -268,7 +291,6 @@ export function AddCardToCollectionDialog({
                     />
                   </div>
 
-
                   {selectedVariant && marketPriceForSelectedVariant > 0 && (
                       <p className="text-sm text-center text-foreground flex items-center justify-center gap-1">
                           <DollarSign className="h-4 w-4 text-green-500"/> Selected Value: <strong>${marketPriceForSelectedVariant.toFixed(2)}</strong>
@@ -321,7 +343,8 @@ export function AddCardToCollectionDialog({
               disabled={isAddButtonDisabled}
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
-              Add to Collection
+              {isAdding ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : user ? null : <LogIn className="mr-2 h-4 w-4"/>}
+              {user ? 'Add to Collection' : 'Login to Add'}
             </Button>
           </DialogFooter>
         </DialogContent>

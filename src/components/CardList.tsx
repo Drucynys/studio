@@ -1,4 +1,4 @@
-
+// src/components/CardList.tsx
 "use client";
 
 import type { PokemonCard } from "@/types";
@@ -6,12 +6,13 @@ import { CardItem } from "./CardItem";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { List, PackageOpen } from "lucide-react";
+import { Button } from "./ui/button";
 
 type CardListProps = {
   cards: PokemonCard[];
   onEditCard: (card: PokemonCard) => void;
   onRemoveCard: (cardId: string) => void;
-  onViewCard: (cardIndex: number) => void; // New prop for viewing card
+  onViewCard: (cardIndex: number) => void;
 };
 
 export function CardList({ cards, onEditCard, onRemoveCard, onViewCard }: CardListProps) {
@@ -25,11 +26,11 @@ export function CardList({ cards, onEditCard, onRemoveCard, onViewCard }: CardLi
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-center py-8 flex flex-col items-center gap-2">
+          <div className="text-center py-8 flex flex-col items-center gap-2">
             <PackageOpen className="h-12 w-12 text-muted-foreground opacity-70"/>
-            Your collection is currently empty. 
-            <a href="/add-card" className="text-primary hover:underline">Add some cards</a> to get started!
-          </p>
+            <p className="text-muted-foreground">Your collection is empty.</p>
+            <p className="text-sm text-muted-foreground">Use the search or browse pages to find and add cards.</p>
+          </div>
         </CardContent>
       </Card>
     );

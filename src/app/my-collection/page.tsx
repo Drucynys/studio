@@ -1,7 +1,7 @@
-
+// src/app/my-collection/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppHeader } from "@/components/AppHeader";
 import { CardList } from "@/components/CardList";
 import type { PokemonCard } from "@/types";
@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { EditCardDialog } from "@/components/EditCardDialog"; 
-import { FullScreenCardView } from "@/components/FullScreenCardView"; // Import FullScreenCardView
-import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { EditCardDialog } from "@/components/EditCardDialog";
+import { FullScreenCardView } from "@/components/FullScreenCardView";
+import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,11 +25,19 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export default function MyCollectionPage() {
-  const [allCards, setAllCards] = useState<PokemonCard[]>([]);
+  const { 
+    user, 
+    loading, 
+    collection, 
+    loadingCollection, 
+    updateCardInCollection, 
+    removeCardFromCollection,
+    openAuthModal
+  } = useAuth();
+  
   const [filteredCards, setFilteredCards] = useState<PokemonCard[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("dateAddedDesc"); // Default sort: newest first
-  const [isClient, setIsClient] = useState(false);
+  const [sortOption, setSortOption] = useState("dateAddedDesc");
   const [cardToEdit, setCardToEdit] = useState<PokemonCard | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [cardToDelete, setCardToDelete] = useState<PokemonCard | null>(null);
@@ -39,32 +48,8 @@ export default function MyCollectionPage() {
 
   const { toast } = useToast();
 
-  const loadCards = useCallback(() => {
-    const storedCardsRaw = localStorage.getItem("pokemonCards");
-    const loadedCards: PokemonCard[] = storedCardsRaw ? JSON.parse(storedCardsRaw) : [];
-    setAllCards(loadedCards);
-  }, []);
-
   useEffect(() => {
-    setIsClient(true);
-    loadCards();
-  }, [loadCards]);
-
-
-  useEffect(() => {
-    if (!isClient) return;
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "pokemonCards") {
-        loadCards();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [isClient, loadCards]);
-
-
-  useEffect(() => {
-    let tempCards = [...allCards];
+    let tempCards = [...collection];
 
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
@@ -94,9 +79,10 @@ export default function MyCollectionPage() {
         break;
       case "dateAddedDesc":
       default:
-        break; 
+        // Firestore data is already sorted by timestamp desc by default in context
+        break;
       case "dateAddedAsc":
-        tempCards.reverse(); 
+        tempCards.reverse();
         break;
       case "quantityDesc":
         tempCards.sort((a, b) => b.quantity - a.quantity);
@@ -107,60 +93,52 @@ export default function MyCollectionPage() {
     }
 
     setFilteredCards(tempCards);
-  }, [allCards, searchTerm, sortOption]);
-
+  }, [collection, searchTerm, sortOption]);
 
   const handleRemoveCard = (cardId: string) => {
-    const cardToRemove = allCards.find(c => c.id === cardId);
+    const cardToRemove = collection.find(c => c.id === cardId);
     if (cardToRemove) {
-        setCardToDelete(cardToRemove);
-        setIsDeleteDialogOpen(true);
+      setCardToDelete(cardToRemove);
+      setIsDeleteDialogOpen(true);
     }
   };
 
-  const confirmRemoveCard = () => {
+  const confirmRemoveCard = async () => {
     if (!cardToDelete) return;
     try {
-      const updatedCards = allCards.filter((card) => card.id !== cardToDelete.id);
-      localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
-      setAllCards(updatedCards); 
-       toast({
+      await removeCardFromCollection(cardToDelete.id);
+      toast({
         title: "Card Removed",
-        description: `${cardToDelete.name || cardToDelete.cardNumber} has been removed from your collection.`,
+        description: `${cardToDelete.name || cardToDelete.cardNumber} has been removed.`,
       });
-    } catch (e) {
-      console.error("Failed to remove card from localStorage", e);
+    } catch (e: any) {
       toast({
         variant: "destructive",
-        title: "Storage Error",
-        description: "Could not remove card from your collection.",
+        title: "Error",
+        description: "Could not remove card: " + e.message,
       });
     }
     setIsDeleteDialogOpen(false);
     setCardToDelete(null);
   };
 
-
   const handleEditCard = (card: PokemonCard) => {
     setCardToEdit(card);
     setIsEditDialogOpen(true);
   };
 
-  const handleSaveChanges = (updatedCard: PokemonCard) => {
+  const handleSaveChanges = async (updatedCard: PokemonCard) => {
     try {
-      const updatedCards = allCards.map(card => card.id === updatedCard.id ? updatedCard : card);
-      localStorage.setItem("pokemonCards", JSON.stringify(updatedCards));
-      setAllCards(updatedCards);
+      await updateCardInCollection(updatedCard);
       toast({
         title: "Card Updated!",
         description: `${updatedCard.name || updatedCard.cardNumber} has been updated.`,
       });
-    } catch (e) {
-      console.error("Failed to save updated card", e);
+    } catch (e: any) {
       toast({
         variant: "destructive",
         title: "Update Error",
-        description: "Could not update card details.",
+        description: "Could not update card details: " + e.message,
       });
     }
     setIsEditDialogOpen(false);
@@ -188,8 +166,7 @@ export default function MyCollectionPage() {
     }
   };
 
-
-  if (!isClient) {
+  if (loading || loadingCollection) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -200,7 +177,23 @@ export default function MyCollectionPage() {
       </div>
     );
   }
-  
+
+  if (!user) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <AppHeader />
+        <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
+          <div className="text-center">
+            <User className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h2 className="mt-4 text-2xl font-semibold">Access Your Collection</h2>
+            <p className="mt-2 text-muted-foreground">Please log in to view and manage your saved Pokémon cards.</p>
+            <Button className="mt-6" onClick={openAuthModal}>Login / Sign Up</Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
@@ -208,11 +201,11 @@ export default function MyCollectionPage() {
         <section id="collection-controls" aria-labelledby="collection-controls-heading" className="bg-card p-4 md:p-6 rounded-lg shadow">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
             <h2 id="collection-controls-heading" className="text-3xl font-headline font-semibold text-foreground flex items-center">
-                <PackageOpen className="h-8 w-8 mr-2 text-primary" /> My Pokémon Card Collection
+              <PackageOpen className="h-8 w-8 mr-2 text-primary" /> My Pokémon Card Collection
             </h2>
             <div className="flex items-center gap-2">
-                <Filter className="h-5 w-5 text-muted-foreground"/>
-                <p className="text-sm text-muted-foreground font-medium">Filters & Sorting</p>
+              <Filter className="h-5 w-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground font-medium">Filters & Sorting</p>
             </div>
           </div>
           
@@ -227,7 +220,6 @@ export default function MyCollectionPage() {
                 className="pl-9 w-full"
               />
             </div>
-
             <Select value={sortOption} onValueChange={setSortOption}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sort by..." />
@@ -244,23 +236,23 @@ export default function MyCollectionPage() {
                 <SelectItem value="quantityAsc">Quantity (Low-High)</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-           <Button onClick={resetFilters} variant="ghost" size="sm" className="mt-4 text-sm text-muted-foreground hover:text-primary">
-              <ListRestart className="mr-2 h-4 w-4"/> Reset Filters
+             <Button onClick={resetFilters} variant="ghost" size="sm" className="mt-4 text-sm text-muted-foreground hover:text-primary justify-self-start sm:col-span-2 lg:col-span-1 lg:justify-self-end">
+              <ListRestart className="mr-2 h-4 w-4" /> Reset Filters
             </Button>
+          </div>
         </section>
 
-        <CardList 
-            cards={filteredCards} 
-            onEditCard={handleEditCard} 
-            onRemoveCard={handleRemoveCard} 
-            onViewCard={openFullScreenView}
+        <CardList
+          cards={filteredCards}
+          onEditCard={handleEditCard}
+          onRemoveCard={handleRemoveCard}
+          onViewCard={openFullScreenView}
         />
         
         {filteredCards.length === 0 && searchTerm && (
           <div className="text-center py-10 text-muted-foreground">
-              <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg">No cards found matching your search criteria.</p>
+            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg">No cards found matching your search criteria.</p>
           </div>
         )}
       </main>
@@ -290,20 +282,20 @@ export default function MyCollectionPage() {
 
       {cardToDelete && (
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center gap-2"><AlertCircle className="text-destructive"/>Are you sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    This action cannot be undone. This will permanently remove the card <span className="font-semibold">{cardToDelete.name || cardToDelete.cardNumber} ({cardToDelete.set})</span> from your collection.
-                </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setCardToDelete(null)}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmRemoveCard} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete Card
-                </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2"><AlertCircle className="text-destructive"/>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently remove the card <span className="font-semibold">{cardToDelete.name || cardToDelete.cardNumber} ({cardToDelete.set})</span> from your collection.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setCardToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmRemoveCard} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete Card
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
         </AlertDialog>
       )}
 
