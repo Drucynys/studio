@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart } from "lucide-react";
+import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users, ClipboardCopy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
 
 type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error' | 'stopped';
 interface ApiSet {
@@ -17,6 +18,11 @@ interface ApiSet {
   name: string;
   total: number;
 }
+interface ArtistData {
+    name: string;
+    cardCount: number;
+}
+
 
 export default function SyncAdminPage() {
   const [setsSyncStatus, setSetsSyncStatus] = useState<SyncStatus>('idle');
@@ -44,6 +50,12 @@ export default function SyncAdminPage() {
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   const [totalCardsSynced, setTotalCardsSynced] = useState(0);
   const isSyncStopped = useRef(false);
+
+  // State for artist generation
+  const [isGeneratingArtists, setIsGeneratingArtists] = useState(false);
+  const [artistList, setArtistList] = useState<ArtistData[]>([]);
+  const [artistListOutput, setArtistListOutput] = useState<string>("");
+  const [artistError, setArtistError] = useState<string | null>(null);
 
   const checkDbStatus = useCallback(async () => {
     setIsCheckingStatus(true);
@@ -229,11 +241,48 @@ export default function SyncAdminPage() {
     }
   };
 
+  const handleGenerateArtists = async () => {
+    setIsGeneratingArtists(true);
+    setArtistList([]);
+    setArtistListOutput("");
+    setArtistError(null);
+    try {
+      const response = await fetch('/api/artists');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to generate artist list');
+      }
+      const data: ArtistData[] = await response.json();
+      setArtistList(data);
+
+      const outputString = 'export const ARTIST_DATA: Artist[] = [\n' +
+        data.map(artist => ` { name: '${artist.name.replace(/'/g, "\\'")}', cardCount: ${artist.cardCount} },`).join('\n') +
+        '\n];';
+      setArtistListOutput(outputString);
+
+      toast({
+        title: "Artist List Generated!",
+        description: `Found ${data.length} unique artists.`,
+        className: "bg-green-50 text-green-900 border-green-200",
+      });
+
+    } catch (err: any) {
+      setArtistError(err.message);
+      toast({
+        variant: "destructive",
+        title: "Artist Generation Failed",
+        description: err.message,
+      });
+    } finally {
+      setIsGeneratingArtists(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
-        <div className="max-w-2xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-8">
            <Card className="shadow-lg">
               <CardHeader>
                   <CardTitle className="font-headline text-2xl flex items-center gap-2">
@@ -418,6 +467,83 @@ export default function SyncAdminPage() {
                   <p className="text-xs text-muted-foreground">A zip file containing JSON data for all ~16,000+ cards.</p>
               </div>
             </CardContent>
+          </Card>
+
+           <Card className="shadow-lg">
+              <CardHeader>
+                  <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                      <Users className="h-6 w-6 text-primary" />
+                      Generate Artist Data
+                  </CardTitle>
+                  <CardDescription>
+                      Scan all cards in the database to generate a list of artists and their card counts. This can be used to update the static artist list for the browse page.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                  <div className="text-center">
+                      <Button onClick={handleGenerateArtists} disabled={isGeneratingArtists} size="lg">
+                          {isGeneratingArtists ? (
+                              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
+                          ) : 'Generate Artist List'}
+                      </Button>
+                  </div>
+
+                  {artistError && (
+                      <Alert variant="destructive">
+                          <ServerCrash className="h-4 w-4" />
+                          <AlertTitle>Generation Failed</AlertTitle>
+                          <AlertDescription>{artistError}</AlertDescription>
+                      </Alert>
+                  )}
+
+                  {artistList.length > 0 && (
+                      <div className="space-y-4">
+                          <Alert>
+                              <AlertTitle>Generation Complete!</AlertTitle>
+                              <AlertDescription>Found {artistList.length} unique artists. You can copy the code below to update the static artist data file.</AlertDescription>
+                          </Alert>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                  <h4 className="font-semibold mb-2 text-sm">Artist Counts:</h4>
+                                  <ScrollArea className="h-64 border rounded-md p-2 bg-background">
+                                      <ul className="text-sm">
+                                          {artistList.map(artist => (
+                                              <li key={artist.name} className="flex justify-between py-0.5">
+                                                  <span className="truncate pr-4">{artist.name}</span>
+                                                  <span className="font-mono flex-shrink-0">{artist.cardCount}</span>
+                                              </li>
+                                          ))}
+                                      </ul>
+                                  </ScrollArea>
+                              </div>
+                              <div>
+                                  <h4 className="font-semibold mb-2 text-sm">Generated Code for `artistData.ts`:</h4>
+                                  <div className="relative">
+                                      <Textarea
+                                          readOnly
+                                          value={artistListOutput}
+                                          className="h-64 font-mono text-xs bg-muted"
+                                          aria-label="Generated artist data code"
+                                      />
+                                      <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="absolute top-2 right-2 h-7 w-7"
+                                          onClick={() => {
+                                              navigator.clipboard.writeText(artistListOutput);
+                                              toast({ title: "Copied to clipboard!" });
+                                          }}
+                                      >
+                                          <ClipboardCopy className="h-4 w-4" />
+                                          <span className="sr-only">Copy to clipboard</span>
+                                      </Button>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                  )}
+              </CardContent>
           </Card>
         </div>
       </main>
