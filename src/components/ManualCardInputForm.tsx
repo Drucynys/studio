@@ -413,8 +413,8 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    let cardToSave: PokemonCard;
-    const { user } = useAuth();
+    let cardToSave: Omit<PokemonCard, 'id' | 'userId' | 'timestamp'>;
+    const { addCardToCollection } = useAuth();
 
     if (values.language === "English") {
       const selectedSet = englishSets.find(s => s.id === values.selectedSetId);
@@ -424,19 +424,17 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       }
       const { value: cardValue, variant: cardVariant } = getDefaultMarketPrice(selectedEnglishCardData);
       cardToSave = {
-        id: crypto.randomUUID(),
-        userId: user!.uid,
         set: selectedSet.name,
         cardNumber: selectedEnglishCardData.number,
         name: selectedEnglishCardData.name,
         rarity: selectedEnglishCardData.rarity || initialScanData?.rarity || "N/A",
         language: values.language,
-        variant: cardVariant, 
+        variant: cardVariant || null,
         condition: values.condition,
-        imageUrl: selectedEnglishCardData.images.large,
+        imageUrl: selectedEnglishCardData.images.large || null,
         value: cardValue,
         quantity: values.quantity,
-        artist: selectedEnglishCardData.artist,
+        artist: selectedEnglishCardData.artist || null,
       };
     } else { 
       const selectedSet = japaneseSets.find(s => s.id === values.selectedSetId);
@@ -445,23 +443,21 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
         return;
       }
       cardToSave = {
-        id: crypto.randomUUID(),
-        userId: user!.uid,
         set: selectedSet.name, 
         cardNumber: selectedJapaneseCardData.number,
         name: selectedJapaneseCardData.name, 
         rarity: selectedJapaneseCardData.rarity || initialScanData?.rarity || "N/A",
         language: values.language,
-        variant: undefined, 
+        variant: null,
         condition: values.condition,
-        imageUrl: selectedJapaneseCardData.image ? `${selectedJapaneseCardData.image}/high.webp` : undefined,
+        imageUrl: selectedJapaneseCardData.image ? `${selectedJapaneseCardData.image}/high.webp` : null,
         value: 0, 
         quantity: values.quantity,
-        artist: selectedJapaneseCardData.artist,
+        artist: selectedJapaneseCardData.artist || null,
       };
     }
     
-    onAddCard(cardToSave); 
+    addCardToCollection(cardToSave); 
 
     form.reset({
       selectedSetId: values.selectedSetId, 

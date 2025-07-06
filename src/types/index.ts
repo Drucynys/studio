@@ -4,14 +4,14 @@ export interface PokemonCard {
   userId: string; // ID of the user who owns the card
   set: string;
   cardNumber: string;
-  name?: string; 
+  name: string;
   rarity: string;
-  variant?: string;
+  variant: string | null;
   condition: string;
   language: 'English' | 'Japanese';
-  value: number; 
-  imageUrl?: string;
+  value: number;
+  imageUrl: string | null;
   quantity: number;
-  artist?: string;
+  artist: string | null;
   timestamp?: any; // Firestore ServerTimestamp
 }

@@ -157,11 +157,11 @@ export function AddCardToCollectionDialog({
         rarity: pokemonTcgApiCard.rarity || 'N/A',
         condition: selectedCondition,
         value: marketPriceForSelectedVariant,
-        variant: selectedVariant,
+        variant: selectedVariant || null,
         quantity: quantityInput,
-        imageUrl: pokemonTcgApiCard.images.large,
+        imageUrl: pokemonTcgApiCard.images.large || null,
         language: 'English', // Assuming English for now
-        artist: pokemonTcgApiCard.artist,
+        artist: pokemonTcgApiCard.artist || null,
         timestamp: new Date()
       });
       toast({
