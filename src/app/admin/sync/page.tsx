@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users, NotebookText, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users, NotebookText, Sparkles, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -33,16 +33,19 @@ export default function SyncAdminPage() {
   const [cardsSyncStatus, setCardsSyncStatus] = useState<SyncStatus>('idle');
   const [artistsSyncStatus, setArtistsSyncStatus] = useState<SyncStatus>('idle');
   const [pokedexSyncStatus, setPokedexSyncStatus] = useState<SyncStatus>('idle');
+  const [pricesSyncStatus, setPricesSyncStatus] = useState<SyncStatus>('idle');
   
   const [setsLogs, setSetsLogs] = useState<string[]>([]);
   const [cardsLogs, setCardsLogs] = useState<string[]>([]);
   const [artistsLogs, setArtistsLogs] = useState<string[]>([]);
   const [pokedexLogs, setPokedexLogs] = useState<string[]>([]);
+  const [pricesLogs, setPricesLogs] = useState<string[]>([]);
   
   const [setsError, setSetsError] = useState<string | null>(null);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [artistsError, setArtistsError] = useState<string | null>(null);
   const [pokedexError, setPokedexError] = useState<string | null>(null);
+  const [pricesError, setPricesError] = useState<string | null>(null);
 
   const [isExportingSets, setIsExportingSets] = useState(false);
   const [isExportingCards, setIsExportingCards] = useState(false);
@@ -66,7 +69,7 @@ export default function SyncAdminPage() {
   const [showCardSyncConfirm, setShowCardSyncConfirm] = useState(false);
   const [isCheckingCardDiff, setIsCheckingCardDiff] = useState(false);
 
-  // States for the new Master Sync flow
+  // States for the Master Sync flow
   const [masterSyncStatus, setMasterSyncStatus] = useState<SyncStatus>('idle');
   const [masterSyncLogs, setMasterSyncLogs] = useState<string[]>([]);
   const [masterSyncError, setMasterSyncError] = useState<string | null>(null);
@@ -249,13 +252,21 @@ export default function SyncAdminPage() {
   const stopCardSync = () => {
     isSyncStopped.current = true;
     setCardsSyncStatus('stopped');
+    setPricesSyncStatus('stopped');
     setCardsLogs(prev => [...prev, '🛑 Sync process stopped by user.']);
+    setPricesLogs(prev => [...prev, '🛑 Sync process stopped by user.']);
   };
   
-  const resetCardSync = () => {
-    setCardsSyncStatus('idle');
-    setCardsLogs([]);
-    setCardsError(null);
+  const resetCardSync = (type: 'cards' | 'prices') => {
+    if (type === 'cards') {
+        setCardsSyncStatus('idle');
+        setCardsLogs([]);
+        setCardsError(null);
+    } else {
+        setPricesSyncStatus('idle');
+        setPricesLogs([]);
+        setPricesError(null);
+    }
     setCurrentSetIndex(0);
     setTotalCardsSynced(0);
     setAllSetsToSync([]);
@@ -285,7 +296,7 @@ export default function SyncAdminPage() {
   };
 
   const handleCardsSync = async () => {
-    resetCardSync();
+    resetCardSync('cards');
     setCardsSyncStatus('in-progress');
     
     setCardsLogs(prev => [...prev, 'Fetching list of all sets to sync...']);
@@ -340,6 +351,62 @@ export default function SyncAdminPage() {
     }
   };
   
+  const handlePricesSync = async () => {
+    resetCardSync('prices');
+    setPricesSyncStatus('in-progress');
+    
+    setPricesLogs(prev => [...prev, 'Fetching list of all sets to sync for price updates...']);
+    try {
+      const setsResponse = await fetch('/api/sets');
+      if (!setsResponse.ok) throw new Error(`Failed to fetch set list: ${setsResponse.statusText}`);
+      const sets: ApiSet[] = await setsResponse.json();
+      if (sets.length === 0) {
+        setPricesLogs(prev => [...prev, '⚠️ No sets found in database. Please sync sets first.']);
+        setPricesSyncStatus('error');
+        setPricesError('No sets found in database. Please sync sets first.');
+        return;
+      }
+      setAllSetsToSync(sets);
+      setPricesLogs(prev => [...prev, `Found ${sets.length} sets. Starting incremental price update...`]);
+
+      let cumulativeCardCount = 0;
+      for (let i = 0; i < sets.length; i++) {
+        if (isSyncStopped.current) break;
+
+        setCurrentSetIndex(i);
+        const currentSet = sets[i];
+        setPricesLogs(prev => [...prev, `\n[${i + 1}/${sets.length}] Updating prices for set: ${currentSet.name} (${currentSet.id})`]);
+
+        const syncResponse = await fetch('/api/sync-prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ setId: currentSet.id }),
+        });
+        
+        const syncResult = await syncResponse.json();
+        setPricesLogs(prev => [...prev, ...(syncResult.logs || [])]);
+
+        if (!syncResponse.ok || syncResult.status !== 'success') {
+          throw new Error(syncResult.message || `Failed to update prices for set ${currentSet.id}`);
+        }
+        
+        cumulativeCardCount += syncResult.count || 0;
+        setTotalCardsSynced(cumulativeCardCount);
+      }
+      
+      if (!isSyncStopped.current) {
+        setPricesSyncStatus('success');
+        setPricesLogs(prev => [...prev, `\n✅✅✅ Price update complete! Total cards updated: ${cumulativeCardCount}.`]);
+        await checkDbStatus();
+      }
+
+    } catch (err: any) {
+        setPricesSyncStatus('error');
+        setPricesError(err.message || "An unknown client-side error occurred during price sync.");
+        setPricesLogs(prev => [...prev, `❌ Error: ${err.message}`]);
+    }
+  };
+
   const handleArtistsSync = async () => {
     setArtistsSyncStatus('in-progress');
     setArtistsLogs(['Starting artist database generation...']);
@@ -620,7 +687,7 @@ export default function SyncAdminPage() {
                     </Button>
                  )}
                  {cardsSyncStatus === 'stopped' && (
-                    <Button onClick={resetCardSync} variant="outline" size="lg">
+                    <Button onClick={() => resetCardSync('cards')} variant="outline" size="lg">
                         <ListRestart className="mr-2 h-4 w-4"/> Reset
                     </Button>
                  )}
@@ -661,6 +728,81 @@ export default function SyncAdminPage() {
 
                   <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Card Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
                       <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{cardsLogs.join('\n')}</pre></ScrollArea>
+                  </CardContent></Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                <DollarSign className="h-6 w-6 text-primary" />
+                Update Card Prices
+              </CardTitle>
+              <CardDescription>
+                Efficiently update TCGPlayer and Cardmarket prices for all cards in your database without re-syncing all data.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert>
+                <AlertTitle>Targeted & Efficient</AlertTitle>
+                <AlertDescription>
+                  This process fetches the latest prices and updates only the price fields on your existing card documents, making it much faster than a full sync.
+                </AlertDescription>
+              </Alert>
+              <div className="flex gap-4 justify-center">
+                 {pricesSyncStatus !== 'in-progress' ? (
+                    <Button onClick={handlePricesSync} size="lg">
+                      <Play className="mr-2 h-4 w-4"/> Start Price Update
+                    </Button>
+                 ) : (
+                    <Button onClick={stopCardSync} variant="destructive" size="lg">
+                        <Square className="mr-2 h-4 w-4"/> Stop Update
+                    </Button>
+                 )}
+                 {pricesSyncStatus === 'stopped' && (
+                    <Button onClick={() => resetCardSync('prices')} variant="outline" size="lg">
+                        <ListRestart className="mr-2 h-4 w-4"/> Reset
+                    </Button>
+                 )}
+              </div>
+
+              {pricesSyncStatus !== 'idle' && (
+                <div className="space-y-4">
+                  {pricesSyncStatus === 'in-progress' && (
+                    <div>
+                      <Progress value={overallProgress} className="w-full" />
+                      <p className="text-center text-sm text-muted-foreground mt-2">
+                        Overall Progress: Updated prices for {currentSetIndex} of {allSetsToSync.length} sets ({overallProgress.toFixed(1)}%)
+                        <br/>
+                        Total Cards Updated in this Session: {totalCardsSynced}
+                      </p>
+                    </div>
+                  )}
+                  {pricesSyncStatus === 'success' && (
+                    <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertTitle>Price Update Successful!</AlertTitle>
+                    </Alert>
+                  )}
+                  {pricesSyncStatus === 'error' && pricesError && (
+                    <Alert variant="destructive">
+                      <ServerCrash className="h-4 w-4" />
+                      <AlertTitle>Price Update Failed</AlertTitle>
+                      <AlertDescription>{pricesError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {pricesSyncStatus === 'stopped' && (
+                    <Alert variant="default" className="border-yellow-300 bg-yellow-50 text-yellow-900">
+                        <CheckCircle className="h-4 w-4 text-yellow-600" />
+                        <AlertTitle>Update Stopped</AlertTitle>
+                        <AlertDescription>The price update was stopped. Click Reset to clear logs and start again.</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Price Update Logs</CardTitle></CardHeader><CardContent className="p-2">
+                      <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{pricesLogs.join('\n')}</pre></ScrollArea>
                   </CardContent></Card>
                 </div>
               )}
