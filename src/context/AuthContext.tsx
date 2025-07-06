@@ -99,11 +99,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const additionalInfo = getAdditionalUserInfo(userCredential);
     
     if (additionalInfo?.isNewUser) {
-      const userProfileRef = doc(db, "users", newUser.uid, "profile", "data");
-      await setDoc(userProfileRef, {
+      const userDocRef = doc(db, "users", newUser.uid);
+      await setDoc(userDocRef, {
         email: newUser.email,
-        displayName: newUser.displayName,
+        displayName: newUser.displayName || newUser.email,
         createdAt: new Date().toISOString(),
+        uid: newUser.uid,
       });
       await migrateLocalCollectionToFirestore(newUser.uid);
     }
