@@ -29,3 +29,40 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  # ADD THESE FIREBASE CLIENT VARIABLES:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyCs2IWCbkVY8Md1X0k6k12LCVuny4Nplc8
+    availability:
+      - BUILD
+      - RUNTIME
+      
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: pokdex-tracker-mjjbo.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+      
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: pokdex-tracker-mjjbo
+    availability:
+      - BUILD
+      - RUNTIME
+      
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: pokdex-tracker-mjjbo.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+      
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: 430361704452
+    availability:
+      - BUILD
+      - RUNTIME
+      
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:430361704452:web:c27505e6c9816e70e49d51
+    availability:
+      - BUILD
+      - RUNTIME
