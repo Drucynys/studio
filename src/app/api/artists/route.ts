@@ -30,20 +30,33 @@ function initializeFirebaseAdmin() {
 /**
  * GET handler: Fetches the pre-generated list of artists from the 'pokemon-tcg-artists' collection.
  * This is used by the front-end browse pages.
+ * This version fetches all artists and sorts them in-memory to avoid needing a composite index.
  */
 export async function GET() {
     try {
         initializeFirebaseAdmin();
         const db = getFirestore();
         const artistsCollection = db.collection(ARTISTS_COLLECTION);
-        // Order by card count descending, then alphabetically for artists with the same count
-        const snapshot = await artistsCollection.orderBy('cardCount', 'desc').orderBy('name', 'asc').get();
+        
+        // Fetch all documents without a specific order from Firestore.
+        const snapshot = await artistsCollection.get();
 
         if (snapshot.empty) {
             return NextResponse.json([]);
         }
 
         const artists = snapshot.docs.map(doc => doc.data());
+
+        // Sort the results in-memory on the server.
+        artists.sort((a: any, b: any) => {
+            // Primary sort: cardCount descending
+            if (a.cardCount > b.cardCount) return -1;
+            if (a.cardCount < b.cardCount) return 1;
+
+            // Secondary sort (tie-breaker): name ascending
+            return a.name.localeCompare(b.name);
+        });
+        
         return NextResponse.json(artists);
 
     } catch (error: any) {
