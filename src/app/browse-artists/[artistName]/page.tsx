@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useParams } from 'next/navigation';
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,12 +15,9 @@ import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-interface ArtistDetailPageProps {
-  params: { artistName: string };
-}
-
-const ArtistDetailPage = ({ params }: ArtistDetailPageProps) => {
-  const { artistName: artistNameParam } = params;
+const ArtistDetailPage = () => {
+  const params = useParams();
+  const artistNameParam = params.artistName as string;
   
   const [cardsByArtist, setCardsByArtist] = useState<ApiPokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);

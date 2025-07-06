@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useParams } from 'next/navigation';
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -64,12 +65,9 @@ interface SetDetails {
   series: string;
 }
 
-interface SetDetailsPageProps {
-  params: { setId: string };
-}
-
-const SetDetailsPage = ({ params }: SetDetailsPageProps) => {
-  const { setId } = params;
+const SetDetailsPage = () => {
+  const params = useParams();
+  const setId = params.setId as string;
   const { collection } = useAuth();
   
   const [setDetails, setSetDetails] = useState<SetDetails | null>(null);

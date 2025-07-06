@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useParams } from 'next/navigation';
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,12 +24,9 @@ export interface Pokemon {
 
 const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 
-interface PokemonDetailPageProps {
-  params: { pokemonName: string };
-}
-
-const PokemonDetailPage = ({ params }: PokemonDetailPageProps) => {
-  const { pokemonName } = params;
+const PokemonDetailPage = () => {
+  const params = useParams();
+  const pokemonName = params.pokemonName as string;
 
   const [cardsForPokemon, setCardsForPokemon] = useState<ApiPokemonCard[]>([]);
   const [pokemonData, setPokemonData] = useState<Pokemon | null>(null);
