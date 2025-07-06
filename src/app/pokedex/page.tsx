@@ -16,6 +16,16 @@ import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { PokedexIcon } from "@/components/icons/PokedexIcon";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+
 
 export interface Pokemon {
   id: number;
@@ -35,6 +45,7 @@ export default function PokedexPage() {
   
   const [selectedGenerations, setSelectedGenerations] = useState<number[]>([]);
   const totalGenerations = 9;
+  const generations = useMemo(() => Array.from({ length: totalGenerations }, (_, i) => i + 1), [totalGenerations]);
 
   const ownedPokemonNames = useMemo(() => {
     if (!user) return new Set();
@@ -154,62 +165,69 @@ export default function PokedexPage() {
       setSelectedGenerations([]);
   };
 
-  const renderGenerationFilters = () => {
-    const generations = Array.from({ length: totalGenerations }, (_, i) => i + 1);
-    return (
-        <div className="flex flex-wrap gap-2">
-            <Button
-                size="sm"
-                variant={selectedGenerations.length === 0 ? 'default' : 'outline'}
-                onClick={handleSelectAllGens}
-            >
-                All Gens
-            </Button>
-            {generations.map(gen => (
-                <Button
-                    key={gen}
-                    size="sm"
-                    variant={selectedGenerations.includes(gen) ? 'default' : 'outline'}
-                    onClick={() => handleGenerationToggle(gen)}
-                >
-                    Gen {gen}
-                </Button>
-            ))}
-        </div>
-    );
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Card className="shadow-xl">
           <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div>
                 <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
                   <PokedexIcon className="h-8 w-8 text-primary"/>
                   Pokédex
                 </CardTitle>
-                <div className="relative w-full md:w-1/3">
+                <CardDescription className="pt-2">
+                  Browse all Pokémon to see their TCG card appearances. Data is sourced from your local database.
+                </CardDescription>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                <div className="relative flex-grow">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder="Search Pokémon by name or number..."
+                      placeholder="Search Pokémon..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10 w-full"
                     />
                 </div>
-            </div>
-            <CardDescription className="pt-2">
-              Browse all Pokémon to see their TCG card appearances. Data is sourced from your local database.
-            </CardDescription>
-            <div className="pt-4">
-              {renderGenerationFilters()}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full sm:w-auto justify-start">
+                      <span>Filter Generations</span>
+                      {selectedGenerations.length > 0 && (
+                        <Badge variant="secondary" className="ml-2">{selectedGenerations.length} selected</Badge>
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56">
+                    <DropdownMenuLabel>Filter by Generation</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuCheckboxItem
+                        checked={selectedGenerations.length === 0}
+                        onCheckedChange={() => handleSelectAllGens()}
+                    >
+                        All Generations
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuSeparator />
+                    {generations.map(gen => (
+                      <DropdownMenuCheckboxItem
+                        key={gen}
+                        checked={selectedGenerations.includes(gen)}
+                        onCheckedChange={() => handleGenerationToggle(gen)}
+                      >
+                        Generation {gen}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-28rem)]">
+            <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-26rem)]">
               {filteredPokemon.length > 0 ? (
                 sortedGenerationKeys.map(genKey => (
                     <div key={genKey}>
@@ -264,3 +282,4 @@ export default function PokedexPage() {
     </div>
   );
 }
+
