@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Dialog,
@@ -219,27 +220,37 @@ export function AddCardToCollectionDialog({
       <Dialog open={isOpen && !isImageZoomed} onOpenChange={(open) => { if (!open) onClose(); }}>
         <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add "{cardName}" to Collection</DialogTitle>
-             <DialogDescription className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm pt-1">
+            <DialogTitle>{cardName}</DialogTitle>
+            {pokemonTcgApiCard?.set.name && (
+              <DialogDescription>{pokemonTcgApiCard.set.name}</DialogDescription>
+            )}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm pt-1 text-muted-foreground">
               {pokemonTcgApiCard?.rarity && (
                 <span className="flex items-center gap-1.5">
                   <Gem className="h-4 w-4 text-amber-500" />
-                  <strong>Rarity:</strong> <Badge variant="secondary">{pokemonTcgApiCard.rarity}</Badge>
+                  Rarity: <Badge variant="secondary">{pokemonTcgApiCard.rarity}</Badge>
                 </span>
               )}
               {pokemonTcgApiCard?.number && pokemonTcgApiCard.set.printedTotal > 0 && (
                 <span className="flex items-center gap-1.5">
                   <Hash className="h-4 w-4 text-slate-500" />
-                  <strong>Number:</strong> <Badge variant="outline">{pokemonTcgApiCard.number} / {pokemonTcgApiCard.set.printedTotal}</Badge>
+                  # Number: <Badge variant="outline">{pokemonTcgApiCard.number} / {pokemonTcgApiCard.set.printedTotal}</Badge>
                 </span>
               )}
               {pokemonTcgApiCard?.artist && (
                 <span className="flex items-center gap-1.5">
                   <Paintbrush className="h-4 w-4 text-rose-500" />
-                  <strong>Artist:</strong> <Badge variant="outline">{pokemonTcgApiCard.artist}</Badge>
+                  Artist:
+                  <Link
+                    href={`/browse-artists/${encodeURIComponent(pokemonTcgApiCard.artist)}`}
+                    className="text-primary hover:underline"
+                    onClick={onClose}
+                  >
+                    {pokemonTcgApiCard.artist}
+                  </Link>
                 </span>
               )}
-            </DialogDescription>
+            </div>
           </DialogHeader>
 
           <ScrollArea className="max-h-[75vh] md:max-h-[80vh] pr-6">
