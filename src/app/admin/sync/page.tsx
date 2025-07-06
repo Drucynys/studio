@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users } from "lucide-react";
+import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users, NotebookText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error' | 'stopped';
@@ -22,14 +22,17 @@ export default function SyncAdminPage() {
   const [setsSyncStatus, setSetsSyncStatus] = useState<SyncStatus>('idle');
   const [cardsSyncStatus, setCardsSyncStatus] = useState<SyncStatus>('idle');
   const [artistsSyncStatus, setArtistsSyncStatus] = useState<SyncStatus>('idle');
+  const [pokedexSyncStatus, setPokedexSyncStatus] = useState<SyncStatus>('idle');
   
   const [setsLogs, setSetsLogs] = useState<string[]>([]);
   const [cardsLogs, setCardsLogs] = useState<string[]>([]);
   const [artistsLogs, setArtistsLogs] = useState<string[]>([]);
+  const [pokedexLogs, setPokedexLogs] = useState<string[]>([]);
   
   const [setsError, setSetsError] = useState<string | null>(null);
   const [cardsError, setCardsError] = useState<string | null>(null);
   const [artistsError, setArtistsError] = useState<string | null>(null);
+  const [pokedexError, setPokedexError] = useState<string | null>(null);
 
   const [isExportingSets, setIsExportingSets] = useState(false);
   const [isExportingCards, setIsExportingCards] = useState(false);
@@ -37,6 +40,7 @@ export default function SyncAdminPage() {
   const [setCount, setSetCount] = useState<number | null>(null);
   const [cardCount, setCardCount] = useState<number | null>(null);
   const [artistCount, setArtistCount] = useState<number | null>(null);
+  const [pokedexCount, setPokedexCount] = useState<number | null>(null);
   
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -52,10 +56,11 @@ export default function SyncAdminPage() {
     setIsCheckingStatus(true);
     setStatusError(null);
     try {
-        const [setsResponse, cardsResponse, artistsResponse] = await Promise.all([
+        const [setsResponse, cardsResponse, artistsResponse, pokedexResponse] = await Promise.all([
             fetch('/api/sets-count'),
             fetch('/api/cards-count'),
-            fetch('/api/artists-count')
+            fetch('/api/artists-count'),
+            fetch('/api/pokedex-count'),
         ]);
         
         if (!setsResponse.ok) throw new Error(`Failed to fetch set count: ${setsResponse.statusText}`);
@@ -69,12 +74,17 @@ export default function SyncAdminPage() {
         if (!artistsResponse.ok) throw new Error(`Failed to fetch artist count: ${artistsResponse.statusText}`);
         const artistsData = await artistsResponse.json();
         setArtistCount(artistsData.count);
+        
+        if (!pokedexResponse.ok) throw new Error(`Failed to fetch pokedex count: ${pokedexResponse.statusText}`);
+        const pokedexData = await pokedexResponse.json();
+        setPokedexCount(pokedexData.count);
 
     } catch (err: any) {
         setStatusError(err.message);
         setSetCount(null);
         setCardCount(null);
         setArtistCount(null);
+        setPokedexCount(null);
     } finally {
         setIsCheckingStatus(false);
     }
@@ -204,6 +214,30 @@ export default function SyncAdminPage() {
       setArtistsLogs(prev => [...prev, `❌ Error: ${err.message}`]);
     }
   };
+
+  const handlePokedexSync = async () => {
+    setPokedexSyncStatus('in-progress');
+    setPokedexLogs(['Starting Pokédex sync from PokeAPI...']);
+    setPokedexError(null);
+    try {
+      const response = await fetch('/api/sync-pokedex', { method: 'POST' });
+      const result = await response.json();
+
+      setPokedexLogs(result.logs || ['No logs returned from server.']);
+
+      if (response.ok && result.status === 'success') {
+        setPokedexSyncStatus('success');
+        setPokedexLogs(prev => [...prev, `✅ Successfully synced ${result.count} Pokémon.`]);
+        await checkDbStatus();
+      } else {
+        throw new Error(result.message || `Server responded with status ${response.status}`);
+      }
+    } catch (err: any) {
+      setPokedexSyncStatus('error');
+      setPokedexError(err.message || 'An unknown client-side error occurred.');
+      setPokedexLogs(prev => [...prev, `❌ Error: ${err.message}`]);
+    }
+  };
   
   const overallProgress = allSetsToSync.length > 0 ? ((currentSetIndex + 1) / allSetsToSync.length) * 100 : 0;
 
@@ -288,7 +322,7 @@ export default function SyncAdminPage() {
                           <AlertDescription>{statusError}</AlertDescription>
                       </Alert>
                   ) : (
-                      <div className="grid grid-cols-3 divide-x divide-border text-center">
+                      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border text-center">
                           <div>
                               <p className="text-sm text-muted-foreground">Sets</p>
                               <p className="text-5xl font-bold text-primary">{setCount}</p>
@@ -300,6 +334,10 @@ export default function SyncAdminPage() {
                            <div>
                               <p className="text-sm text-muted-foreground">Artists</p>
                               <p className="text-5xl font-bold text-primary">{artistCount}</p>
+                          </div>
+                          <div>
+                              <p className="text-sm text-muted-foreground">Pokédex</p>
+                              <p className="text-5xl font-bold text-primary">{pokedexCount}</p>
                           </div>
                       </div>
                   )}
@@ -471,6 +509,48 @@ export default function SyncAdminPage() {
             </CardContent>
           </Card>
 
+           <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="font-headline text-2xl flex items-center gap-2">
+                <NotebookText className="h-6 w-6 text-primary" />
+                Pokédex Data Sync
+              </CardTitle>
+              <CardDescription>
+                Fetch data for the first 151 Pokémon from PokeAPI and store it in the `pokedex` collection.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="text-center">
+                <Button onClick={handlePokedexSync} disabled={pokedexSyncStatus === 'in-progress'} size="lg">
+                  {pokedexSyncStatus === 'in-progress' ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing Pokédex...</>
+                  ) : 'Sync Pokédex Data'}
+                </Button>
+              </div>
+
+              {pokedexSyncStatus !== 'idle' && (
+                <div className="space-y-4">
+                  {pokedexSyncStatus === 'success' && (
+                    <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertTitle>Pokédex Sync Successful!</AlertTitle>
+                    </Alert>
+                  )}
+                  {pokedexSyncStatus === 'error' && pokedexError && (
+                    <Alert variant="destructive">
+                      <ServerCrash className="h-4 w-4" />
+                      <AlertTitle>Pokédex Sync Failed</AlertTitle>
+                      <AlertDescription>{pokedexError}</AlertDescription>
+                    </Alert>
+                  )}
+                  <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Pokédex Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
+                      <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{pokedexLogs.join('\n')}</pre></ScrollArea>
+                  </CardContent></Card>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card className="shadow-lg">
             <CardHeader>
                 <CardTitle className="font-headline text-2xl flex items-center gap-2">
@@ -495,10 +575,12 @@ export default function SyncAdminPage() {
                   <p className="text-xs text-muted-foreground">A zip file containing JSON data for all ~16,000+ cards.</p>
               </div>
             </CardContent>
-          </Card>>
+          </Card>
 
         </div>
       </main>
     </div>
   );
 }
+
+    

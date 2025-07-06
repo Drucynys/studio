@@ -12,7 +12,13 @@ import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialo
 import type { PokemonCard as CollectionPokemonCard } from "@/types";
 import { Loader2, ServerCrash, ArrowLeft, Target, Images } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { POKEMON_DATA } from '../pokedexData';
+
+// Interface for a single Pokémon entry from our DB
+export interface Pokemon {
+  id: number;
+  name: string;
+  sprite: string;
+}
 
 // Re-defining the API card type here for this page
 export interface ApiPokemonCard {
@@ -62,30 +68,38 @@ const PokemonDetailPage = async ({ params }: PokemonDetailPageProps) => {
 // Client component to handle state and effects
 const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
   const [cardsForPokemon, setCardsForPokemon] = useState<ApiPokemonCard[]>([]);
+  const [pokemonData, setPokemonData] = useState<Pokemon | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const pokemonData = POKEMON_DATA.find(p => p.name.toLowerCase() === pokemonName.toLowerCase());
-
-  const fetchCardsForPokemon = useCallback(async () => {
+  const fetchPageData = useCallback(async () => {
     if (!pokemonName) return;
     setIsLoading(true);
     setError(null);
     try {
-      const headers: HeadersInit = {};
-      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
-        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
+      // Fetch Pokémon details (for sprite) and card list in parallel
+      const [pokemonDetailsResponse, cardsResponse] = await Promise.all([
+        fetch(`/api/pokedex/${pokemonName}`),
+        fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${pokemonName}"&orderBy=set.releaseDate`, {
+            headers: { 'X-Api-Key': process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY || '' }
+        })
+      ]);
+
+      if (!pokemonDetailsResponse.ok) {
+        throw new Error(`Failed to fetch Pokémon details from database.`);
       }
-      
-      const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${pokemonName}"&orderBy=set.releaseDate`, { headers });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch cards: ${response.statusText} (status: ${response.status})`);
+      const pokemonDetailsData = await pokemonDetailsResponse.json();
+      setPokemonData(pokemonDetailsData);
+
+      if (!cardsResponse.ok) {
+        throw new Error(`Failed to fetch cards: ${cardsResponse.statusText} (status: ${cardsResponse.status})`);
       }
-      const data = await response.json();
-      setCardsForPokemon(data.data as ApiPokemonCard[]);
+      const cardsData = await cardsResponse.json();
+      setCardsForPokemon(cardsData.data as ApiPokemonCard[]);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
     } finally {
@@ -93,21 +107,10 @@ const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
     }
   }, [pokemonName]);
 
-  useEffect(() => {
-    fetchCardsForPokemon();
-  }, [fetchCardsForPokemon]);
 
-  const getDefaultMarketPrice = (apiCard: ApiPokemonCard | null): { value: number, variant?: string } => {
-    if (!apiCard || !apiCard.tcgplayer?.prices) return { value: 0 };
-    const prices = apiCard.tcgplayer.prices;
-    const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil'];
-    for (const variant of variantPriority) {
-      if (prices[variant]?.market && typeof prices[variant]!.market === 'number') {
-        return { value: prices[variant]!.market!, variant: variant };
-      }
-    }
-    return { value: 0 };
-  };
+  useEffect(() => {
+    fetchPageData();
+  }, [fetchPageData]);
 
   const handleAddCardToCollection = (condition: string, valueForCollection: number, variant?: string, quantity: number = 1) => {
     if (!selectedApiCard) return;
@@ -172,7 +175,7 @@ const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
         <Card className="shadow-xl">
           <CardHeader>
             <div className="flex items-center gap-4">
-              {pokemonData && (
+              {pokemonData && pokemonData.sprite && (
                  <div className="relative w-20 h-20" data-ai-hint="pokemon sprite">
                    <Image src={pokemonData.sprite} alt={pokemonName} layout="fill" unoptimized />
                  </div>
@@ -254,3 +257,5 @@ const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
 };
 
 export default PokemonDetailPage;
+
+    
