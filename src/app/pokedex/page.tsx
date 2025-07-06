@@ -179,7 +179,7 @@ export default function PokedexPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
-      <main className="flex-grow container mx-auto p-4 md:p-8">
+      <main className="flex-grow container mx-auto p-4 md:p-8 flex flex-col gap-6">
         <Card className="shadow-xl">
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
@@ -251,8 +251,11 @@ export default function PokedexPage() {
               </div>
             )}
           </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-30rem)]">
+        </Card>
+        
+        <Card className="shadow-xl flex-1 overflow-hidden">
+          <CardContent className="pt-6 h-full">
+            <ScrollArea className="h-full">
               {filteredPokemon.length > 0 ? (
                 sortedGenerationKeys.map(genKey => (
                     <div key={genKey}>
