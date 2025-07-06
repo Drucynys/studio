@@ -17,6 +17,7 @@ export interface Pokemon {
   id: number;
   name: string;
   sprite: string;
+  generation: number;
 }
 
 export default function PokedexPage() {
@@ -144,6 +145,7 @@ export default function PokedexPage() {
                         </div>
                         <p className="text-xs text-muted-foreground">#{String(pokemon.id).padStart(3, '0')}</p>
                         <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{pokemon.name}</p>
+                        {pokemon.generation && <p className="text-xs text-muted-foreground mt-1">Gen {pokemon.generation}</p>}
                       </Card>
                     </Link>
                   ))}
@@ -164,5 +166,3 @@ export default function PokedexPage() {
     </div>
   );
 }
-
-    

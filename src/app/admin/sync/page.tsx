@@ -516,7 +516,7 @@ export default function SyncAdminPage() {
                 Pokédex Data Sync
               </CardTitle>
               <CardDescription>
-                Fetch data for the first 151 Pokémon from PokeAPI and store it in the `pokedex` collection.
+                Fetch data for all Pokémon from all generations from PokeAPI and store it in the `pokedex` collection.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -582,5 +582,3 @@ export default function SyncAdminPage() {
     </div>
   );
 }
-
-    

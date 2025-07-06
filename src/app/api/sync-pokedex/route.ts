@@ -6,7 +6,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 const POKEDEX_COLLECTION = 'pokedex';
 const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2';
-const POKEMON_LIMIT = 151; // Gen 1
+const TOTAL_GENERATIONS = 9; // As of now, there are 9 generations
 
 // Safe initialization function
 function initializeFirebaseAdmin() {
@@ -32,31 +32,40 @@ function initializeFirebaseAdmin() {
 }
 
 export async function POST() {
-    const logs: string[] = ["- Starting Pokédex Data Sync -"];
+    const logs: string[] = ["- Starting Full Pokédex Data Sync -"];
     try {
         initializeFirebaseAdmin();
         const db = getFirestore();
         logs.push("✅ Firebase Admin SDK initialized.");
 
-        logs.push(`Fetching list of ${POKEMON_LIMIT} Pokémon from PokeAPI...`);
-        const listResponse = await axios.get(`${POKEAPI_BASE_URL}/pokemon?limit=${POKEMON_LIMIT}`);
-        const pokemonList = listResponse.data.results;
-        logs.push(`✅ Found ${pokemonList.length} Pokémon to process.`);
+        const allPokemonMap = new Map();
 
-        const pokedexPromises = pokemonList.map(async (pokemon: any) => {
-            try {
-                const detailResponse = await axios.get(pokemon.url);
-                const { id, name, sprites } = detailResponse.data;
-                return { id, name, sprite: sprites.front_default };
-            } catch (error) {
-                logs.push(`⚠️ Could not fetch details for ${pokemon.name}. Skipping.`);
-                return null;
+        for (let i = 1; i <= TOTAL_GENERATIONS; i++) {
+            logs.push(`Fetching data for Generation ${i}...`);
+            const generationResponse = await axios.get(`${POKEAPI_BASE_URL}/generation/${i}`);
+            const pokemonSpecies = generationResponse.data.pokemon_species;
+
+            logs.push(`Processing ${pokemonSpecies.length} Pokémon species from Generation ${i}.`);
+
+            for (const species of pokemonSpecies) {
+                const urlParts = species.url.split('/');
+                const id = parseInt(urlParts[urlParts.length - 2]);
+
+                if (!allPokemonMap.has(id)) {
+                    allPokemonMap.set(id, {
+                        id: id,
+                        name: species.name,
+                        // Construct the sprite URL directly to avoid extra API calls
+                        sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`,
+                        generation: i,
+                    });
+                }
             }
-        });
-
-        const pokedexData = (await Promise.all(pokedexPromises)).filter(p => p !== null);
+        }
         
-        logs.push(`✅ Fetched details for ${pokedexData.length} Pokémon.`);
+        const pokedexData = Array.from(allPokemonMap.values()).sort((a,b) => a.id - b.id);
+        logs.push(`✅ Fetched and processed a total of ${pokedexData.length} unique Pokémon across all generations.`);
+
 
         logs.push(`Writing ${pokedexData.length} Pokémon to the '${POKEDEX_COLLECTION}' collection...`);
         const pokedexCollection = db.collection(POKEDEX_COLLECTION);
@@ -65,7 +74,6 @@ export async function POST() {
 
         pokedexData.forEach((pokemon: any) => {
             if (pokemon && pokemon.name && pokemon.id) {
-                // Use the pokemon's numeric ID as a string for the document ID
                 const docRef = pokedexCollection.doc(String(pokemon.id));
                 batch.set(docRef, pokemon);
                 pokemonWritten++;
@@ -91,5 +99,3 @@ export async function POST() {
         );
     }
 }
-
-    

@@ -18,6 +18,7 @@ export interface Pokemon {
   id: number;
   name: string;
   sprite: string;
+  generation: number;
 }
 
 // Re-defining the API card type here for this page
@@ -185,7 +186,10 @@ const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
                   <Target className="h-8 w-8 text-primary"/>
                   {pokemonName}
                 </CardTitle>
-                <CardDescription>All TCG card appearances</CardDescription>
+                <CardDescription>
+                  {pokemonData?.generation && `Generation ${pokemonData.generation} | `}
+                  All TCG card appearances
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -257,5 +261,3 @@ const PokemonDetailPageClient = ({ pokemonName }: { pokemonName: string }) => {
 };
 
 export default PokemonDetailPage;
-
-    
