@@ -3,27 +3,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- TEMPORARY DEBUGGING RULE ---
-    // This rule allows any authenticated user to read and write to the entire database.
-    // This helps determine if the issue is with security rules or client-side configuration.
-    // IMPORTANT: This is NOT secure for production. We will replace this once the issue is resolved.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // Helper function to check if a user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if the user is the owner of the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // --- Public Read Rules (Still in effect) ---
-    // These are safe and allow anyone to view public data.
-    match /pokemon-tcg-sets/{set} {
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Public data collections are read-only for everyone
+    match /pokemon-tcg-sets/{setId} {
       allow read: if true;
     }
-    match /pokemon-tcg-cards/{card} {
+    match /pokemon-tcg-cards/{cardId} {
       allow read: if true;
     }
-    match /pokemon-tcg-artists/{artist} {
-        allow read: if true;
+     match /pokemon-tcg-artists/{artistId} {
+      allow read: if true;
     }
-    match /pokedex/{pokemon} {
-        allow read: if true;
+     match /pokedex/{pokemonId} {
+      allow read: if true;
+    }
+
+
+    // User-specific data
+    match /users/{userId} {
+      // A user can create their own profile document.
+      allow create: if isOwner(userId);
+      
+      // A user can read or update their own profile document.
+      allow read, update: if isOwner(userId);
+      
+      // Subcollection for user's cards
+      match /cards/{cardId} {
+        // Allow read/write to the cards subcollection only if the requesting user
+        // owns the parent user document. This is the key security rule.
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

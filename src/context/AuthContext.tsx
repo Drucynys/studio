@@ -11,10 +11,9 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
-  getAdditionalUserInfo,
   UserCredential
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, writeBatch, getDocs, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { PokemonCard } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -54,26 +53,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const handleAuthSuccess = useCallback(async (userCredential: UserCredential) => {
     const newUser = userCredential.user;
-    const userDocRef = doc(db, "users", newUser.uid);
-    const info = getAdditionalUserInfo(userCredential);
+    if (!newUser) return;
 
-    // If it's a new user, create their document.
-    // Also check if the document exists, to be safe.
+    const userDocRef = doc(db, "users", newUser.uid);
     const docSnap = await getDoc(userDocRef);
-    if (info?.isNewUser || !docSnap.exists()) {
-      console.log("Creating new user document for UID:", newUser.uid);
-      await setDoc(userDocRef, {
-        email: newUser.email,
-        displayName: newUser.displayName || newUser.email?.split('@')[0] || 'New User',
-        createdAt: new Date().toISOString(),
-        uid: newUser.uid,
-      });
+
+    if (!docSnap.exists()) {
+      console.log(`User document for ${newUser.uid} not found. Creating...`);
+      try {
+        await setDoc(userDocRef, {
+          uid: newUser.uid,
+          email: newUser.email,
+          displayName: newUser.displayName || newUser.email?.split('@')[0] || 'New User',
+          createdAt: new Date().toISOString(),
+        });
+        console.log(`User document for ${newUser.uid} created successfully.`);
+      } catch (error) {
+        console.error("Error creating user document:", error);
+        toast({
+          variant: 'destructive',
+          title: 'Account Setup Failed',
+          description: 'Could not create your user profile in the database.',
+        });
+        // We probably should sign the user out if their profile can't be created
+        await signOut(auth);
+        return; // Stop execution
+      }
     } else {
-        console.log("Existing user logged in:", newUser.uid);
+      console.log(`User document for ${newUser.uid} already exists.`);
     }
     
     closeAuthModal();
-  }, []);
+  }, [toast]);
 
   const signUp = async (email: string, pass: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
@@ -83,7 +94,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, pass: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-    await handleAuthSuccess(userCredential); // Check on sign-in too, for robustness
+    await handleAuthSuccess(userCredential);
     return userCredential;
   };
 
@@ -103,8 +114,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) throw new Error("You must be logged in to add cards.");
     
     const userCardsRef = collection(db, 'users', user.uid, 'cards');
-    const newCardRef = doc(userCardsRef);
-    await setDoc(newCardRef, { ...card, id: newCardRef.id, userId: user.uid, timestamp: new Date() });
+    const newCardRef = doc(userCardsRef); // Create a new document reference with a unique ID
+    
+    await setDoc(newCardRef, { 
+      ...card, 
+      id: newCardRef.id, 
+      userId: user.uid, 
+      timestamp: new Date() 
+    });
   };
 
   const updateCardInCollection = async (card: PokemonCard) => {
@@ -131,9 +148,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (user) {
       setLoadingCollection(true);
       const collRef = collection(db, "users", user.uid, "cards");
-      const unsubscribe = onSnapshot(collRef, (snapshot) => {
+      const q = query(collRef); // Prepare a query
+      const unsubscribe = onSnapshot(q, (snapshot) => {
         const userCards = snapshot.docs.map(doc => doc.data() as PokemonCard);
-        setUserCollection(userCards.sort((a, b) => (b.timestamp as any) - (a.timestamp as any) || 0)); // Sort by timestamp if available
+        // Sort by timestamp if available
+        userCards.sort((a, b) => {
+          const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
+          const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+          return timeB - timeA;
+        });
+        setUserCollection(userCards);
         setLoadingCollection(false);
       }, (error) => {
         console.error("Error fetching collection:", error);
