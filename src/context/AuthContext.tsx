@@ -97,20 +97,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleAuthSuccess = useCallback(async (userCredential: any) => {
     const newUser = userCredential.user;
     const userDocRef = doc(db, "users", newUser.uid);
-    
-    // Check if user document already exists
-    const docSnap = await getDoc(userDocRef);
+    const info = getAdditionalUserInfo(userCredential);
 
-    if (!docSnap.exists()) {
-      // Document doesn't exist, so create it
+    // If it's a new user, create their document and migrate data
+    if (info?.isNewUser) {
       await setDoc(userDocRef, {
         email: newUser.email,
-        displayName: newUser.displayName || newUser.email,
+        displayName: newUser.displayName || newUser.email?.split('@')[0] || 'New User',
         createdAt: new Date().toISOString(),
         uid: newUser.uid,
       });
-      // And migrate local data since this is their first time with a DB entry
       await migrateLocalCollectionToFirestore(newUser.uid);
+    } else {
+      // For existing users, we can just ensure their doc is there or update a lastLogin timestamp
+      await setDoc(userDocRef, { lastLogin: new Date().toISOString() }, { merge: true });
     }
     
     closeAuthModal();
@@ -124,7 +124,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, pass: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-    await handleAuthSuccess(userCredential);
+    // For regular sign-in, we can't reliably know if it's their "first" time
+    // without a DB read, so we ensure the doc exists here too.
+    const userDocRef = doc(db, "users", userCredential.user.uid);
+    const docSnap = await getDoc(userDocRef);
+    if (!docSnap.exists()) {
+        await setDoc(userDocRef, {
+            email: userCredential.user.email,
+            displayName: userCredential.user.displayName || userCredential.user.email?.split('@')[0],
+            createdAt: new Date().toISOString(),
+            uid: userCredential.user.uid,
+        });
+    }
+    closeAuthModal();
     return userCredential;
   };
 
@@ -145,27 +157,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const userCardsRef = collection(db, 'users', user.uid, 'cards');
     
-    // Check if a virtually identical card already exists to avoid duplicates and just update quantity
-    const q = query(userCardsRef, 
-      where("name", "==", card.name),
-      where("set", "==", card.set),
-      where("cardNumber", "==", card.cardNumber),
-      where("variant", "==", card.variant),
-      where("condition", "==", card.condition),
-      where("language", "==", card.language)
-    );
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      // Update quantity of the first found match
-      const existingDoc = querySnapshot.docs[0];
-      const newQuantity = (existingDoc.data().quantity || 1) + card.quantity;
-      await setDoc(doc(db, 'users', user.uid, 'cards', existingDoc.id), { quantity: newQuantity }, { merge: true });
-    } else {
-      // Add as new card
-      const newCardRef = doc(userCardsRef);
-      await setDoc(newCardRef, { ...card, id: newCardRef.id, userId: user.uid });
-    }
+    // TEMPORARILY SIMPLIFIED: Always add a new card without checking for duplicates.
+    // This helps isolate the permission issue.
+    const newCardRef = doc(userCardsRef);
+    await setDoc(newCardRef, { ...card, id: newCardRef.id, userId: user.uid });
   };
 
   const updateCardInCollection = async (card: PokemonCard) => {
