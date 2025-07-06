@@ -10,6 +10,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, RefreshCw, ServerCrash, CheckCircle, Download, Database, RefreshCcw, Library, Play, Square, ListRestart, Users, NotebookText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error' | 'stopped';
 interface ApiSet {
@@ -51,6 +61,10 @@ export default function SyncAdminPage() {
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   const [totalCardsSynced, setTotalCardsSynced] = useState(0);
   const isSyncStopped = useRef(false);
+  
+  const [remoteApiCardCount, setRemoteApiCardCount] = useState<number | null>(null);
+  const [showCardSyncConfirm, setShowCardSyncConfirm] = useState(false);
+  const [isCheckingCardDiff, setIsCheckingCardDiff] = useState(false);
 
   const checkDbStatus = useCallback(async () => {
     setIsCheckingStatus(true);
@@ -133,6 +147,28 @@ export default function SyncAdminPage() {
     setTotalCardsSynced(0);
     setAllSetsToSync([]);
     isSyncStopped.current = false;
+  };
+  
+  const handleCardSyncCheck = async () => {
+    setIsCheckingCardDiff(true);
+    setCardsError(null);
+    try {
+        await checkDbStatus(); // Ensure local count is up-to-date
+        const response = await fetch('/api/tcg-api-stats');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to fetch API card count.');
+        }
+        const data = await response.json();
+        setRemoteApiCardCount(data.totalCount);
+        setShowCardSyncConfirm(true);
+    } catch (err: any) {
+        setCardsError(err.message);
+        setCardsSyncStatus('error');
+        setCardsLogs(prev => [...prev, `❌ Error during pre-sync check: ${err.message}`]);
+    } finally {
+        setIsCheckingCardDiff(false);
+    }
   };
 
   const handleCardsSync = async () => {
@@ -399,7 +435,7 @@ export default function SyncAdminPage() {
                 Full Card Database Sync
               </CardTitle>
               <CardDescription>
-                Fetch **all** cards from the API and store them in Firestore, one set at a time.
+                Fetch **all** cards from the API and store them in Firestore, one set at a time. This now checks for updates before starting.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -411,8 +447,12 @@ export default function SyncAdminPage() {
                 </Alert>
               <div className="flex gap-4 justify-center">
                  {cardsSyncStatus !== 'in-progress' ? (
-                    <Button onClick={handleCardsSync} size="lg">
-                        <Play className="mr-2 h-4 w-4"/> Start Full Card Sync
+                    <Button onClick={handleCardSyncCheck} disabled={isCheckingCardDiff} size="lg">
+                        {isCheckingCardDiff ? (
+                           <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Checking for Updates...</>
+                        ) : (
+                           <><Play className="mr-2 h-4 w-4"/> Start Full Card Sync</>
+                        )}
                     </Button>
                  ) : (
                     <Button onClick={stopCardSync} variant="destructive" size="lg">
@@ -576,8 +616,39 @@ export default function SyncAdminPage() {
               </div>
             </CardContent>
           </Card>
-
         </div>
+        <AlertDialog open={showCardSyncConfirm} onOpenChange={setShowCardSyncConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Full Card Sync</AlertDialogTitle>
+              <AlertDialogDescription>
+                An update check has been performed. Please review the counts before starting the sync.
+                <div className="grid grid-cols-2 gap-4 mt-4 text-foreground">
+                    <div className="p-3 bg-muted rounded-md text-center">
+                        <p className="text-sm text-muted-foreground">Cards in Your Database</p>
+                        <p className="text-2xl font-bold">{cardCount ?? 'N/A'}</p>
+                    </div>
+                    <div className="p-3 bg-muted rounded-md text-center">
+                        <p className="text-sm text-muted-foreground">Total Cards in API</p>
+                        <p className="text-2xl font-bold">{remoteApiCardCount ?? 'N/A'}</p>
+                    </div>
+                </div>
+                <p className="mt-4 text-sm">
+                    Proceeding will fetch all cards from the Pokémon TCG API and store them in your database. This process can take several minutes.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                  setShowCardSyncConfirm(false);
+                  handleCardsSync();
+              }}>
+                Proceed with Sync
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );
