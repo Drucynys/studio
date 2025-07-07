@@ -11,7 +11,8 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
-  UserCredential
+  UserCredential,
+  updateProfile,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
@@ -60,11 +61,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (!docSnap.exists()) {
       console.log(`User document for ${newUser.uid} not found. Creating...`);
+      
+      const displayName = newUser.displayName || newUser.email?.split('@')[0] || 'New User';
+
+      // If the user signed up with email, their Auth profile won't have a displayName.
+      // We update it here to ensure it's available immediately in the UI.
+      if (!newUser.displayName) {
+        try {
+          await updateProfile(newUser, { displayName });
+          console.log("Firebase Auth profile updated with displayName:", displayName);
+        } catch (authError) {
+          console.error("Error updating Auth profile:", authError);
+          // Non-fatal, we can still proceed with Firestore.
+        }
+      }
+
       const userProfileData = {
         uid: newUser.uid,
         email: newUser.email,
-        displayName: newUser.displayName || newUser.email?.split('@')[0] || 'New User',
-        createdAt: new Date(), // Use a standard Date object
+        displayName: displayName,
+        createdAt: new Date(),
       };
 
       console.log("Attempting to write this user data to Firestore:", userProfileData);
