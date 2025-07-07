@@ -22,6 +22,7 @@ import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where
 import { app } from '@/lib/firebase';
 import { PokemonCard } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -70,6 +71,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,6 +185,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signOut(auth);
     setUserCollection([]);
     setFollowing([]);
+    router.push('/');
   };
 
   const addCardToCollection = async (card: Omit<PokemonCard, 'id' | 'userId'>) => {
@@ -336,33 +339,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setLoadingNotifications(true);
       const notificationsRef = collection(db, "users", user.uid, "notifications");
-      const qNotifications = query(notificationsRef, where("read", "==", false), orderBy("timestamp", "desc"));
+      const qNotifications = query(notificationsRef, orderBy("timestamp", "desc"));
       const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
-        const unreadUserNotifications = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        setNotifications(unreadUserNotifications);
+        const allNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        const unread = allNotifications.filter(n => !n.read);
+        setNotifications(unread);
         setLoadingNotifications(false);
-      }, (error) => {
-        console.error("Error fetching notifications:", error);
-        // This is a common error if the index is not created yet.
-        // We'll modify the query to not require a composite index, fetching all and filtering client-side
-        // to prevent this error from blocking the user.
-        console.warn("Firestore index error likely. Attempting fallback query.");
-        const fallbackQuery = query(notificationsRef, orderBy("timestamp", "desc"));
-        const unsubscribeFallback = onSnapshot(fallbackQuery, (snapshot) => {
-            const allNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-            const unread = allNotifications.filter(n => !n.read);
-            setNotifications(unread);
-            setLoadingNotifications(false);
-        }, (fallbackError) => {
-            console.error("Fallback notification query also failed:", fallbackError);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not load your notifications.' });
-            setLoadingNotifications(false);
-        });
-        // We should only have one active listener, but for the sake of the fix, we return the fallback.
-        return unsubscribeFallback;
+      }, (fallbackError) => {
+          console.error("Notification query failed:", fallbackError);
+          toast({ variant: 'destructive', title: 'Error', description: 'Could not load your notifications.' });
+          setLoadingNotifications(false);
       });
-
 
       return () => {
         unsubscribeCards();
