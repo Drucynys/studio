@@ -13,6 +13,10 @@ import {
   signInWithPopup,
   UserCredential,
   updateProfile,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updateEmail,
+  updatePassword,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
@@ -37,6 +41,10 @@ export interface AuthContextType {
   addCardToCollection: (card: Omit<PokemonCard, 'id' | 'userId'>) => Promise<void>;
   updateCardInCollection: (card: PokemonCard) => Promise<void>;
   removeCardFromCollection: (cardId: string) => Promise<void>;
+  updateUserDisplayName: (newName: string) => Promise<void>;
+  reauthenticate: (password: string) => Promise<void>;
+  updateUserEmail: (newEmail: string) => Promise<void>;
+  updateUserPassword: (newPassword: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -169,6 +177,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await deleteDoc(cardRef);
   };
 
+  const updateUserDisplayName = async (newName: string) => {
+    if (!user) throw new Error("User not logged in.");
+    await updateProfile(user, { displayName: newName });
+    const userDocRef = doc(db, "users", user.uid);
+    await setDoc(userDocRef, { displayName: newName }, { merge: true });
+  };
+  
+  const reauthenticate = async (password: string) => {
+    if (!user || !user.email) throw new Error("User not found or email is missing.");
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+  };
+
+  const updateUserEmail = async (newEmail: string) => {
+    if (!user) throw new Error("User not logged in.");
+    await updateEmail(user, newEmail);
+    const userDocRef = doc(db, "users", user.uid);
+    await setDoc(userDocRef, { email: newEmail }, { merge: true });
+  };
+  
+  const updateUserPassword = async (newPassword: string) => {
+    if (!user) throw new Error("User not logged in.");
+    await updatePassword(user, newPassword);
+    // Log the user out after a password change for security
+    await signOut(auth);
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -219,6 +254,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     addCardToCollection,
     updateCardInCollection,
     removeCardFromCollection,
+    updateUserDisplayName,
+    reauthenticate,
+    updateUserEmail,
+    updateUserPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
