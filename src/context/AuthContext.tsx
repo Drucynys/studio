@@ -115,6 +115,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         createdAt: new Date(),
         role: 'user',
         followSetting: 'everyone' as PrivacySetting,
+        followersCount: 0,
+        followingCount: 0,
       };
 
       console.log("Attempting to write this user data to Firestore:", userProfileData);
@@ -318,8 +320,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const qNotifications = query(notificationsRef, orderBy("timestamp", "desc"));
       const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
           const allUserNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-          const unreadNotifications = allUserNotifications.filter(n => n.read === false);
-          setNotifications(unreadNotifications);
+          setNotifications(allUserNotifications);
           setLoadingNotifications(false);
       }, (error) => {
         console.error("Error fetching notifications:", error);
