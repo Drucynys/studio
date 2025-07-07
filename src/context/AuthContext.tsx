@@ -18,7 +18,7 @@ import {
   updateEmail,
   updatePassword,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc, orderBy } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc, orderBy, writeBatch } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { PokemonCard } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +61,7 @@ export interface AuthContextType {
   updateUserPrivacySetting: (setting: PrivacySetting) => Promise<void>;
   notifications: Notification[];
   loadingNotifications: boolean;
+  markNotificationsAsRead: (notificationsToUpdate: Notification[]) => Promise<void>;
   following: string[]; // List of UIDs the user is following
   loadingFollowing: boolean;
 }
@@ -247,6 +248,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await setDoc(userDocRef, { followSetting: setting }, { merge: true });
   };
 
+  const markNotificationsAsRead = async (notificationsToUpdate: Notification[]) => {
+    if (!user || notificationsToUpdate.length === 0) return;
+
+    try {
+      const batch = writeBatch(db);
+      notificationsToUpdate.forEach(notification => {
+        const notificationRef = doc(db, 'users', user.uid, 'notifications', notification.id);
+        batch.update(notificationRef, { read: true });
+      });
+      await batch.commit();
+      console.log(`${notificationsToUpdate.length} notifications marked as read.`);
+    } catch (error) {
+      console.error("Error marking notifications as read: ", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not update notifications.'
+      });
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -314,17 +336,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setLoadingNotifications(true);
       const notificationsRef = collection(db, "users", user.uid, "notifications");
-      const qNotifications = query(notificationsRef, orderBy("timestamp", "desc"));
+      const qNotifications = query(notificationsRef, where("read", "==", false), orderBy("timestamp", "desc"));
       const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
         const unreadUserNotifications = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() } as Notification))
-          .filter(notification => !notification.read);
+          .map(doc => ({ id: doc.id, ...doc.data() } as Notification));
         setNotifications(unreadUserNotifications);
         setLoadingNotifications(false);
       }, (error) => {
         console.error("Error fetching notifications:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your notifications.' });
-        setLoadingNotifications(false);
+        // This is a common error if the index is not created yet.
+        // We'll modify the query to not require a composite index, fetching all and filtering client-side
+        // to prevent this error from blocking the user.
+        console.warn("Firestore index error likely. Attempting fallback query.");
+        const fallbackQuery = query(notificationsRef, orderBy("timestamp", "desc"));
+        const unsubscribeFallback = onSnapshot(fallbackQuery, (snapshot) => {
+            const allNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+            const unread = allNotifications.filter(n => !n.read);
+            setNotifications(unread);
+            setLoadingNotifications(false);
+        }, (fallbackError) => {
+            console.error("Fallback notification query also failed:", fallbackError);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not load your notifications.' });
+            setLoadingNotifications(false);
+        });
+        // We should only have one active listener, but for the sake of the fix, we return the fallback.
+        return unsubscribeFallback;
       });
 
 
@@ -367,6 +403,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateUserPrivacySetting,
     notifications,
     loadingNotifications,
+    markNotificationsAsRead,
     following,
     loadingFollowing,
   };

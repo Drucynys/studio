@@ -3,8 +3,12 @@ const admin = require('firebase-admin');
 const sharp = require('sharp'); // Import sharp for image processing
 const axios = require('axios'); // Keep axios, though currently not used for OCR
 
+// Initialize admin with the correct region
 admin.initializeApp();
 const db = admin.firestore();
+
+// Set the region to match your Firestore database
+const europeFunctions = functions.region('europe-west4');
 
 /**
  * Firebase Cloud Function to process newly uploaded Pokémon card images.
@@ -12,11 +16,7 @@ const db = admin.firestore();
  * Performs image preprocessing (grayscale, crop) and OCR to extract text,
  * then saves the extracted text to Firestore.
  */
-exports.processCardUpload = functions.storage.object().matches({
-  // You might want to specify your bucket name here if not using the default
-  // bucket: 'your-firebase-storage-bucket-name',
-  destination: '/card_uploads/{uid}/{filename}',
-}).onFinalize(async (object) => {
+exports.processCardUpload = europeFunctions.storage.object().onFinalize(async (object) => {
   const fileBucket = object.bucket; // The Storage bucket that contains the file.
   const filePath = object.name; // File path in the bucket.
   const contentType = object.contentType; // File content type.
@@ -34,10 +34,10 @@ exports.processCardUpload = functions.storage.object().matches({
     return null;
   }
 
-  // Get the uid from the file path
+  // Check if the file is in the correct path (card_uploads/{uid}/{filename})
   const filePathParts = filePath.split('/');
   if (filePathParts.length !== 3 || filePathParts[0] !== 'card_uploads') {
-      console.error('Invalid file path structure:', filePath);
+      console.log('File not in card_uploads directory, skipping:', filePath);
       return null;
   }
   const uid = filePathParts[1];
@@ -89,7 +89,6 @@ exports.processCardUpload = functions.storage.object().matches({
     cardNumber = details.cardNumber;
     console.log(`Extracted details - Pokémon Name: ${pokemonName}, Card Number: ${cardNumber}`);
     // --- End Extraction ---
-
 
   } catch (error) {
     console.error('Error during image processing or OCR:', error);
@@ -155,12 +154,11 @@ function extractCardDetails(text) {
   return { pokemonName, cardNumber };
 }
 
-
 /**
  * Cloud Function to create a notification when a user gains a new follower.
  * Triggers when a document is created in any user's 'followers' subcollection.
  */
-exports.notifyOnNewFollower = functions.firestore
+exports.notifyOnNewFollower = europeFunctions.firestore
   .document('users/{followedUid}/followers/{followerUid}')
   .onCreate(async (snap, context) => {
     const { followedUid, followerUid } = context.params;

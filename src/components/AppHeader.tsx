@@ -1,16 +1,31 @@
-
 // src/components/AppHeader.tsx
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch, LayoutList, Search, Bell, Users } from "lucide-react";
+import { PackageSearch, LayoutList, Search, Bell, Users, UserPlus } from "lucide-react";
 import { AuthButton } from "./AuthButton";
 import { PokedexIcon } from "./icons/PokedexIcon";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { formatDistanceToNow } from 'date-fns';
+
 
 export function AppHeader() {
-  const { notifications } = useAuth();
+  const { notifications, markNotificationsAsRead } = useAuth();
   const hasNotifications = notifications.length > 0;
+
+  const handleMarkAllRead = () => {
+    if (hasNotifications) {
+      markNotificationsAsRead(notifications);
+    }
+  };
 
   return (
     <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
@@ -53,13 +68,50 @@ export function AppHeader() {
             </Button>
           </Link>
           <div className="ml-2 md:ml-4 flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="relative hover:bg-primary-foreground/10 text-primary-foreground">
-              <Bell className="h-5 w-5" />
-              {hasNotifications && (
-                <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-accent ring-2 ring-primary" />
-              )}
-              <span className="sr-only">Notifications</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative hover:bg-primary-foreground/10 text-primary-foreground">
+                  <Bell className="h-5 w-5" />
+                  {hasNotifications && (
+                    <span className="absolute top-2 right-2 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
+                    </span>
+                  )}
+                  <span className="sr-only">Notifications</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80 md:w-96">
+                <div className="flex items-center justify-between p-2">
+                    <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                    {hasNotifications && (
+                        <Button variant="link" size="sm" className="text-xs h-auto p-0" onClick={handleMarkAllRead}>
+                            Mark all as read
+                        </Button>
+                    )}
+                </div>
+                <DropdownMenuSeparator />
+                {hasNotifications ? (
+                  notifications.map((notif) => (
+                    <DropdownMenuItem key={notif.id} className="flex gap-3 p-3 cursor-pointer" asChild>
+                      <Link href="/friends">
+                        <UserPlus className="h-4 w-4 text-primary mt-1"/>
+                        <div className="flex-1">
+                          <p><span className="font-semibold">{notif.followerDisplayName}</span> started following you.</p>
+                          <p className="text-xs text-muted-foreground pt-1">
+                            {notif.timestamp?.toDate ? formatDistanceToNow(notif.timestamp.toDate(), { addSuffix: true }) : ''}
+                          </p>
+                        </div>
+                      </Link>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                   <div className="text-center text-sm text-muted-foreground p-4">
+                    You're all caught up!
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <AuthButton />
           </div>
         </nav>
