@@ -2,51 +2,33 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    // Helper function to check if the user is the owner of the document
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
 
-    // Default deny all access
-    match /{document=**} {
-      allow read, write: if false;
-    }
-    
-    // Public data collections are read-only for everyone
-    match /pokemon-tcg-sets/{setId} {
-      allow read: if true;
-    }
-    match /pokemon-tcg-cards/{cardId} {
-      allow read: if true;
-    }
-     match /pokemon-tcg-artists/{artistId} {
-      allow read: if true;
-    }
-     match /pokedex/{pokemonId} {
-      allow read: if true;
-    }
-
-
-    // User-specific data
+    // USERS COLLECTION
+    // Allow reading of public user profiles by anyone.
+    // Allow authenticated users to create and update their own profile.
     match /users/{userId} {
-      // A user can create their own profile document.
-      allow create: if isOwner(userId);
-      
-      // A user can read or update their own profile document.
-      allow read, update: if isOwner(userId);
-      
-      // Subcollection for user's cards
-      match /cards/{cardId} {
-        // Allow read/write to the cards subcollection only if the requesting user
-        // owns the parent user document. This is the key security rule.
-        allow read, write: if isOwner(userId);
-      }
+      allow get: if true;
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // CARDS SUBCOLLECTION
+    // Authenticated users can only read and write to their own card collection.
+    match /users/{userId}/cards/{cardId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // FOLLOWING SUBCOLLECTION
+    // Authenticated users can manage their own list of who they follow.
+    match /users/{userId}/following/{targetId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // FOLLOWERS SUBCOLLECTION
+    // Authenticated users can see who follows them.
+    // Writes are handled by the backend API and are disallowed from the client.
+    match /users/{userId}/followers/{followerId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Explicitly deny client-side writes
     }
   }
 }
