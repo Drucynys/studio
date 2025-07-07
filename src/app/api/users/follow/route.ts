@@ -1,3 +1,4 @@
+
 // src/app/api/users/follow/route.ts
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
@@ -8,18 +9,18 @@ import { getFirestore } from 'firebase-admin/firestore';
 function initializeFirebaseAdmin() {
     if (admin.apps.length > 0) { return; }
     const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
 
-    if (!serviceAccountJson || !projectId) {
+    if (!serviceAccountJson) {
         throw new Error("Firebase credentials or Project ID are not set in environment variables.");
     }
     const serviceAccount = JSON.parse(serviceAccountJson);
      if (serviceAccount.private_key) {
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
+    // Relying solely on the credential from the service account JSON is more robust.
+    // The project ID is included within the service account file.
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
     });
 }
 
