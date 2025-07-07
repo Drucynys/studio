@@ -112,9 +112,11 @@ export default function FriendsPage() {
         openAuthModal();
         return;
       }
+      console.log(`[CLIENT] Attempting to ${action} user: ${targetUserId}`);
       setIsSubmittingFollow(targetUserId);
       try {
         const idToken = await user.getIdToken();
+        console.log('[CLIENT] Sending request to /api/users/follow');
         const response = await fetch('/api/users/follow', {
           method: 'POST',
           headers: {
@@ -124,9 +126,13 @@ export default function FriendsPage() {
           body: JSON.stringify({ targetUserId, action }),
         });
         
+        console.log(`[CLIENT] Received response with status: ${response.status}`);
         const result = await response.json();
+        console.log('[CLIENT] API response body:', result);
+
 
         if (!response.ok) {
+          console.error(`[CLIENT] API Error: ${result.message || `Failed to ${action} user.`}`);
           throw new Error(result.message || `Failed to ${action} user.`);
         }
         
@@ -134,8 +140,10 @@ export default function FriendsPage() {
           title: 'Success!',
           description: `You are now ${action === 'follow' ? 'following' : 'no longer following'} the user.`,
         });
+        console.log(`[CLIENT] Successfully ${action}ed user ${targetUserId}. A notification should be triggered if 'follow' was the action.`);
 
       } catch (err: any) {
+        console.error('[CLIENT] Error in handleFollowToggle:', err);
         toast({
           variant: 'destructive',
           title: 'Error',
