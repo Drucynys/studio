@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Initialize Firebase Admin SDK
 function initializeFirebaseAdmin() {
@@ -54,44 +54,26 @@ export async function POST(request: Request) {
             console.error('[API] Bad Request: User cannot follow themselves.');
             return NextResponse.json({ message: 'You cannot follow yourself.' }, { status: 400 });
         }
+        
+        // 3. Perform the follow/unfollow action using a batched write for atomicity
+        const currentUserFollowingRef = db.collection('users').doc(currentUserId).collection('following').doc(targetUserId);
+        const targetUserFollowersRef = db.collection('users').doc(targetUserId).collection('followers').doc(currentUserId);
+        
+        const batch = db.batch();
 
-        // 3. Use a transaction to perform the follow/unfollow and update counts
-        const currentUserRef = db.collection('users').doc(currentUserId);
-        const targetUserRef = db.collection('users').doc(targetUserId);
+        if (action === 'follow') {
+            console.log('[API] Batch: Following user.');
+            const timestamp = new Date();
+            batch.set(currentUserFollowingRef, { uid: targetUserId, followedAt: timestamp });
+            batch.set(targetUserFollowersRef, { uid: currentUserId, followedAt: timestamp });
+        } else { // 'unfollow'
+            console.log('[API] Batch: Unfollowing user.');
+            batch.delete(currentUserFollowingRef);
+            batch.delete(targetUserFollowersRef);
+        }
 
-        await db.runTransaction(async (transaction) => {
-            const targetUserDoc = await transaction.get(targetUserRef);
-            if (!targetUserDoc.exists) {
-                throw new Error("User to follow does not exist.");
-            }
-
-            const currentUserFollowingRef = currentUserRef.collection('following').doc(targetUserId);
-            const targetUserFollowersRef = targetUserRef.collection('followers').doc(currentUserId);
-
-            if (action === 'follow') {
-                console.log('[API] Transaction: Following user.');
-                const timestamp = new Date();
-                transaction.set(currentUserFollowingRef, { uid: targetUserId, followedAt: timestamp });
-                transaction.set(targetUserFollowersRef, { uid: currentUserId, followedAt: timestamp });
-                
-                // Increment counts
-                transaction.update(currentUserRef, { followingCount: FieldValue.increment(1) });
-                transaction.update(targetUserRef, { followersCount: FieldValue.increment(1) });
-                console.log('[API] Transaction: Incremented followingCount for current user and followersCount for target user.');
-
-            } else { // 'unfollow'
-                console.log('[API] Transaction: Unfollowing user.');
-                transaction.delete(currentUserFollowingRef);
-                transaction.delete(targetUserFollowersRef);
-                
-                // Decrement counts
-                transaction.update(currentUserRef, { followingCount: FieldValue.increment(-1) });
-                transaction.update(targetUserRef, { followersCount: FieldValue.increment(-1) });
-                console.log('[API] Transaction: Decremented followingCount for current user and followersCount for target user.');
-            }
-        });
-
-        console.log('[API] Database transaction successful.');
+        await batch.commit();
+        console.log('[API] Database batch write successful.');
 
         return NextResponse.json({ status: 'success', message: `Successfully ${action}ed user.` });
 

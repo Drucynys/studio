@@ -1,4 +1,3 @@
-
 // src/context/AuthContext.tsx
 "use client";
 
@@ -115,8 +114,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         createdAt: new Date(),
         role: 'user',
         followSetting: 'everyone' as PrivacySetting,
-        followersCount: 0,
-        followingCount: 0,
       };
 
       console.log("Attempting to write this user data to Firestore:", userProfileData);
@@ -319,9 +316,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const notificationsRef = collection(db, "users", user.uid, "notifications");
       const qNotifications = query(notificationsRef, orderBy("timestamp", "desc"));
       const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
-          const allUserNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-          setNotifications(allUserNotifications);
-          setLoadingNotifications(false);
+        const unreadUserNotifications = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as Notification))
+          .filter(notification => !notification.read);
+        setNotifications(unreadUserNotifications);
+        setLoadingNotifications(false);
       }, (error) => {
         console.error("Error fetching notifications:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load your notifications.' });
