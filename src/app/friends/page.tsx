@@ -7,9 +7,10 @@ import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, Users, UserPlus, Info, UserCheck } from 'lucide-react';
+import { Loader2, Search, Users, UserPlus, Info, UserCheck, UserX } from 'lucide-react';
 import type { PokemonCard } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserSearchResult {
   uid: string;
@@ -19,17 +20,15 @@ interface UserSearchResult {
 }
 
 export default function FriendsPage() {
-    const { user, openAuthModal } = useAuth();
+    const { user, openAuthModal, following, loadingFollowing } = useAuth();
+    const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoadingSearch, setIsLoadingSearch] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasSearched, setHasSearched] = useState(false);
 
-    // Placeholder for following logic
-    const [following, setFollowing] = useState<string[]>([]);
     const [isSubmittingFollow, setIsSubmittingFollow] = useState<string | null>(null);
-
 
     const handleSearch = useCallback(async (query: string) => {
         if (query.trim().length < 3) {
@@ -38,7 +37,7 @@ export default function FriendsPage() {
             return;
         }
 
-        setIsLoading(true);
+        setIsLoadingSearch(true);
         setError(null);
         setHasSearched(true);
         try {
@@ -52,23 +51,51 @@ export default function FriendsPage() {
         } catch (err: any) {
             setError(err.message);
         } finally {
-            setIsLoading(false);
+            setIsLoadingSearch(false);
         }
     }, [user?.uid]);
     
-    // In a real app, this would be a server action or API call.
-    const handleFollow = async (targetUserId: string) => {
+    const handleFollowToggle = async (targetUserId: string, action: 'follow' | 'unfollow') => {
       if (!user) {
         openAuthModal();
         return;
       }
       setIsSubmittingFollow(targetUserId);
-      // Fake delay to simulate a network request
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setFollowing(prev => [...prev, targetUserId]);
-      setIsSubmittingFollow(null);
-    }
+      try {
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/users/follow', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ targetUserId, action }),
+        });
+        
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || `Failed to ${action} user.`);
+        }
+        
+        toast({
+          title: 'Success!',
+          description: `You are now ${action === 'follow' ? 'following' : 'no longer following'} the user.`,
+        });
+
+      } catch (err: any) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: err.message,
+        });
+      } finally {
+        setIsSubmittingFollow(null);
+      }
+    };
     
+    const isLoading = loadingFollowing || isLoadingSearch;
+
     return (
         <div className="flex flex-col min-h-screen bg-background">
             <AppHeader />
@@ -118,46 +145,50 @@ export default function FriendsPage() {
                 
                 {!isLoading && searchResults.length > 0 && (
                     <div className="space-y-6">
-                        {searchResults.map((foundUser) => (
-                            <Card key={foundUser.uid} className="shadow-lg">
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <div>
-                                        <CardTitle>{foundUser.displayName}</CardTitle>
-                                        <CardDescription>
-                                            {foundUser.followSetting === 'everyone' ? `Collection Preview` : `This user's collection is private.`}
-                                        </CardDescription>
-                                    </div>
-                                    <Button 
-                                      onClick={() => handleFollow(foundUser.uid)} 
-                                      disabled={isSubmittingFollow === foundUser.uid || following.includes(foundUser.uid)}
-                                    >
-                                        {isSubmittingFollow === foundUser.uid ? (
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        ) : following.includes(foundUser.uid) ? (
-                                          <UserCheck className="mr-2 h-4 w-4" />
-                                        ) : (
-                                          <UserPlus className="mr-2 h-4 w-4" />
-                                        )}
-                                        {following.includes(foundUser.uid) ? 'Following' : 'Follow'}
-                                    </Button>
-                                </CardHeader>
-                                {foundUser.followSetting === 'everyone' && (
-                                    <CardContent>
-                                        {foundUser.collectionPreview.length > 0 ? (
-                                            <div className="flex gap-2 overflow-x-auto pb-2">
-                                                {foundUser.collectionPreview.map(card => (
-                                                    <div key={card.id} className="relative flex-shrink-0 w-24 h-32 rounded-md overflow-hidden bg-muted" data-ai-hint="pokemon card front">
-                                                        <Image src={card.imageUrl || "https://placehold.co/200x280.png"} alt={card.name} layout="fill" objectFit="contain" />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground italic">This user's collection is empty.</p>
-                                        )}
-                                    </CardContent>
-                                )}
-                            </Card>
-                        ))}
+                        {searchResults.map((foundUser) => {
+                            const isFollowing = following.includes(foundUser.uid);
+                            return (
+                                <Card key={foundUser.uid} className="shadow-lg">
+                                    <CardHeader className="flex flex-row items-center justify-between">
+                                        <div>
+                                            <CardTitle>{foundUser.displayName}</CardTitle>
+                                            <CardDescription>
+                                                {foundUser.followSetting === 'everyone' ? `Collection Preview` : `This user's collection is private.`}
+                                            </CardDescription>
+                                        </div>
+                                        <Button 
+                                          onClick={() => handleFollowToggle(foundUser.uid, isFollowing ? 'unfollow' : 'follow')} 
+                                          disabled={isSubmittingFollow === foundUser.uid || loadingFollowing}
+                                          variant={isFollowing ? 'outline' : 'default'}
+                                        >
+                                            {isSubmittingFollow === foundUser.uid ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : isFollowing ? (
+                                              <UserX className="mr-2 h-4 w-4" />
+                                            ) : (
+                                              <UserPlus className="mr-2 h-4 w-4" />
+                                            )}
+                                            {isFollowing ? 'Unfollow' : 'Follow'}
+                                        </Button>
+                                    </CardHeader>
+                                    {foundUser.followSetting === 'everyone' && (
+                                        <CardContent>
+                                            {foundUser.collectionPreview.length > 0 ? (
+                                                <div className="flex gap-2 overflow-x-auto pb-2">
+                                                    {foundUser.collectionPreview.map(card => (
+                                                        <div key={card.id} className="relative flex-shrink-0 w-24 h-32 rounded-md overflow-hidden bg-muted" data-ai-hint="pokemon card front">
+                                                            <Image src={card.imageUrl || "https://placehold.co/200x280.png"} alt={card.name} layout="fill" objectFit="contain" />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground italic">This user's collection is empty.</p>
+                                            )}
+                                        </CardContent>
+                                    )}
+                                </Card>
+                            )
+                        })}
                     </div>
                 )}
                  
@@ -168,7 +199,13 @@ export default function FriendsPage() {
                         <CardDescription>A list of people you follow will appear here.</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-muted-foreground text-sm">Feature coming soon.</p>
+                         {loadingFollowing ? (
+                           <Loader2 className="h-5 w-5 animate-spin"/>
+                         ) : following.length > 0 ? (
+                            <p className="text-muted-foreground text-sm">You are following {following.length} user(s).</p>
+                         ) : (
+                            <p className="text-muted-foreground text-sm">You are not following anyone yet.</p>
+                         )}
                       </CardContent>
                   </Card>
                  </div>

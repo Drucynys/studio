@@ -52,6 +52,8 @@ export interface AuthContextType {
   privacySetting: PrivacySetting | null;
   updateUserPrivacySetting: (setting: PrivacySetting) => Promise<void>;
   notificationsCount: number;
+  following: string[]; // List of UIDs the user is following
+  loadingFollowing: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -66,6 +68,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [privacySetting, setPrivacySetting] = useState<PrivacySetting | null>(null);
   const [notificationsCount, setNotificationsCount] = useState(0);
+  const [following, setFollowing] = useState<string[]>([]);
+  const [loadingFollowing, setLoadingFollowing] = useState(true);
 
 
   const openAuthModal = () => setIsAuthModalOpen(true);
@@ -157,6 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logOut = async () => {
     await signOut(auth);
     setUserCollection([]);
+    setFollowing([]);
   };
 
   const addCardToCollection = async (card: Omit<PokemonCard, 'id' | 'userId'>) => {
@@ -257,7 +262,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoadingCollection(true);
       const collRef = collection(db, "users", user.uid, "cards");
       const q = query(collRef);
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribeCards = onSnapshot(q, (snapshot) => {
         const userCards = snapshot.docs.map(doc => doc.data() as PokemonCard);
         userCards.sort((a, b) => {
           const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
@@ -271,10 +276,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load your collection.'});
         setLoadingCollection(false);
       });
-      return () => unsubscribe();
+
+      setLoadingFollowing(true);
+      const followingRef = collection(db, "users", user.uid, "following");
+      const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
+        const followingUIDs = snapshot.docs.map(doc => doc.id);
+        setFollowing(followingUIDs);
+        setLoadingFollowing(false);
+      }, (error) => {
+        console.error("Error fetching following list:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your following list.' });
+        setLoadingFollowing(false);
+      });
+
+
+      return () => {
+        unsubscribeCards();
+        unsubscribeFollowing();
+      };
     } else {
       setUserCollection([]);
+      setFollowing([]);
       setLoadingCollection(false);
+      setLoadingFollowing(false);
     }
   }, [user, toast]);
 
@@ -301,6 +325,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     privacySetting,
     updateUserPrivacySetting,
     notificationsCount,
+    following,
+    loadingFollowing,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
