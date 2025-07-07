@@ -1,22 +1,28 @@
 
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Loader2, Search, Users, UserPlus, Info, UserCheck, UserX } from 'lucide-react';
+import { Loader2, Search, Users, UserPlus, Info, UserX } from 'lucide-react';
 import type { PokemonCard } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface UserSearchResult {
   uid: string;
   displayName: string;
   followSetting: 'everyone' | 'onRequest';
   collectionPreview: PokemonCard[];
+}
+
+interface FollowedUser {
+    uid: string;
+    displayName: string;
 }
 
 export default function FriendsPage() {
@@ -29,6 +35,52 @@ export default function FriendsPage() {
     const [hasSearched, setHasSearched] = useState(false);
 
     const [isSubmittingFollow, setIsSubmittingFollow] = useState<string | null>(null);
+    
+    const [followedProfiles, setFollowedProfiles] = useState<FollowedUser[]>([]);
+    const [loadingFollowedProfiles, setLoadingFollowedProfiles] = useState(false);
+
+    useEffect(() => {
+        const fetchFollowedProfiles = async () => {
+            if (!user || following.length === 0) {
+                setFollowedProfiles([]);
+                return;
+            }
+
+            setLoadingFollowedProfiles(true);
+            try {
+                const idToken = await user.getIdToken();
+                const response = await fetch('/api/users/get-profiles', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`,
+                    },
+                    body: JSON.stringify({ uids: following }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch followed user profiles.');
+                }
+                
+                const profiles: FollowedUser[] = await response.json();
+                profiles.sort((a, b) => a.displayName.localeCompare(b.displayName));
+                setFollowedProfiles(profiles);
+
+            } catch (err: any) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Error',
+                    description: 'Could not load your following list details.',
+                });
+            } finally {
+                setLoadingFollowedProfiles(false);
+            }
+        };
+
+        if (!loadingFollowing) {
+            fetchFollowedProfiles();
+        }
+    }, [user, following, loadingFollowing, toast]);
 
     const handleSearch = useCallback(async (query: string) => {
         if (query.trim().length < 3) {
@@ -195,16 +247,40 @@ export default function FriendsPage() {
                  <div className="mt-8">
                   <Card className="border-dashed">
                       <CardHeader>
-                        <CardTitle>Following</CardTitle>
-                        <CardDescription>A list of people you follow will appear here.</CardDescription>
+                        <CardTitle>Following ({following.length})</CardTitle>
+                        <CardDescription>A list of people you follow.</CardDescription>
                       </CardHeader>
                       <CardContent>
-                         {loadingFollowing ? (
-                           <Loader2 className="h-5 w-5 animate-spin"/>
-                         ) : following.length > 0 ? (
-                            <p className="text-muted-foreground text-sm">You are following {following.length} user(s).</p>
+                         {loadingFollowing || loadingFollowedProfiles ? (
+                           <div className="flex items-center text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Loading following list...</div>
+                         ) : followedProfiles.length > 0 ? (
+                            <ul className="space-y-4">
+                                {followedProfiles.map(profile => (
+                                    <li key={profile.uid} className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <Avatar>
+                                                <AvatarFallback>{profile.displayName.charAt(0).toUpperCase()}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="font-medium">{profile.displayName}</span>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleFollowToggle(profile.uid, 'unfollow')}
+                                            disabled={isSubmittingFollow === profile.uid}
+                                        >
+                                            {isSubmittingFollow === profile.uid ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <UserX className="mr-2 h-4 w-4" />
+                                            )}
+                                            Unfollow
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ul>
                          ) : (
-                            <p className="text-muted-foreground text-sm">You are not following anyone yet.</p>
+                            <p className="text-muted-foreground text-sm">You are not following anyone yet. Use the search above to find other collectors.</p>
                          )}
                       </CardContent>
                   </Card>
