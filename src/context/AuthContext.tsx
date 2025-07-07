@@ -19,7 +19,7 @@ import {
   updateEmail,
   updatePassword,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc, orderBy } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { PokemonCard } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,15 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 export type PrivacySetting = 'everyone' | 'onRequest';
+
+export interface Notification {
+  id: string;
+  type: 'new_follower';
+  followerUid: string;
+  followerDisplayName: string;
+  timestamp: any; // Firestore Timestamp
+  read: boolean;
+}
 
 export interface AuthContextType {
   user: User | null;
@@ -51,7 +60,8 @@ export interface AuthContextType {
   updateUserPassword: (newPassword: string) => Promise<void>;
   privacySetting: PrivacySetting | null;
   updateUserPrivacySetting: (setting: PrivacySetting) => Promise<void>;
-  notificationsCount: number;
+  notifications: Notification[];
+  loadingNotifications: boolean;
   following: string[]; // List of UIDs the user is following
   loadingFollowing: boolean;
 }
@@ -67,7 +77,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingCollection, setLoadingCollection] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [privacySetting, setPrivacySetting] = useState<PrivacySetting | null>(null);
-  const [notificationsCount, setNotificationsCount] = useState(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [following, setFollowing] = useState<string[]>([]);
   const [loadingFollowing, setLoadingFollowing] = useState(true);
 
@@ -289,20 +300,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoadingFollowing(false);
       });
 
+      setLoadingNotifications(true);
+      const notificationsRef = collection(db, "users", user.uid, "notifications");
+      const qNotifications = query(notificationsRef, where("read", "==", false), orderBy("timestamp", "desc"));
+      const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
+        const userNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        setNotifications(userNotifications);
+        setLoadingNotifications(false);
+      }, (error) => {
+        console.error("Error fetching notifications:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your notifications.' });
+        setLoadingNotifications(false);
+      });
+
 
       return () => {
         unsubscribeCards();
         unsubscribeFollowing();
+        unsubscribeNotifications();
       };
     } else {
       setUserCollection([]);
       setFollowing([]);
+      setNotifications([]);
       setLoadingCollection(false);
       setLoadingFollowing(false);
+      setLoadingNotifications(false);
     }
   }, [user, toast]);
 
-  const value = {
+  const value: AuthContextType = {
     user,
     loading,
     role,
@@ -324,7 +351,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateUserPassword,
     privacySetting,
     updateUserPrivacySetting,
-    notificationsCount,
+    notifications,
+    loadingNotifications,
     following,
     loadingFollowing,
   };

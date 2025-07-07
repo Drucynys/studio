@@ -154,3 +154,45 @@ function extractCardDetails(text) {
 
   return { pokemonName, cardNumber };
 }
+
+
+/**
+ * Cloud Function to create a notification when a user gains a new follower.
+ * Triggers when a document is created in any user's 'followers' subcollection.
+ */
+exports.notifyOnNewFollower = functions.firestore
+  .document('users/{followedUid}/followers/{followerUid}')
+  .onCreate(async (snap, context) => {
+    const { followedUid, followerUid } = context.params;
+    console.log(`User ${followerUid} started following user ${followedUid}`);
+
+    try {
+      // Get the follower's display name
+      const followerDoc = await db.collection('users').doc(followerUid).get();
+      if (!followerDoc.exists) {
+        console.error(`Follower user document ${followerUid} not found.`);
+        return null;
+      }
+      const followerData = followerDoc.data();
+      const followerDisplayName = followerData.displayName || 'A new user';
+
+      // Create the notification document
+      const notification = {
+        type: 'new_follower',
+        followerUid: followerUid,
+        followerDisplayName: followerDisplayName,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        read: false, // Mark as unread initially
+      };
+
+      // Add the notification to the 'notifications' subcollection of the followed user
+      await db.collection('users').doc(followedUid).collection('notifications').add(notification);
+
+      console.log(`Notification created for user ${followedUid}.`);
+      return null;
+
+    } catch (error) {
+      console.error('Error creating new follower notification:', error);
+      return null;
+    }
+  });

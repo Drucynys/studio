@@ -1,44 +1,69 @@
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Public data is read-only for all users
-    match /pokedex/{pokemonId} {
+    // PUBLIC, READ-ONLY DATA
+    match /pokemon-tcg-sets/{document=**} {
       allow read: if true;
       allow write: if false;
     }
-    
-    match /pokemon-tcg-artists/{artistId} {
+    match /pokemon-tcg-cards/{document=**} {
       allow read: if true;
       allow write: if false;
     }
-    
-    match /pokemon-tcg-cards/{cardId} {
+     match /pokemon-tcg-artists/{document=**} {
       allow read: if true;
       allow write: if false;
     }
-    
-    match /pokemon-tcg-sets/{setId} {
+    match /pokedex/{document=**} {
       allow read: if true;
       allow write: if false;
     }
-    
-    // User data is private to the owner
+
+    // USER DATA
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // User's card collection
+      // Users can read their own profile, and update their own displayName and followSetting
+      allow read: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId && request.resource.data.keys().hasOnly(['displayName', 'followSetting']);
+
+      // Public profile data (for search) - allow anyone to read displayName and followSetting
+      // This is less restrictive. To make profiles fully private, remove this 'get' rule.
+      allow get: if request.resource.data.followSetting == 'everyone';
+
+      // USERS' PRIVATE SUBCOLLECTIONS
       match /cards/{cardId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if request.auth.uid == userId;
+      }
+      
+      // Anyone can read a user's collection if their setting is 'everyone'
+      match /cards/{cardId} {
+        allow list: if get(/databases/$(database)/documents/users/$(userId)).data.followSetting == 'everyone';
+      }
+      
+      // Followers & Following
+      match /followers/{followerId} {
+        // A user can see who follows them.
+        allow read: if request.auth.uid == userId;
+        // A user can be followed by another authenticated user (the followerId must match the incoming user's uid)
+        allow create: if request.auth.uid == followerId;
+        // A user can unfollow by deleting their record from the other user's followers list.
+        allow delete: if request.auth.uid == followerId;
       }
 
-      // User's follow lists
-      match /following/{targetId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      match /following/{followingId} {
+        // A user can see who they are following.
+        allow read: if request.auth.uid == userId;
+        // A user can follow another authenticated user.
+        allow create: if request.auth.uid == userId;
+        // A user can unfollow someone.
+        allow delete: if request.auth.uid == userId;
       }
-      match /followers/{followerId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        // A user can read and manage their own notifications.
+        allow read, write, delete: if request.auth.uid == userId;
       }
     }
   }

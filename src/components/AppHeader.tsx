@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { PackageSearch, LayoutList, Search, Bell, Users } from "lucide-react";
 import { AuthButton } from "./AuthButton";
 import { PokedexIcon } from "./icons/PokedexIcon";
+import { useAuth } from "@/hooks/useAuth";
 
 export function AppHeader() {
-  const hasNotifications = true; // Placeholder for notification state
+  const { notifications } = useAuth();
+  const hasNotifications = notifications.length > 0;
 
   return (
     <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
