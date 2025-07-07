@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -15,7 +16,22 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 const profileFormSchema = z.object({
-  displayName: z.string().min(3, { message: "Username must be at least 3 characters." }).max(30, { message: "Username cannot be longer than 30 characters." }),
+  displayName: z
+    .string()
+    .min(3, { message: "Username must be at least 3 characters." })
+    .max(30, { message: "Username cannot be longer than 30 characters." })
+    .regex(/^[a-zA-Z0-9._]+$/, {
+      message: "Username can only contain letters, numbers, periods (.), and underscores (_).",
+    })
+    .refine((name) => !name.startsWith('.') && !name.startsWith('_'), {
+      message: "Username cannot start with a period or underscore.",
+    })
+    .refine((name) => !name.endsWith('.') && !name.endsWith('_'), {
+      message: "Username cannot end with a period or underscore.",
+    })
+    .refine((name) => !name.includes('..') && !name.includes('__'), {
+      message: "Username cannot have consecutive periods or underscores.",
+    }),
 });
 
 const emailFormSchema = z.object({
