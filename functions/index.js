@@ -164,17 +164,22 @@ exports.notifyOnNewFollower = functions.firestore
   .document('users/{followedUid}/followers/{followerUid}')
   .onCreate(async (snap, context) => {
     const { followedUid, followerUid } = context.params;
-    console.log(`User ${followerUid} started following user ${followedUid}`);
+    console.log(`🔔 TRIGGER: User ${followerUid} started following user ${followedUid}`);
+    console.log(`📄 Snap data:`, snap.data());
 
     try {
       // Get the follower's display name
+      console.log(`🔍 Looking up follower: ${followerUid}`);
       const followerDoc = await db.collection('users').doc(followerUid).get();
+      
       if (!followerDoc.exists) {
-        console.error(`Follower user document ${followerUid} not found.`);
+        console.error(`❌ Follower user document ${followerUid} not found.`);
         return null;
       }
+      
       const followerData = followerDoc.data();
       const followerDisplayName = followerData.displayName || 'A new user';
+      console.log(`👤 Follower display name: ${followerDisplayName}`);
 
       // Create the notification document
       const notification = {
@@ -182,17 +187,20 @@ exports.notifyOnNewFollower = functions.firestore
         followerUid: followerUid,
         followerDisplayName: followerDisplayName,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        read: false, // Mark as unread initially
+        read: false,
       };
 
-      // Add the notification to the 'notifications' subcollection of the followed user
-      await db.collection('users').doc(followedUid).collection('notifications').add(notification);
-
-      console.log(`Notification created for user ${followedUid}.`);
+      console.log(`📝 Creating notification:`, notification);
+      
+      // Add the notification to the 'notifications' subcollection
+      const notificationRef = await db.collection('users').doc(followedUid).collection('notifications').add(notification);
+      
+      console.log(`✅ Notification created with ID: ${notificationRef.id} for user ${followedUid}`);
       return null;
 
     } catch (error) {
-      console.error('Error creating new follower notification:', error);
+      console.error('❌ Error creating new follower notification:', error);
+      console.error('Error details:', error.code, error.message);
       return null;
     }
   });
