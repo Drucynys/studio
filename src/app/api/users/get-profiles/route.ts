@@ -7,8 +7,10 @@ import { getAuth } from 'firebase-admin/auth';
 function initializeFirebaseAdmin() {
     if (admin.apps.length > 0) { return; }
     const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    if (!serviceAccountJson) {
-        throw new Error("Firebase credentials are not set in environment variables.");
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+
+    if (!serviceAccountJson || !projectId) {
+        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
     }
     const serviceAccount = JSON.parse(serviceAccountJson);
     if (serviceAccount.private_key) {
@@ -16,6 +18,7 @@ function initializeFirebaseAdmin() {
     }
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
+        projectId: projectId,
     });
 }
 
