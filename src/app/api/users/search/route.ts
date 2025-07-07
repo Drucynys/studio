@@ -37,11 +37,13 @@ export async function GET(request: Request) {
             return NextResponse.json({ message: 'Search query must be at least 3 characters long.' }, { status: 400 });
         }
 
+        const lowercasedQuery = query.toLowerCase();
         const usersRef = db.collection('users');
-        // This is a simple "starts with" search. For a more robust search, a third-party service like Algolia or a different data structure is recommended.
+        
+        // This is a simple "starts with" search on the case-insensitive field.
         const usersSnapshot = await usersRef
-            .where('displayName', '>=', query)
-            .where('displayName', '<=', query + '\uf8ff')
+            .where('displayName_lowercase', '>=', lowercasedQuery)
+            .where('displayName_lowercase', '<=', lowercasedQuery + '\uf8ff')
             .limit(10)
             .get();
 

@@ -111,6 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         uid: newUser.uid,
         email: newUser.email,
         displayName: displayName,
+        displayName_lowercase: displayName.toLowerCase(),
         createdAt: new Date(),
         role: 'user',
         followSetting: 'everyone' as PrivacySetting,
@@ -144,6 +145,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return; 
       }
     } else {
+        const data = docSnap.data();
+        if (!data.displayName_lowercase && data.displayName) {
+            try {
+                await setDoc(userDocRef, { displayName_lowercase: data.displayName.toLowerCase() }, { merge: true });
+                console.log(`Backfilled displayName_lowercase for user ${newUser.uid}.`);
+            } catch (error) {
+                console.error("Error backfilling displayName_lowercase:", error);
+            }
+        }
       console.log(`User document for ${newUser.uid} already exists.`);
     }
     
@@ -207,7 +217,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) throw new Error("User not logged in.");
     await updateProfile(user, { displayName: newName });
     const userDocRef = doc(db, "users", user.uid);
-    await setDoc(userDocRef, { displayName: newName }, { merge: true });
+    await setDoc(userDocRef, { 
+        displayName: newName,
+        displayName_lowercase: newName.toLowerCase()
+    }, { merge: true });
   };
   
   const reauthenticate = async (password: string) => {
@@ -302,13 +315,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setLoadingNotifications(true);
       const notificationsRef = collection(db, "users", user.uid, "notifications");
-      // This query no longer requires a composite index
       const qNotifications = query(notificationsRef, orderBy("timestamp", "desc"));
       const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
-        const allUserNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        const unreadNotifications = allUserNotifications.filter(n => n.read === false);
-        setNotifications(unreadNotifications);
-        setLoadingNotifications(false);
+          const allUserNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+          const unreadNotifications = allUserNotifications.filter(n => n.read === false);
+          setNotifications(unreadNotifications);
+          setLoadingNotifications(false);
       }, (error) => {
         console.error("Error fetching notifications:", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load your notifications.' });
