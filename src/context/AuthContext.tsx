@@ -302,10 +302,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setLoadingNotifications(true);
       const notificationsRef = collection(db, "users", user.uid, "notifications");
-      const qNotifications = query(notificationsRef, where("read", "==", false), orderBy("timestamp", "desc"));
+      // This query no longer requires a composite index
+      const qNotifications = query(notificationsRef, orderBy("timestamp", "desc"));
       const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
-        const userNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        setNotifications(userNotifications);
+        const allUserNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
+        const unreadNotifications = allUserNotifications.filter(n => n.read === false);
+        setNotifications(unreadNotifications);
         setLoadingNotifications(false);
       }, (error) => {
         console.error("Error fetching notifications:", error);
