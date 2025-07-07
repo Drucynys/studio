@@ -29,6 +29,7 @@ const db = getFirestore(app);
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
+  role: string | null;
   collection: PokemonCard[];
   loadingCollection: boolean;
   isAuthModalOpen: boolean;
@@ -52,6 +53,7 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [userCollection, setUserCollection] = useState<PokemonCard[]>([]);
   const [loadingCollection, setLoadingCollection] = useState(true);
@@ -89,6 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email: newUser.email,
         displayName: displayName,
         createdAt: new Date(),
+        role: 'user',
       };
 
       console.log("Attempting to write this user data to Firestore:", userProfileData);
@@ -214,6 +217,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (user) {
+      const userDocRef = doc(db, 'users', user.uid);
+      const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          setRole(docSnap.data().role || 'user');
+        } else {
+          setRole('user');
+        }
+      }, (error) => {
+        console.error("Error fetching user role: ", error);
+        setRole(null);
+      });
+      
+      return () => unsubscribe();
+    } else {
+      setRole(null);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
       setLoadingCollection(true);
       const collRef = collection(db, "users", user.uid, "cards");
       const q = query(collRef); // Prepare a query
@@ -242,6 +265,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     loading,
+    role,
     collection: userCollection,
     loadingCollection,
     isAuthModalOpen,

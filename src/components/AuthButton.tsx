@@ -12,11 +12,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Loader2, LogIn, LogOut, User, Settings } from "lucide-react";
+import { Loader2, LogIn, LogOut, User, Settings, Shield } from "lucide-react";
 import Link from "next/link";
 
 export function AuthButton() {
-  const { user, loading, openAuthModal, logOut } = useAuth();
+  const { user, loading, role, openAuthModal, logOut } = useAuth();
 
   if (loading) {
     return <Button variant="ghost" size="icon" disabled><Loader2 className="h-5 w-5 animate-spin" /></Button>;
@@ -52,6 +52,14 @@ export function AuthButton() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {role === 'admin' && (
+          <DropdownMenuItem asChild>
+            <Link href="/admin/sync">
+              <Shield className="mr-2 h-4 w-4" />
+              <span>Admin</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
           <Link href="/settings">
             <Settings className="mr-2 h-4 w-4" />
