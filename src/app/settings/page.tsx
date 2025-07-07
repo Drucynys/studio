@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, User, Settings as SettingsIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,8 +49,26 @@ const passwordFormSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const privacyFormSchema = z.object({
+  followSetting: z.enum(["everyone", "onRequest"], {
+    required_error: "You need to select a privacy setting.",
+  }),
+});
+
+
 export default function SettingsPage() {
-  const { user, loading, updateUserDisplayName, reauthenticate, updateUserEmail, updateUserPassword, openAuthModal } = useAuth();
+  const { 
+    user, 
+    loading, 
+    updateUserDisplayName, 
+    reauthenticate, 
+    updateUserEmail, 
+    updateUserPassword, 
+    openAuthModal,
+    privacySetting,
+    updateUserPrivacySetting,
+  } = useAuth();
+
   const { toast } = useToast();
   const router = useRouter();
 
@@ -67,6 +86,11 @@ export default function SettingsPage() {
     resolver: zodResolver(passwordFormSchema),
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
   });
+  
+  const privacyForm = useForm<z.infer<typeof privacyFormSchema>>({
+    resolver: zodResolver(privacyFormSchema),
+    defaultValues: { followSetting: privacySetting || "everyone" },
+  });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -78,6 +102,12 @@ export default function SettingsPage() {
       emailForm.reset({ newEmail: user.email || "", password: "" });
     }
   }, [user, loading, router, openAuthModal, profileForm, emailForm]);
+
+  useEffect(() => {
+    if (privacySetting) {
+      privacyForm.reset({ followSetting: privacySetting });
+    }
+  }, [privacySetting, privacyForm]);
   
   const onProfileSubmit = async (values: z.infer<typeof profileFormSchema>) => {
     try {
@@ -105,6 +135,15 @@ export default function SettingsPage() {
       await updateUserPassword(values.newPassword);
       toast({ title: "Success", description: "Your password has been updated." });
       passwordForm.reset();
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    }
+  };
+
+  const onPrivacySubmit = async (values: z.infer<typeof privacyFormSchema>) => {
+    try {
+      await updateUserPrivacySetting(values.followSetting);
+      toast({ title: "Success", description: "Your privacy settings have been updated." });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message });
     }
@@ -161,6 +200,59 @@ export default function SettingsPage() {
               </Form>
             </CardContent>
           </Card>
+
+          {/* Privacy Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Privacy</CardTitle>
+              <CardDescription>Manage who can follow you and see your collection.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...privacyForm}>
+                <form onSubmit={privacyForm.handleSubmit(onPrivacySubmit)} className="space-y-4">
+                  <FormField
+                    control={privacyForm.control}
+                    name="followSetting"
+                    render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel>Follow Settings</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex flex-col space-y-1"
+                          >
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="everyone" />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Allow anyone to follow you
+                              </FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <RadioGroupItem value="onRequest" />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                Require approval for new followers
+                              </FormLabel>
+                            </FormItem>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" disabled={privacyForm.formState.isSubmitting}>
+                    {privacyForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Privacy Settings
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+
 
           {/* Email Settings */}
           <Card>

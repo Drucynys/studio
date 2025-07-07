@@ -1,12 +1,15 @@
+
 // src/components/AppHeader.tsx
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch, LayoutList, Search } from "lucide-react";
+import { PackageSearch, LayoutList, Search, Bell } from "lucide-react";
 import { AuthButton } from "./AuthButton";
 import { PokedexIcon } from "./icons/PokedexIcon";
 
 export function AppHeader() {
+  const hasNotifications = true; // Placeholder for notification state
+
   return (
     <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
@@ -41,7 +44,14 @@ export function AppHeader() {
               <span className="hidden md:inline">Pokédex</span>
             </Button>
           </Link>
-          <div className="ml-2 md:ml-4">
+          <div className="ml-2 md:ml-4 flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="relative hover:bg-primary-foreground/10 text-primary-foreground">
+              <Bell className="h-5 w-5" />
+              {hasNotifications && (
+                <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-accent ring-2 ring-primary" />
+              )}
+              <span className="sr-only">Notifications</span>
+            </Button>
             <AuthButton />
           </div>
         </nav>

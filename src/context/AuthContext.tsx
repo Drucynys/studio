@@ -1,3 +1,4 @@
+
 // src/context/AuthContext.tsx
 "use client";
 
@@ -26,6 +27,8 @@ import { useToast } from '@/hooks/use-toast';
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+export type PrivacySetting = 'everyone' | 'onRequest';
+
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -46,6 +49,9 @@ export interface AuthContextType {
   reauthenticate: (password: string) => Promise<void>;
   updateUserEmail: (newEmail: string) => Promise<void>;
   updateUserPassword: (newPassword: string) => Promise<void>;
+  privacySetting: PrivacySetting | null;
+  updateUserPrivacySetting: (setting: PrivacySetting) => Promise<void>;
+  notificationsCount: number;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +64,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userCollection, setUserCollection] = useState<PokemonCard[]>([]);
   const [loadingCollection, setLoadingCollection] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [privacySetting, setPrivacySetting] = useState<PrivacySetting | null>(null);
+  const [notificationsCount, setNotificationsCount] = useState(0);
+
 
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
@@ -74,15 +83,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const displayName = newUser.displayName || newUser.email?.split('@')[0] || 'New User';
 
-      // If the user signed up with email, their Auth profile won't have a displayName.
-      // We update it here to ensure it's available immediately in the UI.
       if (!newUser.displayName) {
         try {
           await updateProfile(newUser, { displayName });
           console.log("Firebase Auth profile updated with displayName:", displayName);
         } catch (authError) {
           console.error("Error updating Auth profile:", authError);
-          // Non-fatal, we can still proceed with Firestore.
         }
       }
 
@@ -92,6 +98,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         displayName: displayName,
         createdAt: new Date(),
         role: 'user',
+        followSetting: 'everyone' as PrivacySetting,
       };
 
       console.log("Attempting to write this user data to Firestore:", userProfileData);
@@ -156,7 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!user) throw new Error("You must be logged in to add cards.");
     
     const userCardsRef = collection(db, 'users', user.uid, 'cards');
-    const newCardRef = doc(userCardsRef); // Create a new document reference with a unique ID
+    const newCardRef = doc(userCardsRef);
     
     const cardDataWithMetadata = {
       ...card,
@@ -203,8 +210,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUserPassword = async (newPassword: string) => {
     if (!user) throw new Error("User not logged in.");
     await updatePassword(user, newPassword);
-    // Log the user out after a password change for security
     await signOut(auth);
+  };
+  
+  const updateUserPrivacySetting = async (setting: PrivacySetting) => {
+    if (!user) throw new Error("User not logged in.");
+    const userDocRef = doc(db, "users", user.uid);
+    await setDoc(userDocRef, { followSetting: setting }, { merge: true });
   };
 
   useEffect(() => {
@@ -218,20 +230,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (user) {
       const userDocRef = doc(db, 'users', user.uid);
-      const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
-          setRole(docSnap.data().role || 'user');
+          const data = docSnap.data();
+          setRole(data.role || 'user');
+          setPrivacySetting(data.followSetting || 'everyone');
         } else {
           setRole('user');
+          setPrivacySetting('everyone');
         }
       }, (error) => {
-        console.error("Error fetching user role: ", error);
+        console.error("Error fetching user data: ", error);
         setRole(null);
+        setPrivacySetting(null);
       });
       
-      return () => unsubscribe();
+      return () => unsubscribeUser();
     } else {
       setRole(null);
+      setPrivacySetting(null);
     }
   }, [user]);
 
@@ -239,10 +256,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (user) {
       setLoadingCollection(true);
       const collRef = collection(db, "users", user.uid, "cards");
-      const q = query(collRef); // Prepare a query
+      const q = query(collRef);
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const userCards = snapshot.docs.map(doc => doc.data() as PokemonCard);
-        // Sort by timestamp if available
         userCards.sort((a, b) => {
           const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
           const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
@@ -282,6 +298,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     reauthenticate,
     updateUserEmail,
     updateUserPassword,
+    privacySetting,
+    updateUserPrivacySetting,
+    notificationsCount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
