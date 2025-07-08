@@ -58,14 +58,18 @@ export function AuthModal() {
     }
   };
 
+  const clearFormState = () => {
+    setError(null);
+    setEmail('');
+    setPassword('');
+    setConfirmEmail('');
+    setConfirmPassword('');
+  };
+  
   const onOpenChange = (open: boolean) => {
     if (!open) {
       closeAuthModal();
-      setError(null);
-      setEmail('');
-      setPassword('');
-      setConfirmEmail('');
-      setConfirmPassword('');
+      clearFormState();
     }
   };
 
@@ -76,7 +80,7 @@ export function AuthModal() {
           <DialogTitle className="text-2xl font-bold">Welcome to Pokédex Tracker</DialogTitle>
           <DialogDescription>Sign in or create an account to save your collection.</DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="signin" className="w-full">
+        <Tabs defaultValue="signin" className="w-full" onValueChange={clearFormState}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
