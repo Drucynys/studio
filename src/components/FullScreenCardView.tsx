@@ -3,25 +3,17 @@
 
 import type { PokemonCard } from "@/types";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Languages, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
 
 const MAX_ROTATION = 10;
 const MIN_DIMENSION_FOR_TILT_EFFECT = 50;
-
-type FullScreenCardViewProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  cards: PokemonCard[];
-  currentIndex: number | null;
-  onNavigate: (newIndex: number) => void;
-  masterCardData: Map<string, ApiPokemonCard>;
-};
 
 const getMarketPrice = (apiCard: ApiPokemonCard | undefined | null, variant?: string | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
@@ -65,6 +57,53 @@ export function FullScreenCardView({
 
   const currentCard = currentIndex !== null ? cards[currentIndex] : null;
   const masterCard = currentCard ? masterCardData.get(currentCard.apiId) : null;
+
+  const allAvailablePrices = useMemo(() => {
+    const tcgPlayerPrices: { name: string; value: number; currency: string }[] = [];
+    const cardmarketPrices: { name: string; value: number; currency: string }[] = [];
+
+    // TCGPlayer prices
+    if (masterCard?.tcgplayer?.prices) {
+        for (const [variant, priceData] of Object.entries(masterCard.tcgplayer.prices)) {
+            if (priceData?.market && priceData.market > 0) {
+                tcgPlayerPrices.push({
+                    name: formatVariantKey(variant),
+                    value: priceData.market,
+                    currency: '$'
+                });
+            }
+        }
+    }
+
+    // Cardmarket prices
+    if (masterCard?.cardmarket?.prices) {
+        const cardmarketPriceMap: { [key: string]: string } = {
+            averageSellPrice: 'Average Sell',
+            lowPrice: 'Low Price',
+            trendPrice: 'Trend Price',
+            lowPriceExPlus: 'Low Price (EX+)',
+            avg1: '1-Day Avg',
+            avg7: '7-Day Avg',
+            avg30: '30-Day Avg',
+            reverseHoloSell: 'Rev. Holo Sell',
+            reverseHoloLow: 'Rev. Holo Low',
+            reverseHoloTrend: 'Rev. Holo Trend',
+        };
+
+        for (const [key, label] of Object.entries(cardmarketPriceMap)) {
+            const priceValue = masterCard.cardmarket.prices[key as keyof typeof masterCard.cardmarket.prices];
+            if (typeof priceValue === 'number' && priceValue > 0) {
+                cardmarketPrices.push({
+                    name: label,
+                    value: priceValue,
+                    currency: '€' // Assuming Euro for Cardmarket
+                });
+            }
+        }
+    }
+
+    return { tcgPlayerPrices, cardmarketPrices };
+  }, [masterCard]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -146,8 +185,7 @@ export function FullScreenCardView({
   const displayVariant = formatDisplayVariant(currentCard.variant ?? '');
   const currentMarketValue = getMarketPrice(masterCard, currentCard.variant);
   const displayValue = currentMarketValue > 0 ? currentMarketValue : currentCard.value;
-  const allPrices = masterCard?.tcgplayer?.prices;
-
+  
   let dynamicCardTransform = "scale(1.0) translateY(-10px)";
   let shineBackground = "transparent";
   let shineOpacity = 0;
@@ -281,25 +319,46 @@ export function FullScreenCardView({
                             <DollarSign size={12}/> {displayValue.toFixed(2)}
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-64" align="center">
+                    <PopoverContent className="w-72" align="center">
                         <div className="space-y-2">
-                            <h4 className="font-medium leading-none">TCGPlayer Market Prices</h4>
+                            <h4 className="font-medium leading-none">Market Prices</h4>
                             <p className="text-sm text-muted-foreground">
-                                Live market prices for different variants.
+                                Live prices from TCGPlayer & Cardmarket.
                             </p>
                         </div>
-                        <div className="grid gap-2 mt-4">
-                            {allPrices && Object.keys(allPrices).length > 0 ? (
-                                Object.entries(allPrices).map(([variant, priceData]) => (
-                                    priceData && typeof priceData.market === 'number' && (
-                                        <div key={variant} className="grid grid-cols-[1fr,auto] items-center gap-4 text-sm">
-                                            <span className="text-muted-foreground">{formatVariantKey(variant)}</span>
-                                            <span className="font-semibold text-right">${priceData.market.toFixed(2)}</span>
-                                        </div>
-                                    )
-                                ))
-                            ) : (
+                        <div className="mt-4 max-h-64 overflow-y-auto pr-2">
+                            {allAvailablePrices.tcgPlayerPrices.length === 0 && allAvailablePrices.cardmarketPrices.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center">No price data available.</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    {allAvailablePrices.tcgPlayerPrices.length > 0 && (
+                                        <div>
+                                            <p className="text-xs font-semibold text-muted-foreground mb-1">TCGPlayer</p>
+                                            <div className="space-y-1">
+                                                {allAvailablePrices.tcgPlayerPrices.map((price, index) => (
+                                                    <div key={`tcg-${index}`} className="grid grid-cols-[1fr,auto] items-center gap-4 text-sm">
+                                                        <span className="text-muted-foreground">{price.name}</span>
+                                                        <span className="font-semibold text-right">{price.currency}{price.value.toFixed(2)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {allAvailablePrices.tcgPlayerPrices.length > 0 && allAvailablePrices.cardmarketPrices.length > 0 && <Separator />}
+                                    {allAvailablePrices.cardmarketPrices.length > 0 && (
+                                        <div>
+                                            <p className="text-xs font-semibold text-muted-foreground mb-1">Cardmarket</p>
+                                            <div className="space-y-1">
+                                                {allAvailablePrices.cardmarketPrices.map((price, index) => (
+                                                    <div key={`cm-${index}`} className="grid grid-cols-[1fr,auto] items-center gap-4 text-sm">
+                                                        <span className="text-muted-foreground">{price.name}</span>
+                                                        <span className="font-semibold text-right">{price.currency}{price.value.toFixed(2)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </PopoverContent>
