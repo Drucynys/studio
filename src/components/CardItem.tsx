@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye, Languages, Paintbrush } from "lucide-react";
+import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye, Languages, Paintbrush, Star } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ type CardItemProps = {
   onEdit: () => void;
   onRemove: () => void;
   onView: (cardIndex: number) => void; // Handler for viewing the card
+  onToggleFavorite: () => void;
 };
 
 const formatDisplayVariant = (variantKey?: string): string | null => {
@@ -24,7 +25,7 @@ const formatDisplayVariant = (variantKey?: string): string | null => {
     .trim();
 };
 
-export function CardItem({ card, cardIndex, onEdit, onRemove, onView }: CardItemProps) {
+export function CardItem({ card, cardIndex, onEdit, onRemove, onView, onToggleFavorite }: CardItemProps) {
   if (!card) return null; // Add this null checknp
 
   const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant || '') : ''}&view=grid`;
@@ -37,8 +38,12 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView }: CardItem
     <Card className={cn(
       "relative shadow-lg hover:shadow-primary/20 transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-1 hover:z-10 flex flex-col bg-card"
     )}>
-      <CardHeader className="pb-3">
-        <CardTitle className="font-headline text-lg leading-tight">
+      <CardHeader className="pb-3 relative">
+        <Button variant="ghost" size="icon" onClick={onToggleFavorite} className={cn("absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-amber-500 z-10", card.isFavorite && "text-amber-500")}>
+          <Star className={cn("h-5 w-5", card.isFavorite && "fill-current")} />
+          <span className="sr-only">Favorite</span>
+        </Button>
+        <CardTitle className="font-headline text-lg leading-tight pr-8">
           {card.name || `${card.set} #${card.cardNumber}`}
         </CardTitle>
         {card.name && <CardDescription className="text-xs">{card.set} #{card.cardNumber}</CardDescription>}

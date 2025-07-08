@@ -14,4 +14,5 @@ export interface PokemonCard {
   quantity: number;
   artist: string | null;
   timestamp?: any; // Firestore ServerTimestamp
+  isFavorite?: boolean;
 }

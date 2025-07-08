@@ -84,6 +84,16 @@ export default function MyCollectionPage() {
     }
 
     switch (sortOption) {
+      case "favorites":
+        tempCards.sort((a, b) => {
+          const aFav = a.isFavorite ? 1 : 0;
+          const bFav = b.isFavorite ? 1 : 0;
+          if (aFav !== bFav) return bFav - aFav;
+          const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
+          const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
+          return timeB - timeA;
+        });
+        break;
       case "nameAsc":
         tempCards.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
         break;
@@ -188,6 +198,23 @@ export default function MyCollectionPage() {
     }
   };
 
+  const handleToggleFavorite = async (card: PokemonCard) => {
+    try {
+      const updatedCard = { ...card, isFavorite: !card.isFavorite };
+      await updateCardInCollection(updatedCard);
+      toast({
+        title: card.isFavorite ? "Card Unfavorited" : "Card Favorited!",
+        description: `${card.name} has been updated.`,
+      });
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not update favorite status: " + e.message,
+      });
+    }
+  };
+
   if (loading || loadingCollection) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
@@ -278,6 +305,7 @@ export default function MyCollectionPage() {
               <SelectContent>
                 <SelectItem value="dateAddedDesc">Date Added (Newest)</SelectItem>
                 <SelectItem value="dateAddedAsc">Date Added (Oldest)</SelectItem>
+                <SelectItem value="favorites">Favorites First</SelectItem>
                 <SelectItem value="nameAsc">Name (A-Z)</SelectItem>
                 <SelectItem value="nameDesc">Name (Z-A)</SelectItem>
                 <SelectItem value="valueDesc">Value (High-Low)</SelectItem>
@@ -298,6 +326,7 @@ export default function MyCollectionPage() {
           onEditCard={handleEditCard}
           onRemoveCard={handleRemoveCard}
           onViewCard={openFullScreenView}
+          onToggleFavorite={handleToggleFavorite}
         />
         
         {filteredCards.length === 0 && searchTerm && (

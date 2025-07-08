@@ -13,9 +13,10 @@ type CardListProps = {
   onEditCard: (card: PokemonCard) => void;
   onRemoveCard: (cardId: string) => void;
   onViewCard: (cardIndex: number) => void;
+  onToggleFavorite: (card: PokemonCard) => void;
 };
 
-export function CardList({ cards, onEditCard, onRemoveCard, onViewCard }: CardListProps) {
+export function CardList({ cards, onEditCard, onRemoveCard, onViewCard, onToggleFavorite }: CardListProps) {
   if (cards.length === 0) {
     return (
       <Card className="shadow-lg">
@@ -55,6 +56,7 @@ export function CardList({ cards, onEditCard, onRemoveCard, onViewCard }: CardLi
                 onEdit={() => onEditCard(card)} 
                 onRemove={() => onRemoveCard(card.id)}
                 onView={onViewCard}
+                onToggleFavorite={() => onToggleFavorite(card)}
               />
             ))}
           </div>
