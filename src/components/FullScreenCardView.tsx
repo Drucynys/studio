@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { PokemonCard } from "@/types";
@@ -6,7 +5,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Languages } from "lucide-react";
+import { ChevronLeft, ChevronRight, Languages, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const MAX_ROTATION = 10;
@@ -232,7 +231,7 @@ export function FullScreenCardView({
           <p className="text-sm text-muted-foreground">
             {currentCard.set} - #{currentCard.cardNumber}
           </p>
-          <div className="flex gap-2 justify-center mt-2">
+          <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
             <Badge variant="secondary" className="text-xs">{currentCard.rarity}</Badge>
             {displayVariant && <Badge variant="outline" className="text-xs">{displayVariant}</Badge>}
             <Badge variant="outline" className="text-xs">{currentCard.condition}</Badge>
@@ -240,6 +239,11 @@ export function FullScreenCardView({
                 <Languages size={12}/> {currentCard.language}
             </Badge>
              <Badge variant="outline" className="text-xs">Qty: {currentCard.quantity}</Badge>
+             {typeof currentCard.value === 'number' && currentCard.value > 0 && (
+                <Badge variant="outline" className="text-xs border-green-500/50 text-green-600 flex items-center gap-1">
+                    <DollarSign size={12}/> Value: ${currentCard.value.toFixed(2)}
+                </Badge>
+             )}
           </div>
            <p className="text-xs text-muted-foreground mt-2">
             Card {currentIndex !== null ? currentIndex + 1 : '-' } of {cards.length}
