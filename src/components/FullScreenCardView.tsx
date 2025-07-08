@@ -42,6 +42,16 @@ const formatVariantKey = (key: string): string => {
 };
 
 
+type FullScreenCardViewProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  cards: PokemonCard[];
+  currentIndex: number | null;
+  onNavigate: (newIndex: number) => void;
+  masterCardData: Map<string, ApiPokemonCard>;
+};
+
+
 export function FullScreenCardView({
   isOpen,
   onClose,
@@ -62,45 +72,47 @@ export function FullScreenCardView({
     const tcgPlayerPrices: { name: string; value: number; currency: string }[] = [];
     const cardmarketPrices: { name: string; value: number; currency: string }[] = [];
 
-    // TCGPlayer prices
-    if (masterCard && masterCard.tcgplayer && masterCard.tcgplayer.prices) {
-        const tcgPrices = masterCard.tcgplayer.prices;
-        for (const variant in tcgPrices) {
-            if (Object.prototype.hasOwnProperty.call(tcgPrices, variant)) {
-                const priceData = tcgPrices[variant as keyof typeof tcgPrices];
-                if (priceData && typeof priceData.market === 'number' && priceData.market > 0) {
-                    tcgPlayerPrices.push({
-                        name: formatVariantKey(variant),
-                        value: priceData.market,
-                        currency: '$',
-                    });
-                }
-            }
+    // TCGPlayer prices - Using Object.entries for robust iteration
+    if (masterCard?.tcgplayer?.prices) {
+      for (const [variant, priceData] of Object.entries(masterCard.tcgplayer.prices)) {
+        if (priceData?.market && typeof priceData.market === 'number' && priceData.market > 0) {
+          tcgPlayerPrices.push({
+            name: formatVariantKey(variant),
+            value: priceData.market,
+            currency: '$',
+          });
         }
+      }
     }
 
-    // Cardmarket prices
-    if (masterCard && masterCard.cardmarket && masterCard.cardmarket.prices) {
+    // Cardmarket prices - Using a comprehensive map and Object.entries
+    if (masterCard?.cardmarket?.prices) {
         const cmPrices = masterCard.cardmarket.prices;
-        const cardmarketPriceMap: { [key: string]: string } = {
+        const cardmarketPriceMap: Record<string, string> = {
             averageSellPrice: 'Average Sell',
             lowPrice: 'Low Price',
             trendPrice: 'Trend Price',
+            germanProLow: 'German Pro Low',
+            suggestedPrice: 'Suggested Price',
+            reverseHoloSell: 'Rev. Holo Sell',
+            reverseHoloLow: 'Rev. Holo Low',
+            reverseHoloTrend: 'Rev. Holo Trend',
             lowPriceExPlus: 'Low Price (EX+)',
             avg1: '1-Day Avg',
             avg7: '7-Day Avg',
             avg30: '30-Day Avg',
-            reverseHoloSell: 'Rev. Holo Sell',
-            reverseHoloLow: 'Rev. Holo Low',
-            reverseHoloTrend: 'Rev. Holo Trend',
+            reverseHoloAvg1: 'Rev. Holo 1-Day Avg',
+            reverseHoloAvg7: 'Rev. Holo 7-Day Avg',
+            reverseHoloAvg30: 'Rev. Holo 30-Day Avg',
         };
 
-        for (const key in cardmarketPriceMap) {
-            if (Object.prototype.hasOwnProperty.call(cmPrices, key)) {
+        for (const [key, name] of Object.entries(cardmarketPriceMap)) {
+            // Check if key exists on the prices object
+            if (key in cmPrices) {
                 const priceValue = cmPrices[key as keyof typeof cmPrices];
                 if (typeof priceValue === 'number' && priceValue > 0) {
                     cardmarketPrices.push({
-                        name: cardmarketPriceMap[key],
+                        name: name,
                         value: priceValue,
                         currency: '€'
                     });
