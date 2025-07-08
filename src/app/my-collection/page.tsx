@@ -24,6 +24,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+
+const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | null): number => {
+  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
+  const prices = apiCard.tcgplayer.prices;
+  
+  if (variant && prices[variant]?.market) {
+    return prices[variant].market;
+  }
+  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
+  for (const v of variantPriority) {
+    if (prices[v]?.market) {
+      return prices[v].market;
+    }
+  }
+  for (const key in prices) {
+    if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market) {
+      return prices[key].market;
+    }
+  }
+  return 0;
+};
+
 
 export default function MyCollectionPage() {
   const { 
@@ -46,28 +69,81 @@ export default function MyCollectionPage() {
 
   const [isFullScreenViewOpen, setIsFullScreenViewOpen] = useState(false);
   const [currentFullScreenCardIndex, setCurrentFullScreenCardIndex] = useState<number | null>(null);
+  
+  const [masterCardData, setMasterCardData] = useState<Map<string, ApiPokemonCard>>(new Map());
+  const [loadingMasterData, setLoadingMasterData] = useState(false);
+
 
   const { toast } = useToast();
 
+  useEffect(() => {
+    const fetchMasterData = async () => {
+      if (collection.length === 0) {
+        setMasterCardData(new Map());
+        return;
+      }
+      setLoadingMasterData(true);
+      try {
+        const apiIds = [...new Set(collection.map(c => c.apiId).filter(Boolean))];
+        if (apiIds.length === 0) {
+           setMasterCardData(new Map());
+           return;
+        }
+
+        const response = await fetch('/api/master-cards-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: apiIds }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch latest card data.');
+        }
+
+        const masterData: ApiPokemonCard[] = await response.json();
+        const dataMap = new Map<string, ApiPokemonCard>();
+        masterData.forEach(card => dataMap.set(card.id, card));
+        setMasterCardData(dataMap);
+
+      } catch (error) {
+        console.error("Error fetching master card data:", error);
+        // Not showing a toast here to avoid bothering user for a non-critical background fetch
+      } finally {
+        setLoadingMasterData(false);
+      }
+    };
+
+    if (!loadingCollection) {
+      fetchMasterData();
+    }
+  }, [collection, loadingCollection]);
+
+
   const collectionStats = useMemo(() => {
     if (!collection || collection.length === 0) {
-      return { totalValue: 0, totalCards: 0, uniqueCards: 0 };
+      return { totalValueAdded: 0, totalCurrentValue: 0, totalCards: 0, uniqueCards: 0 };
     }
 
-    const totalValue = collection.reduce((acc, card) => {
+    let totalCurrentValue = 0;
+    const totalValueAdded = collection.reduce((acc, card) => {
       const value = card.value || 0;
       const quantity = card.quantity || 1;
+      
+      const masterCard = masterCardData.get(card.apiId);
+      const currentValue = getMarketPrice(masterCard, card.variant);
+      totalCurrentValue += (currentValue > 0 ? currentValue : value) * quantity;
+
       return acc + value * quantity;
     }, 0);
-
+    
     const totalCards = collection.reduce((acc, card) => {
       return acc + (card.quantity || 1);
     }, 0);
 
     const uniqueCards = collection.length;
 
-    return { totalValue, totalCards, uniqueCards };
-  }, [collection]);
+    return { totalValueAdded, totalCurrentValue, totalCards, uniqueCards };
+  }, [collection, masterCardData]);
 
 
   useEffect(() => {
@@ -101,10 +177,22 @@ export default function MyCollectionPage() {
         tempCards.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
         break;
       case "valueDesc":
-        tempCards.sort((a, b) => b.value - a.value);
+        tempCards.sort((a, b) => {
+            const masterA = masterCardData.get(a.apiId);
+            const currentA = getMarketPrice(masterA, a.variant);
+            const masterB = masterCardData.get(b.apiId);
+            const currentB = getMarketPrice(masterB, b.variant);
+            return (currentB > 0 ? currentB : (b.value || 0)) - (currentA > 0 ? currentA : (a.value || 0));
+        });
         break;
       case "valueAsc":
-        tempCards.sort((a, b) => a.value - b.value);
+        tempCards.sort((a, b) => {
+            const masterA = masterCardData.get(a.apiId);
+            const currentA = getMarketPrice(masterA, a.variant);
+            const masterB = masterCardData.get(b.apiId);
+            const currentB = getMarketPrice(masterB, b.variant);
+            return (currentA > 0 ? currentA : (a.value || 0)) - (currentB > 0 ? currentB : (b.value || 0));
+        });
         break;
       case "setAsc":
         tempCards.sort((a, b) => a.set.localeCompare(b.set) || (a.name || "").localeCompare(b.name || ""));
@@ -125,7 +213,7 @@ export default function MyCollectionPage() {
     }
 
     setFilteredCards(tempCards);
-  }, [collection, searchTerm, sortOption]);
+  }, [collection, searchTerm, sortOption, masterCardData]);
 
   const handleRemoveCard = (cardId: string) => {
     const cardToRemove = collection.find(c => c.id === cardId);
@@ -258,10 +346,11 @@ export default function MyCollectionPage() {
               <CardDescription>An at-a-glance overview of your entire collection.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
                 <div className="bg-muted p-4 rounded-lg">
-                  <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><DollarSign className="h-4 w-4" />Total Estimated Value</h3>
-                  <p className="text-3xl font-bold text-primary">${collectionStats.totalValue.toFixed(2)}</p>
+                  <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><DollarSign className="h-4 w-4" />Total Current Value</h3>
+                  <p className="text-3xl font-bold text-primary">${collectionStats.totalCurrentValue.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">(Added Value: ${collectionStats.totalValueAdded.toFixed(2)})</p>
                 </div>
                 <div className="bg-muted p-4 rounded-lg">
                   <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Layers className="h-4 w-4" />Total Cards</h3>
@@ -323,10 +412,12 @@ export default function MyCollectionPage() {
 
         <CardList
           cards={filteredCards}
+          masterCardData={masterCardData}
           onEditCard={handleEditCard}
           onRemoveCard={handleRemoveCard}
           onViewCard={openFullScreenView}
           onToggleFavorite={handleToggleFavorite}
+          isLoadingMasterData={loadingMasterData}
         />
         
         {filteredCards.length === 0 && searchTerm && (

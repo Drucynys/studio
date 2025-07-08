@@ -4,13 +4,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Coins, Sparkles, ExternalLink, Palette, Edit3, Trash2, Layers, Eye, Languages, Paintbrush, Star } from "lucide-react";
+import { Sparkles, ExternalLink, Palette, Edit3, Trash2, Layers, Eye, Languages, Paintbrush, Star, ArrowDown, ArrowRight, ArrowUp, DollarSign } from "lucide-react";
 import React from "react";
 import { cn } from "@/lib/utils";
+import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 
 type CardItemProps = {
   card: PokemonCard;
   cardIndex: number; // Index of the card in the list
+  masterCard?: ApiPokemonCard;
   onEdit: () => void;
   onRemove: () => void;
   onView: (cardIndex: number) => void; // Handler for viewing the card
@@ -25,14 +27,38 @@ const formatDisplayVariant = (variantKey?: string): string | null => {
     .trim();
 };
 
-export function CardItem({ card, cardIndex, onEdit, onRemove, onView, onToggleFavorite }: CardItemProps) {
-  if (!card) return null; // Add this null checknp
+const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | null): number => {
+  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
+  const prices = apiCard.tcgplayer.prices;
+  
+  if (variant && prices[variant]?.market) {
+    return prices[variant].market;
+  }
+  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
+  for (const v of variantPriority) {
+    if (prices[v]?.market) {
+      return prices[v].market;
+    }
+  }
+  for (const key in prices) {
+    if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market) {
+      return prices[key].market;
+    }
+  }
+  return 0;
+};
+
+
+export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView, onToggleFavorite }: CardItemProps) {
+  if (!card) return null;
 
   const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant || '') : ''}&view=grid`;
   const displayVariant = formatDisplayVariant(card.variant as string | undefined);
 
-  const cardValue = card.value || 0;
+  const valueAdded = card.value || 0;
   const cardQuantity = card.quantity || 1;
+  const currentValue = getMarketPrice(masterCard, card.variant);
+  const valueDifference = currentValue > 0 ? currentValue - valueAdded : 0;
 
   return (
     <Card className={cn(
@@ -51,7 +77,7 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, onToggleFa
       <CardContent className="space-y-2 flex-grow pb-3">
         <div
           className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner cursor-pointer group"
-          onClick={() => onView(cardIndex)} // Make image clickable
+          onClick={() => onView(cardIndex)}
         >
           <Image
             src={card.imageUrl || "https://placehold.co/250x350.png"}
@@ -92,10 +118,29 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, onToggleFa
         </div>
       </CardContent>
       <CardFooter className="flex-col items-start space-y-2 pt-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-          <Coins className="h-4 w-4" />
-          Value: ${cardValue.toFixed(2)} (x{cardQuantity} = ${(cardValue * cardQuantity).toFixed(2)})
+         <div className="w-full space-y-1">
+            <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1"><DollarSign size={14}/>Added</span>
+                <span>${valueAdded.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm font-semibold">
+                <span className="text-primary flex items-center gap-1"><DollarSign size={14}/>Current</span>
+                <div className="flex items-center gap-1">
+                    <span>${currentValue > 0 ? currentValue.toFixed(2) : valueAdded.toFixed(2)}</span>
+                    {currentValue > 0 && valueDifference !== 0 && (
+                        <span className={cn(
+                            "flex items-center text-xs",
+                            valueDifference > 0 && "text-green-600",
+                            valueDifference < 0 && "text-red-600"
+                        )}>
+                           {valueDifference > 0 ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}
+                           ${Math.abs(valueDifference).toFixed(2)}
+                        </span>
+                    )}
+                </div>
+            </div>
         </div>
+
         {card.name && card.language === 'English' && (
            <a
             href={tcgPlayerSearchUrl}
@@ -110,7 +155,7 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, onToggleFa
             <p className="text-xs text-muted-foreground italic">(TCGPlayer link N/A for Japanese cards)</p>
         )}
         
-        <div className="flex gap-2 w-full mt-2">
+        <div className="flex gap-2 w-full pt-2">
           <Button variant="outline" size="sm" onClick={onEdit} className="flex-1">
             <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Edit
           </Button>

@@ -21,8 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PokemonCard } from "@/types";
-import { Gem, DollarSign, Layers, Languages, RefreshCw, Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Gem, DollarSign, Layers, Languages } from "lucide-react";
 
 type EditCardDialogProps = {
   isOpen: boolean;
@@ -41,27 +40,6 @@ const formatDisplayVariant = (variantKey?: string): string | null => {
     .trim();
 };
 
-const getMarketPrice = (apiCard: any, variant?: string | null): number => {
-  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
-  const prices = apiCard.tcgplayer.prices;
-  
-  if (variant && prices[variant]?.market) {
-    return prices[variant].market;
-  }
-  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
-  for (const v of variantPriority) {
-    if (prices[v]?.market) {
-      return prices[v].market;
-    }
-  }
-  for (const key in prices) {
-    if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market) {
-      return prices[key].market;
-    }
-  }
-  return 0;
-};
-
 export function EditCardDialog({
   isOpen,
   onClose,
@@ -72,8 +50,6 @@ export function EditCardDialog({
   const [quantityInput, setQuantityInput] = useState<number>(1);
   const [valueInput, setValueInput] = useState<string>("0.00");
   const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Japanese'>('English');
-  const [isFetchingValue, setIsFetchingValue] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (card && isOpen) {
@@ -120,43 +96,6 @@ export function EditCardDialog({
     }
   };
   
-  const handleFetchLatestValue = async () => {
-    if (!editableCard?.apiId) {
-      toast({
-        variant: "destructive",
-        title: "Cannot Fetch Value",
-        description: "This card is missing a master ID and cannot be updated automatically.",
-      });
-      return;
-    }
-    
-    setIsFetchingValue(true);
-    try {
-      const response = await fetch(`/api/master-card/${editableCard.apiId}`);
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to fetch latest price data.");
-      }
-      const masterCardData = await response.json();
-      const latestValue = getMarketPrice(masterCardData, editableCard.variant);
-      
-      setValueInput(latestValue.toFixed(2));
-      toast({
-        title: "Value Updated",
-        description: `Latest market value is $${latestValue.toFixed(2)}. Click Save to apply.`,
-      });
-
-    } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Fetch Error",
-        description: err.message,
-      });
-    } finally {
-      setIsFetchingValue(false);
-    }
-  };
-
   if (!editableCard && !isOpen) return null;
   if (!isOpen) return null;
 
@@ -232,7 +171,7 @@ export function EditCardDialog({
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="value" className="text-right col-span-1">
-              <DollarSign className="inline-block mr-1 h-4 w-4 text-primary"/>Value ($)
+              <DollarSign className="inline-block mr-1 h-4 w-4 text-primary"/>Value (Added)
             </Label>
             <div className="col-span-3 flex items-center gap-2">
               <Input
@@ -243,17 +182,6 @@ export function EditCardDialog({
                 className="flex-grow"
                 placeholder="0.00"
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={handleFetchLatestValue}
-                disabled={isFetchingValue || !editableCard?.apiId}
-                aria-label="Fetch latest value"
-                title="Fetch latest value"
-              >
-                {isFetchingValue ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              </Button>
             </div>
           </div>
         </div>

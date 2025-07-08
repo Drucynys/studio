@@ -5,18 +5,22 @@ import type { PokemonCard } from "@/types";
 import { CardItem } from "./CardItem";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { List, PackageOpen } from "lucide-react";
+import { List, PackageOpen, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
+import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+
 
 type CardListProps = {
   cards: PokemonCard[];
+  masterCardData: Map<string, ApiPokemonCard>;
   onEditCard: (card: PokemonCard) => void;
   onRemoveCard: (cardId: string) => void;
   onViewCard: (cardIndex: number) => void;
   onToggleFavorite: (card: PokemonCard) => void;
+  isLoadingMasterData: boolean;
 };
 
-export function CardList({ cards, onEditCard, onRemoveCard, onViewCard, onToggleFavorite }: CardListProps) {
+export function CardList({ cards, masterCardData, onEditCard, onRemoveCard, onViewCard, onToggleFavorite, isLoadingMasterData }: CardListProps) {
   if (cards.length === 0) {
     return (
       <Card className="shadow-lg">
@@ -39,11 +43,19 @@ export function CardList({ cards, onEditCard, onRemoveCard, onViewCard, onToggle
 
   return (
     <Card className="shadow-lg h-full flex flex-col">
-      <CardHeader>
-        <CardTitle className="font-headline text-2xl flex items-center gap-2">
-          <List className="h-6 w-6 text-primary" />
-          My Collection
-        </CardTitle>
+       <CardHeader>
+        <div className="flex justify-between items-center">
+          <CardTitle className="font-headline text-2xl flex items-center gap-2">
+            <List className="h-6 w-6 text-primary" />
+            My Collection
+          </CardTitle>
+          {isLoadingMasterData && (
+              <div className="flex items-center text-sm text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
+                  <span>Updating market values...</span>
+              </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex-grow p-0">
         <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-24rem)]">
@@ -53,6 +65,7 @@ export function CardList({ cards, onEditCard, onRemoveCard, onViewCard, onToggle
                 key={`${card.id}-${index}`} 
                 card={card} 
                 cardIndex={index}
+                masterCard={masterCardData.get(card.apiId)}
                 onEdit={() => onEditCard(card)} 
                 onRemove={() => onRemoveCard(card.id)}
                 onView={onViewCard}
