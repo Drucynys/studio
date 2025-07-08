@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { PokemonCard } from "@/types";
@@ -240,7 +241,7 @@ export function FullScreenCardView({
              <Badge variant="outline" className="text-xs">Qty: {currentCard.quantity}</Badge>
              {typeof currentCard.value === 'number' && currentCard.value > 0 && (
                 <Badge variant="outline" className="text-xs border-green-500/50 text-green-600 flex items-center gap-1">
-                    <DollarSign size={12}/> Value: ${currentCard.value.toFixed(2)}
+                    <DollarSign size={12}/> ${currentCard.value.toFixed(2)}
                 </Badge>
              )}
           </div>
