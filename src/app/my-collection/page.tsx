@@ -356,7 +356,6 @@ export default function MyCollectionPage() {
           }}
           card={cardToEdit}
           onSave={handleSaveChanges}
-          availableConditions={["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"]}
         />
       )}
 

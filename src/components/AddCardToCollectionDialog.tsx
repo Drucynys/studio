@@ -49,7 +49,6 @@ type AddCardToCollectionDialogProps = {
   onClose: () => void;
   cardName: string;
   initialCardImageUrl?: string | null;
-  availableConditions: string[];
   pokemonTcgApiCard: PokemonTcgApiCard | null;
   // onAddCard is now handled by the context
 };
@@ -59,13 +58,11 @@ export function AddCardToCollectionDialog({
   onClose,
   cardName,
   initialCardImageUrl,
-  availableConditions,
   pokemonTcgApiCard,
 }: AddCardToCollectionDialogProps) {
   const { user, addCardToCollection, openAuthModal } = useAuth();
   const { toast } = useToast();
 
-  const [selectedCondition, setSelectedCondition] = useState<string>("");
   const [quantityInput, setQuantityInput] = useState<number>(1);
   const [finalDisplayImageUrl, setFinalDisplayImageUrl] = useState<string>("https://placehold.co/200x280.png");
   const [displayPrices, setDisplayPrices] = useState<DisplayPriceInfo[]>([]);
@@ -76,7 +73,6 @@ export function AddCardToCollectionDialog({
 
   useEffect(() => {
     if (!isOpen) {
-      setSelectedCondition("");
       setQuantityInput(1);
       setDisplayPrices([]);
       setFinalDisplayImageUrl("https://placehold.co/200x280.png");
@@ -186,7 +182,6 @@ export function AddCardToCollectionDialog({
         set: pokemonTcgApiCard.set.name,
         cardNumber: pokemonTcgApiCard.number,
         rarity: pokemonTcgApiCard.rarity || 'N/A',
-        condition: selectedCondition,
         value: marketPriceForSelectedVariant,
         variant: selectedVariant || null,
         quantity: quantityInput,
@@ -212,7 +207,7 @@ export function AddCardToCollectionDialog({
     setFinalDisplayImageUrl("https://placehold.co/200x280.png/CCCCCC/333333?text=Image+Error");
   };
   
-  const isAddButtonDisabled = !selectedCondition || (currentAvailableVariants.length > 0 && !selectedVariant) || quantityInput < 1 || isAdding;
+  const isAddButtonDisabled = (currentAvailableVariants.length > 0 && !selectedVariant) || quantityInput < 1 || isAdding;
   const formattedSelectedVariantName = useMemo(() => selectedVariant ? formatVariantKey(selectedVariant) : undefined, [selectedVariant]);
 
   return (
@@ -302,24 +297,6 @@ export function AddCardToCollectionDialog({
                       </Select>
                     </div>
                   )}
-
-                  <div className="grid grid-cols-4 items-center gap-x-4 gap-y-2">
-                    <Label htmlFor="condition" className="text-right col-span-1">
-                      Condition
-                    </Label>
-                    <Select value={selectedCondition} onValueChange={setSelectedCondition}>
-                      <SelectTrigger id="condition" className="col-span-3">
-                        <SelectValue placeholder="Select condition" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableConditions.map((condition) => (
-                          <SelectItem key={condition} value={condition}>
-                            {condition}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div className="grid grid-cols-4 items-center gap-x-4 gap-y-2">
                     <Label htmlFor="quantity" className="text-right col-span-1 flex items-center gap-1">

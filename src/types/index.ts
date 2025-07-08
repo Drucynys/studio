@@ -7,7 +7,6 @@ export interface PokemonCard {
   name: string;
   rarity: string;
   variant: string | null;
-  condition: string;
   language: 'English' | 'Japanese';
   value: number;
   imageUrl: string | null;

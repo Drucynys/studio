@@ -234,7 +234,6 @@ export function FullScreenCardView({
           <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
             <Badge variant="secondary" className="text-xs">{currentCard.rarity}</Badge>
             {displayVariant && <Badge variant="outline" className="text-xs">{displayVariant}</Badge>}
-            <Badge variant="outline" className="text-xs">{currentCard.condition}</Badge>
             <Badge variant="outline" className="text-xs border-indigo-500/50 text-indigo-600 flex items-center gap-1">
                 <Languages size={12}/> {currentCard.language}
             </Badge>

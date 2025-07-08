@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Coins, Sparkles, ShieldCheck, ExternalLink, Palette, Edit3, Trash2, Layers, ShoppingCart, Info, Eye, Languages, Paintbrush, Star } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import { Coins, Sparkles, ExternalLink, Palette, Edit3, Trash2, Layers, Eye, Languages, Paintbrush, Star } from "lucide-react";
+import React from "react";
 import { cn } from "@/lib/utils";
 
 type CardItemProps = {
@@ -85,10 +85,6 @@ export function CardItem({ card, cardIndex, onEdit, onRemove, onView, onToggleFa
          <div className="flex items-center gap-2 text-xs">
           <Languages className="h-3.5 w-3.5 text-indigo-500" />
           <strong>Language:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-indigo-500/50 text-indigo-600">{card.language}</Badge>
-        </div>
-        <div className="flex items-center gap-2 text-xs">
-          <ShieldCheck className="h-3.5 w-3.5 text-green-500" />
-          <strong>Condition:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5">{card.condition}</Badge>
         </div>
          <div className="flex items-center gap-2 text-xs">
           <Layers className="h-3.5 w-3.5 text-purple-500" />

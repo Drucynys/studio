@@ -13,8 +13,6 @@ import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialo
 import { Loader2, ServerCrash, ArrowLeft, Images, Paintbrush } from "lucide-react";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 
-const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
-
 const ArtistDetailPage = () => {
   const params = useParams();
   const artistNameParam = params.artistName as string;
@@ -140,7 +138,6 @@ const ArtistDetailPage = () => {
           cardName={selectedApiCard.name}
           initialCardImageUrl={selectedApiCard.images.small}
           pokemonTcgApiCard={selectedApiCard}
-          availableConditions={conditionOptions}
         />
       )}
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">

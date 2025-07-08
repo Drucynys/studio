@@ -11,8 +11,6 @@ import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialo
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { Loader2, ServerCrash, Search as SearchIcon, Info } from "lucide-react";
 
-const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
-
 export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ApiPokemonCard[]>([]);
@@ -149,7 +147,6 @@ export default function SearchPage() {
           cardName={selectedApiCard.name}
           initialCardImageUrl={selectedApiCard.images.small}
           pokemonTcgApiCard={selectedApiCard}
-          availableConditions={conditionOptions}
         />
       )}
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,14 +21,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PokemonCard } from "@/types";
-import { Gem, DollarSign, ShieldCheck, Layers, Languages } from "lucide-react"; // Added Layers, Languages
+import { Gem, DollarSign, Layers, Languages } from "lucide-react";
 
 type EditCardDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   card: PokemonCard | null;
   onSave: (updatedCard: PokemonCard) => void;
-  availableConditions: string[];
 };
 
 const languageOptions: Array<'English' | 'Japanese'> = ["English", "Japanese"];
@@ -48,7 +46,6 @@ export function EditCardDialog({
   onClose,
   card,
   onSave,
-  availableConditions,
 }: EditCardDialogProps) {
   const [editableCard, setEditableCard] = useState<PokemonCard | null>(null);
   const [quantityInput, setQuantityInput] = useState<number>(1);
@@ -69,12 +66,6 @@ export function EditCardDialog({
       setSelectedLanguage('English');
     }
   }, [card, isOpen]);
-
-  const handleInputChange = (field: keyof PokemonCard, value: any) => {
-    if (editableCard) {
-      setEditableCard({ ...editableCard, [field]: value });
-    }
-  };
   
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const num = parseInt(e.target.value, 10);
@@ -171,27 +162,6 @@ export function EditCardDialog({
               className="col-span-3"
               min="1"
             />
-          </div>
-
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="condition" className="text-right col-span-1">
-              <ShieldCheck className="inline-block mr-1 h-4 w-4 text-green-500"/>Condition
-            </Label>
-            <Select
-              value={currentCardToDisplay?.condition || ""}
-              onValueChange={(value) => handleInputChange("condition", value)}
-            >
-              <SelectTrigger id="condition" className="col-span-3">
-                <SelectValue placeholder="Select condition" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableConditions.map((condition) => (
-                  <SelectItem key={condition} value={condition}>
-                    {condition}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           
           {displayVariant && (

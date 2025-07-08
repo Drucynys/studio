@@ -75,8 +75,6 @@ export interface ApiPokemonCard {
   types?: string[];
 }
 
-const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
-
 interface SetDetails {
   id: string;
   name: string;
@@ -303,7 +301,6 @@ const SetDetailsPage = () => {
           cardName={selectedApiCard.name}
           initialCardImageUrl={selectedApiCard.images.small}
           pokemonTcgApiCard={selectedApiCard}
-          availableConditions={conditionOptions}
         />
       )}
        <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">

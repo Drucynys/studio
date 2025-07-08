@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,7 +22,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { PokemonCard } from "@/types";
-//import type { OcrScanOutput } from "@/components/CardScannerDialog"; // Changed from ScanCardOutput
 import { FilePlus, Loader2, Layers, Languages } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
@@ -35,19 +33,16 @@ const formSchema = z.object({
   selectedSetId: z.string().min(1, "Set is required"),
   selectedCardId: z.string().min(1, "Card is required"),
   language: z.enum(["English", "Japanese"], { required_error: "Language is required" }),
-  condition: z.string().min(1, "Condition is required"),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
 });
 
 type ManualCardInputFormProps = {
   onAddCard: (card: PokemonCard) => void;
-  initialScanData?: Partial<FindCardOutput> | null; // Updated type for initialScanData
+  initialScanData?: Partial<FindCardOutput> | null;
 };
 
-const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
 const languageOptions: Array<'English' | 'Japanese'> = ["English", "Japanese"];
 
-// Types for api.pokemontcg.io
 interface ApiSet {
   id: string;
   name: string;
@@ -86,7 +81,6 @@ interface ApiPokemonCard {
   };
 }
 
-// Types for TCGdex API (api.tcgdex.net)
 interface TcgDexApiSet {
   id: string;
   name: string;
@@ -96,13 +90,13 @@ interface TcgDexApiSet {
 }
 
 interface TcgDexApiCard {
-  id: string; // e.g., "sv5k-1"
-  name: string; // Japanese name
-  image?: string; // Base URL for image, append '/low.webp' or '/high.webp'
+  id: string;
+  name: string;
+  image?: string;
   number: string;
   rarity: string;
-  artist?: string; // TCGdex might not have this, so keep it optional
-  set: { id: string; name: string; logo?: string; }; // Simplified set info within card
+  artist?: string;
+  set: { id: string; name: string; logo?: string; };
 }
 
 
@@ -124,7 +118,7 @@ const getDefaultMarketPrice = (apiCard: ApiPokemonCard | null): { value: number,
 };
 
 const normalizeString = (str: string = ""): string => {
-  return str.toLowerCase().replace(/[^a-z0-9\s'-]/gi, '').trim(); // Keep spaces, apostrophes, hyphens
+  return str.toLowerCase().replace(/[^a-z0-9\s'-]/gi, '').trim();
 };
 
 
@@ -157,7 +151,6 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       selectedSetId: "",
       selectedCardId: "",
       language: "English",
-      condition: "",
       quantity: 1,
     },
   });
@@ -292,9 +285,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       setCardsInSelectedEnglishSet([]);
       setCardsInSelectedJapaneseSet([]);
       
-      // Determine scanned language (default to English if OCR doesn't specify)
-      // For now, OCR in CardScannerDialog only uses 'eng'. If language detection is added, this could be dynamic.
-      const scannedLang = "English"; // Hardcoding to English as OCR is set to English
+      const scannedLang = "English";
       form.setValue("language", scannedLang, { shouldValidate: true });
 
       let currentSets: ApiSet[] | TcgDexApiSet[] = [];
@@ -311,7 +302,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       }
 
       let matchedSetId: string | undefined = undefined;
-      if (initialScanData.set) { // OCR might provide a set name
+      if (initialScanData.set) {
         const normalizedScanSet = normalizeString(initialScanData.set);
         const foundSet = currentSets.find(s => normalizeString(s.name).includes(normalizedScanSet));
         if (foundSet) {
@@ -355,15 +346,13 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       setIsPreFilling(false);
     };
 
-    // Only run preFill if initialScanData is present and relevant sets are loaded or can be loaded.
-    if (initialScanData && (initialScanData.name || initialScanData.cardNumber || initialScanData.set)) { // Check if we have actual scan data
+    if (initialScanData && (initialScanData.name || initialScanData.cardNumber || initialScanData.set)) {
         if ((watchedLanguage === "English" && (englishSets.length > 0 || !isLoadingEnglishSets)) ||
             (watchedLanguage === "Japanese" && (japaneseSets.length > 0 || !isLoadingJapaneseSets))) {
           preFillForm();
         }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialScanData, form.setValue, toast, fetchEnglishSets, fetchJapaneseSets, fetchCardsForEnglishSet, fetchCardsForJapaneseSet, englishSets, japaneseSets, isLoadingEnglishSets, isLoadingJapaneseSets]);
+  }, [initialScanData, form, toast, fetchEnglishSets, fetchJapaneseSets, fetchCardsForEnglishSet, fetchCardsForJapaneseSet, englishSets, japaneseSets, isLoadingEnglishSets, isLoadingJapaneseSets, watchedLanguage]);
 
 
   useEffect(() => {
@@ -382,7 +371,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
     }
 
     if (watchedLanguage === "English") {
-      if (watchedSetId !== selectedEnglishCardData?.set.id) { // Check if cards for this set are already loaded
+      if (watchedSetId !== selectedEnglishCardData?.set.id) {
         fetchCardsForEnglishSet(watchedSetId);
       }
     } else { 
@@ -430,7 +419,6 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
         rarity: selectedEnglishCardData.rarity || initialScanData?.rarity || "N/A",
         language: values.language,
         variant: cardVariant || null,
-        condition: values.condition,
         imageUrl: selectedEnglishCardData.images.large || null,
         value: cardValue,
         quantity: values.quantity,
@@ -449,7 +437,6 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
         rarity: selectedJapaneseCardData.rarity || initialScanData?.rarity || "N/A",
         language: values.language,
         variant: null,
-        condition: values.condition,
         imageUrl: selectedJapaneseCardData.image ? `${selectedJapaneseCardData.image}/high.webp` : null,
         value: 0, 
         quantity: values.quantity,
@@ -463,7 +450,6 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       selectedSetId: values.selectedSetId, 
       selectedCardId: "",
       language: values.language, 
-      condition: "",
       quantity: 1,
     });
     setSelectedEnglishCardData(null); 
@@ -487,7 +473,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
           <FilePlus className="h-6 w-6 text-primary" />
           Manual Card Entry
         </CardTitle>
-        <CardDescription>Select Language, Set, Card, Condition, and Quantity. Scanner may pre-fill some fields.</CardDescription>
+        <CardDescription>Select Language, Set, Card, and Quantity. Scanner may pre-fill some fields.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -624,29 +610,6 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
                 </div>
               </Card>
             )}
-
-            <FormField
-              control={form.control}
-              name="condition"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Condition</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={isUIDisabled || !currentCardDisplayData}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder={!currentCardDisplayData ? "Select card first" : "Select condition"} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {conditionOptions.map(option => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}

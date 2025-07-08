@@ -22,8 +22,6 @@ export interface Pokemon {
   generation: number;
 }
 
-const conditionOptions = ["Mint", "Near Mint", "Excellent", "Good", "Lightly Played", "Played", "Poor", "Damaged"];
-
 const PokemonDetailPage = () => {
   const params = useParams();
   const pokemonName = params.pokemonName as string;
@@ -156,7 +154,6 @@ const PokemonDetailPage = () => {
           cardName={selectedApiCard.name}
           initialCardImageUrl={selectedApiCard.images.small}
           pokemonTcgApiCard={selectedApiCard}
-          availableConditions={conditionOptions}
         />
       )}
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
