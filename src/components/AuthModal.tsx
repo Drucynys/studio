@@ -77,7 +77,7 @@ export function AuthModal() {
     <Dialog open={isAuthModalOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-center">
-          <DialogTitle className="text-2xl font-bold">Welcome to Pokédex Tracker</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">Welcome to PokéTRKR</DialogTitle>
           <DialogDescription>Sign in or create an account to save your collection.</DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="signin" className="w-full" onValueChange={clearFormState}>

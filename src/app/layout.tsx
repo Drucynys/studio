@@ -6,7 +6,7 @@ import { AuthProvider } from '@/context/AuthContext';
 import { AuthModal } from '@/components/AuthModal';
 
 export const metadata: Metadata = {
-  title: 'Pokédex Tracker',
+  title: 'PokéTRKR',
   description: 'Track your Pokémon card collection',
 };
 

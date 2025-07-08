@@ -136,7 +136,7 @@ export default function BrowseArtistsPage() {
         </Card>
       </main>
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
-        Pokédex Tracker &copy; {new Date().getFullYear()}
+        PokéTRKR &copy; {new Date().getFullYear()}
       </footer>
     </div>
   );

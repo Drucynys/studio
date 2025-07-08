@@ -33,7 +33,7 @@ export function AppHeader() {
         <Link href="/" className="flex items-center gap-3">
           <PokeballIcon className="h-8 w-8 md:h-10 md:w-10" />
           <h1 className="text-2xl md:text-3xl font-headline font-bold">
-            Pokédex Tracker
+            PokéTRKR
           </h1>
         </Link>
         <nav className="flex items-center gap-1 md:gap-2">
