@@ -7,8 +7,8 @@ const axios = require('axios'); // Keep axios, though currently not used for OCR
 admin.initializeApp();
 const db = admin.firestore();
 
-// Set the region to match your Firestore database
-const europeFunctions = functions.region('europe-west4');
+// Set the region to a supported European region close to your Firestore
+const europeFunctions = functions.region('europe-west1');
 
 /**
  * Firebase Cloud Function to process newly uploaded Pokémon card images.

@@ -17,6 +17,8 @@ export function AuthModal() {
   const { isAuthModalOpen, closeAuthModal, signUp, signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -25,7 +27,15 @@ export function AuthModal() {
     setLoading(true);
     setError(null);
     try {
-      if (action === 'signUp') await signUp(email, password);
+      if (action === 'signUp') {
+        if (email !== confirmEmail) {
+          throw new Error("Emails do not match.");
+        }
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match.");
+        }
+        await signUp(email, password);
+      }
       if (action === 'signIn') await signIn(email, password);
       if (action === 'google') await signInWithGoogle();
       
@@ -36,7 +46,12 @@ export function AuthModal() {
 
     } catch (err: any) {
       console.error(err);
-      const friendlyMessage = err.code ? err.code.replace('auth/', '').replace(/-/g, ' ') : 'An unknown error occurred.';
+      let friendlyMessage = 'An unknown error occurred.';
+      if (err.message && (err.message.includes("match") || err.message.includes("valid"))) {
+          friendlyMessage = err.message;
+      } else if (err.code) {
+          friendlyMessage = err.code.replace('auth/', '').replace(/-/g, ' ');
+      }
       setError(friendlyMessage.charAt(0).toUpperCase() + friendlyMessage.slice(1));
     } finally {
       setLoading(false);
@@ -49,6 +64,8 @@ export function AuthModal() {
       setError(null);
       setEmail('');
       setPassword('');
+      setConfirmEmail('');
+      setConfirmPassword('');
     }
   };
 
@@ -87,8 +104,16 @@ export function AuthModal() {
                 <Input id="email-up" type="email" placeholder="m@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="confirm-email-up">Confirm Email</Label>
+                <Input id="confirm-email-up" type="email" placeholder="m@example.com" value={confirmEmail} onChange={(e) => setConfirmEmail(e.target.value)} />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="password-up">Password (6+ characters)</Label>
                 <Input id="password-up" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password-up">Confirm Password</Label>
+                <Input id="confirm-password-up" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
               <Button disabled={loading} className="w-full" onClick={() => handleAuthAction('signUp')}>
                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
