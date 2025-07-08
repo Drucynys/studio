@@ -63,20 +63,25 @@ export function FullScreenCardView({
     const cardmarketPrices: { name: string; value: number; currency: string }[] = [];
 
     // TCGPlayer prices
-    if (masterCard?.tcgplayer?.prices) {
-        for (const [variant, priceData] of Object.entries(masterCard.tcgplayer.prices)) {
-            if (priceData?.market && priceData.market > 0) {
-                tcgPlayerPrices.push({
-                    name: formatVariantKey(variant),
-                    value: priceData.market,
-                    currency: '$'
-                });
+    if (masterCard && masterCard.tcgplayer && masterCard.tcgplayer.prices) {
+        const tcgPrices = masterCard.tcgplayer.prices;
+        for (const variant in tcgPrices) {
+            if (Object.prototype.hasOwnProperty.call(tcgPrices, variant)) {
+                const priceData = tcgPrices[variant as keyof typeof tcgPrices];
+                if (priceData && typeof priceData.market === 'number' && priceData.market > 0) {
+                    tcgPlayerPrices.push({
+                        name: formatVariantKey(variant),
+                        value: priceData.market,
+                        currency: '$',
+                    });
+                }
             }
         }
     }
 
     // Cardmarket prices
-    if (masterCard?.cardmarket?.prices) {
+    if (masterCard && masterCard.cardmarket && masterCard.cardmarket.prices) {
+        const cmPrices = masterCard.cardmarket.prices;
         const cardmarketPriceMap: { [key: string]: string } = {
             averageSellPrice: 'Average Sell',
             lowPrice: 'Low Price',
@@ -90,20 +95,23 @@ export function FullScreenCardView({
             reverseHoloTrend: 'Rev. Holo Trend',
         };
 
-        for (const [key, label] of Object.entries(cardmarketPriceMap)) {
-            const priceValue = masterCard.cardmarket.prices[key as keyof typeof masterCard.cardmarket.prices];
-            if (typeof priceValue === 'number' && priceValue > 0) {
-                cardmarketPrices.push({
-                    name: label,
-                    value: priceValue,
-                    currency: '€' // Assuming Euro for Cardmarket
-                });
+        for (const key in cardmarketPriceMap) {
+            if (Object.prototype.hasOwnProperty.call(cmPrices, key)) {
+                const priceValue = cmPrices[key as keyof typeof cmPrices];
+                if (typeof priceValue === 'number' && priceValue > 0) {
+                    cardmarketPrices.push({
+                        name: cardmarketPriceMap[key],
+                        value: priceValue,
+                        currency: '€'
+                    });
+                }
             }
         }
     }
 
     return { tcgPlayerPrices, cardmarketPrices };
   }, [masterCard]);
+
 
   useEffect(() => {
     if (!isOpen) {
