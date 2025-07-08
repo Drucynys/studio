@@ -84,6 +84,7 @@ export async function POST(request: Request) {
 
         logs.push(`Updating prices for ${allCardsForSet.length} cards in Firestore...`);
         const cardsCollection = db.collection('pokemon-tcg-cards');
+        const historyCollection = db.collection('priceHistory');
         const batchPromises: Promise<any>[] = [];
 
         for (let i = 0; i < allCardsForSet.length; i += BATCH_SIZE) {
@@ -96,16 +97,25 @@ export async function POST(request: Request) {
                         tcgplayer: card.tcgplayer || null,
                         cardmarket: card.cardmarket || null,
                     };
-                    // Use set with merge to update only these fields.
-                    // This will also create the document if it somehow doesn't exist, preventing errors.
+                    // Use set with merge to update only these fields in the master card list.
                     batch.set(docRef, priceData, { merge: true });
+                    
+                    // Also save a snapshot to the priceHistory collection
+                    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+                    const historyDocRef = historyCollection.doc(`${card.id}_${today}`);
+                    const historyData = {
+                        cardApiId: card.id,
+                        date: admin.firestore.Timestamp.now(),
+                        prices: priceData,
+                    };
+                    batch.set(historyDocRef, historyData);
                 }
             });
             batchPromises.push(batch.commit());
         }
         
         await Promise.all(batchPromises);
-        logs.push(`✅ Successfully updated prices for ${allCardsForSet.length} cards in set '${setId}'.`);
+        logs.push(`✅ Successfully updated prices and saved history for ${allCardsForSet.length} cards in set '${setId}'.`);
 
         return NextResponse.json({ status: 'success', count: allCardsForSet.length, logs });
 

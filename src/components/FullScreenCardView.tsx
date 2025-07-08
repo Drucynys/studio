@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { MarketPriceHistoryChart } from "./MarketPriceHistoryChart";
 
 const MAX_ROTATION = 10;
 const MIN_DIMENSION_FOR_TILT_EFFECT = 50;
@@ -76,12 +77,11 @@ export function FullScreenCardView({
     const tcgPlayerPrices: { name: string; value: number; currency: string }[] = [];
     const cardmarketPrices: { name: string; value: number; currency: string }[] = [];
 
-    // TCGPlayer: Dynamically iterate through all keys and use robust checking
+    // TCGPlayer
     if (masterCard?.tcgplayer?.prices) {
       for (const [variant, priceData] of Object.entries(masterCard.tcgplayer.prices)) {
-        const marketPrice = priceData?.market;
-        if (marketPrice !== undefined && marketPrice !== null) {
-          const numericValue = parseFloat(marketPrice as any);
+        if (priceData?.market) {
+          const numericValue = parseFloat(priceData.market as any);
           if (!isNaN(numericValue) && numericValue > 0) {
             tcgPlayerPrices.push({
               name: formatVariantKey(variant),
@@ -93,7 +93,7 @@ export function FullScreenCardView({
       }
     }
 
-    // Cardmarket: Dynamically iterate through all keys and use robust checking
+    // Cardmarket
     if (masterCard?.cardmarket?.prices) {
         for (const [key, value] of Object.entries(masterCard.cardmarket.prices)) {
             if (value !== undefined && value !== null) {
@@ -319,14 +319,14 @@ export function FullScreenCardView({
                             <DollarSign size={12}/> {displayValue.toFixed(2)}
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-72" align="center">
+                    <PopoverContent className="w-96" align="center">
                         <div className="space-y-2">
                             <h4 className="font-medium leading-none">Market Prices</h4>
                             <p className="text-sm text-muted-foreground">
                                 Live prices from TCGPlayer & Cardmarket.
                             </p>
                         </div>
-                        <div className="mt-4 max-h-64 overflow-y-auto pr-2">
+                        <div className="mt-4 max-h-40 overflow-y-auto pr-2">
                             {allAvailablePrices.tcgPlayerPrices.length === 0 && allAvailablePrices.cardmarketPrices.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center">No price data available.</p>
                             ) : (
@@ -361,6 +361,8 @@ export function FullScreenCardView({
                                 </div>
                             )}
                         </div>
+                        <Separator className="my-4" />
+                        <MarketPriceHistoryChart cardApiId={currentCard?.apiId ?? null} />
                     </PopoverContent>
                 </Popover>
              )}
