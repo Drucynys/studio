@@ -21,7 +21,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PokemonCard } from "@/types";
-import { Gem, DollarSign, Layers, Languages } from "lucide-react";
+import { Gem, DollarSign, Layers, Languages, RefreshCw, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type EditCardDialogProps = {
   isOpen: boolean;
@@ -32,13 +33,33 @@ type EditCardDialogProps = {
 
 const languageOptions: Array<'English' | 'Japanese'> = ["English", "Japanese"];
 
-// Helper to format variant keys for display
 const formatDisplayVariant = (variantKey?: string): string | null => {
   if (!variantKey) return null;
   return variantKey
     .replace(/([A-Z0-9])/g, " $1")
     .replace(/^./, (str) => str.toUpperCase())
     .trim();
+};
+
+const getMarketPrice = (apiCard: any, variant?: string | null): number => {
+  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
+  const prices = apiCard.tcgplayer.prices;
+  
+  if (variant && prices[variant]?.market) {
+    return prices[variant].market;
+  }
+  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
+  for (const v of variantPriority) {
+    if (prices[v]?.market) {
+      return prices[v].market;
+    }
+  }
+  for (const key in prices) {
+    if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market) {
+      return prices[key].market;
+    }
+  }
+  return 0;
 };
 
 export function EditCardDialog({
@@ -51,7 +72,8 @@ export function EditCardDialog({
   const [quantityInput, setQuantityInput] = useState<number>(1);
   const [valueInput, setValueInput] = useState<string>("0.00");
   const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Japanese'>('English');
-
+  const [isFetchingValue, setIsFetchingValue] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (card && isOpen) {
@@ -83,7 +105,6 @@ export function EditCardDialog({
     }
   }
 
-
   const handleSave = () => {
     if (editableCard) {
       const parsedValue = parseFloat(valueInput);
@@ -98,13 +119,49 @@ export function EditCardDialog({
         // No fallback needed here as image is already loaded or placeholder is inherent
     }
   };
+  
+  const handleFetchLatestValue = async () => {
+    if (!editableCard?.apiId) {
+      toast({
+        variant: "destructive",
+        title: "Cannot Fetch Value",
+        description: "This card is missing a master ID and cannot be updated automatically.",
+      });
+      return;
+    }
+    
+    setIsFetchingValue(true);
+    try {
+      const response = await fetch(`/api/master-card/${editableCard.apiId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch latest price data.");
+      }
+      const masterCardData = await response.json();
+      const latestValue = getMarketPrice(masterCardData, editableCard.variant);
+      
+      setValueInput(latestValue.toFixed(2));
+      toast({
+        title: "Value Updated",
+        description: `Latest market value is $${latestValue.toFixed(2)}. Click Save to apply.`,
+      });
 
-  if (!editableCard && !isOpen) return null; // Don't render if no card and not open
-  if (!isOpen) return null; // Ensure dialog content isn't rendered when closed, prevents issues with initial editableCard state
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Fetch Error",
+        description: err.message,
+      });
+    } finally {
+      setIsFetchingValue(false);
+    }
+  };
 
-  const currentCardToDisplay = editableCard || card; // Use card prop if editableCard is null (e.g. initial open)
+  if (!editableCard && !isOpen) return null;
+  if (!isOpen) return null;
+
+  const currentCardToDisplay = editableCard || card;
   const displayVariant = formatDisplayVariant(currentCardToDisplay?.variant as string | undefined);
-
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -173,19 +230,31 @@ export function EditCardDialog({
             </div>
           )}
 
-
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="value" className="text-right col-span-1">
               <DollarSign className="inline-block mr-1 h-4 w-4 text-primary"/>Value ($)
             </Label>
-            <Input
-              id="value"
-              type="text" 
-              value={valueInput}
-              onChange={handleValueChange}
-              className="col-span-3"
-              placeholder="0.00"
-            />
+            <div className="col-span-3 flex items-center gap-2">
+              <Input
+                id="value"
+                type="text" 
+                value={valueInput}
+                onChange={handleValueChange}
+                className="flex-grow"
+                placeholder="0.00"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleFetchLatestValue}
+                disabled={isFetchingValue || !editableCard?.apiId}
+                aria-label="Fetch latest value"
+                title="Fetch latest value"
+              >
+                {isFetchingValue ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
+            </div>
           </div>
         </div>
         <DialogFooter>
@@ -196,4 +265,3 @@ export function EditCardDialog({
     </Dialog>
   );
 }
-    

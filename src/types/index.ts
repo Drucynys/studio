@@ -1,6 +1,7 @@
 // src/types/index.ts
 export interface PokemonCard {
   id: string; // Firestore document ID
+  apiId: string; // The ID from the pokemontcg.io API (e.g., "base1-4")
   userId: string; // ID of the user who owns the card
   set: string;
   cardNumber: string;

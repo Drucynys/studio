@@ -178,6 +178,7 @@ export function AddCardToCollectionDialog({
     setIsAdding(true);
     try {
       await addCardToCollection({
+        apiId: pokemonTcgApiCard.id,
         name: pokemonTcgApiCard.name,
         set: pokemonTcgApiCard.set.name,
         cardNumber: pokemonTcgApiCard.number,
