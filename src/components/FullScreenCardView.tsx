@@ -291,7 +291,7 @@ export function FullScreenCardView({
                         <div className="grid gap-2 mt-4">
                             {allPrices && Object.keys(allPrices).length > 0 ? (
                                 Object.entries(allPrices).map(([variant, priceData]) => (
-                                    priceData && priceData.market && (
+                                    priceData && typeof priceData.market === 'number' && (
                                         <div key={variant} className="grid grid-cols-[1fr,auto] items-center gap-4 text-sm">
                                             <span className="text-muted-foreground">{formatVariantKey(variant)}</span>
                                             <span className="font-semibold text-right">${priceData.market.toFixed(2)}</span>
