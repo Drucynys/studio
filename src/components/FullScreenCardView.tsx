@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Languages, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const MAX_ROTATION = 10;
 const MIN_DIMENSION_FOR_TILT_EFFECT = 50;
@@ -18,7 +20,35 @@ type FullScreenCardViewProps = {
   cards: PokemonCard[];
   currentIndex: number | null;
   onNavigate: (newIndex: number) => void;
+  masterCardData: Map<string, ApiPokemonCard>;
 };
+
+const getMarketPrice = (apiCard: ApiPokemonCard | undefined | null, variant?: string | null): number => {
+  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
+  const prices = apiCard.tcgplayer.prices;
+  
+  if (variant && prices[variant]?.market) {
+    return prices[variant].market;
+  }
+  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
+  for (const v of variantPriority) {
+    if (prices[v]?.market) {
+      return prices[v].market;
+    }
+  }
+  for (const key in prices) {
+    if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market) {
+      return prices[key].market;
+    }
+  }
+  return 0;
+};
+
+const formatVariantKey = (key: string): string => {
+  if (!key) return "N/A";
+  return key.replace(/([A-Z0-9])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
+};
+
 
 export function FullScreenCardView({
   isOpen,
@@ -26,6 +56,7 @@ export function FullScreenCardView({
   cards,
   currentIndex,
   onNavigate,
+  masterCardData,
 }: FullScreenCardViewProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovering, setIsHovering] = useState(false);
@@ -33,6 +64,7 @@ export function FullScreenCardView({
   const [cardDimensions, setCardDimensions] = useState({ width: 1, height: 1 });
 
   const currentCard = currentIndex !== null ? cards[currentIndex] : null;
+  const masterCard = currentCard ? masterCardData.get(currentCard.apiId) : null;
 
   useEffect(() => {
     if (!isOpen) {
@@ -112,6 +144,9 @@ export function FullScreenCardView({
   }
 
   const displayVariant = formatDisplayVariant(currentCard.variant ?? '');
+  const currentMarketValue = getMarketPrice(masterCard, currentCard.variant);
+  const displayValue = currentMarketValue > 0 ? currentMarketValue : currentCard.value;
+  const allPrices = masterCard?.tcgplayer?.prices;
 
   let dynamicCardTransform = "scale(1.0) translateY(-10px)";
   let shineBackground = "transparent";
@@ -239,10 +274,36 @@ export function FullScreenCardView({
                 <Languages size={12}/> {currentCard.language}
             </Badge>
              <Badge variant="outline" className="text-xs">Qty: {currentCard.quantity}</Badge>
-             {typeof currentCard.value === 'number' && currentCard.value > 0 && (
-                <Badge variant="outline" className="text-xs border-green-500/50 text-green-600 flex items-center gap-1">
-                    <DollarSign size={12}/> {currentCard.value.toFixed(2)}
-                </Badge>
+             {(displayValue > 0) && (
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-auto px-2 py-0.5 text-xs border-green-500/50 text-green-600 hover:bg-green-500/10 hover:text-green-700 flex items-center gap-1">
+                            <DollarSign size={12}/> {displayValue.toFixed(2)}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64" align="center">
+                        <div className="space-y-2">
+                            <h4 className="font-medium leading-none">TCGPlayer Market Prices</h4>
+                            <p className="text-sm text-muted-foreground">
+                                Live market prices for different variants.
+                            </p>
+                        </div>
+                        <div className="grid gap-2 mt-4">
+                            {allPrices && Object.keys(allPrices).length > 0 ? (
+                                Object.entries(allPrices).map(([variant, priceData]) => (
+                                    priceData && priceData.market && (
+                                        <div key={variant} className="grid grid-cols-[1fr,auto] items-center gap-4 text-sm">
+                                            <span className="text-muted-foreground">{formatVariantKey(variant)}</span>
+                                            <span className="font-semibold text-right">${priceData.market.toFixed(2)}</span>
+                                        </div>
+                                    )
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center">No price data available.</p>
+                            )}
+                        </div>
+                    </PopoverContent>
+                </Popover>
              )}
           </div>
            <p className="text-xs text-muted-foreground mt-2">

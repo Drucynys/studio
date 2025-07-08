@@ -435,6 +435,7 @@ export default function MyCollectionPage() {
           cards={filteredCards}
           currentIndex={currentFullScreenCardIndex}
           onNavigate={navigateFullScreen}
+          masterCardData={masterCardData}
         />
       )}
 
