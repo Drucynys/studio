@@ -38,7 +38,11 @@ const getMarketPrice = (apiCard: ApiPokemonCard | undefined | null, variant?: st
 
 const formatVariantKey = (key: string): string => {
   if (!key) return "N/A";
-  return key.replace(/([A-Z0-9])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim();
+  return key
+    .replace(/([A-Z0-9])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/^./, (str) => str.toUpperCase())
+    .trim();
 };
 
 
@@ -72,48 +76,32 @@ export function FullScreenCardView({
     const tcgPlayerPrices: { name: string; value: number; currency: string }[] = [];
     const cardmarketPrices: { name: string; value: number; currency: string }[] = [];
 
-    // TCGPlayer prices - Using Object.entries for robust iteration
+    // TCGPlayer: Dynamically iterate through all keys and use robust checking
     if (masterCard?.tcgplayer?.prices) {
       for (const [variant, priceData] of Object.entries(masterCard.tcgplayer.prices)) {
-        if (priceData?.market && typeof priceData.market === 'number' && priceData.market > 0) {
-          tcgPlayerPrices.push({
-            name: formatVariantKey(variant),
-            value: priceData.market,
-            currency: '$',
-          });
+        const marketPrice = priceData?.market;
+        if (marketPrice !== undefined && marketPrice !== null) {
+          const numericValue = parseFloat(marketPrice as any);
+          if (!isNaN(numericValue) && numericValue > 0) {
+            tcgPlayerPrices.push({
+              name: formatVariantKey(variant),
+              value: numericValue,
+              currency: '$',
+            });
+          }
         }
       }
     }
 
-    // Cardmarket prices - Using a comprehensive map and Object.entries
+    // Cardmarket: Dynamically iterate through all keys and use robust checking
     if (masterCard?.cardmarket?.prices) {
-        const cmPrices = masterCard.cardmarket.prices;
-        const cardmarketPriceMap: Record<string, string> = {
-            averageSellPrice: 'Average Sell',
-            lowPrice: 'Low Price',
-            trendPrice: 'Trend Price',
-            germanProLow: 'German Pro Low',
-            suggestedPrice: 'Suggested Price',
-            reverseHoloSell: 'Rev. Holo Sell',
-            reverseHoloLow: 'Rev. Holo Low',
-            reverseHoloTrend: 'Rev. Holo Trend',
-            lowPriceExPlus: 'Low Price (EX+)',
-            avg1: '1-Day Avg',
-            avg7: '7-Day Avg',
-            avg30: '30-Day Avg',
-            reverseHoloAvg1: 'Rev. Holo 1-Day Avg',
-            reverseHoloAvg7: 'Rev. Holo 7-Day Avg',
-            reverseHoloAvg30: 'Rev. Holo 30-Day Avg',
-        };
-
-        for (const [key, name] of Object.entries(cardmarketPriceMap)) {
-            // Check if key exists on the prices object
-            if (key in cmPrices) {
-                const priceValue = cmPrices[key as keyof typeof cmPrices];
-                if (typeof priceValue === 'number' && priceValue > 0) {
+        for (const [key, value] of Object.entries(masterCard.cardmarket.prices)) {
+            if (value !== undefined && value !== null) {
+                const numericValue = parseFloat(value as any);
+                if (!isNaN(numericValue) && numericValue > 0) {
                     cardmarketPrices.push({
-                        name: name,
-                        value: priceValue,
+                        name: formatVariantKey(key),
+                        value: numericValue,
                         currency: '€'
                     });
                 }
@@ -190,21 +178,13 @@ export function FullScreenCardView({
     setIsHovering(false);
   };
 
-  const formatDisplayVariant = (variantKey?: string): string | null => {
-    if (!variantKey) return null;
-    return variantKey
-      .replace(/([A-Z0-9])/g, " $1")
-      .replace(/^./, (str) => str.toUpperCase())
-      .trim();
-  };
-
+  const displayVariant = formatVariantKey(currentCard?.variant ?? '');
+  const currentMarketValue = getMarketPrice(masterCard, currentCard?.variant);
+  const displayValue = currentMarketValue > 0 ? currentMarketValue : (currentCard?.value || 0);
+  
   if (!currentCard) {
     return null;
   }
-
-  const displayVariant = formatDisplayVariant(currentCard.variant ?? '');
-  const currentMarketValue = getMarketPrice(masterCard, currentCard.variant);
-  const displayValue = currentMarketValue > 0 ? currentMarketValue : currentCard.value;
   
   let dynamicCardTransform = "scale(1.0) translateY(-10px)";
   let shineBackground = "transparent";
