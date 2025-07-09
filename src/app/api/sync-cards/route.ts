@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         }
         logs.push(`✅ Finished fetching. Total cards found for set: ${allCardsForSet.length}.`);
 
-        logs.push(`Writing ${allCardsForSet.length} cards to Firestore...`);
+        logs.push(`Writing ${allCardsForSet.length} cards to Firestore (excluding prices)...`);
         const cardsCollection = db.collection('pokemon-tcg-cards');
         const batchPromises: Promise<any>[] = [];
 
@@ -92,7 +92,11 @@ export async function POST(request: Request) {
             chunk.forEach(card => {
                 if (card && card.id) {
                     const docRef = cardsCollection.doc(card.id);
-                    batch.set(docRef, card);
+                    // Create a copy of the card and remove pricing data before saving
+                    const cardToSave = { ...card };
+                    delete cardToSave.tcgplayer;
+                    delete cardToSave.cardmarket;
+                    batch.set(docRef, cardToSave);
                 }
             });
             batchPromises.push(batch.commit());
