@@ -213,7 +213,7 @@ exports.notifyOnNewFollower = europeFunctions.firestore
  * - Keeps weekly data for 91-365 days old.
  * - Deletes data older than 365 days.
  */
-exports.downsamplePriceHistory = europeFunctions.pubsub.schedule('every 24 hours').onRun(async (context) => {
+exports.downsamplePriceHistory = europeFunctions.pubsub.schedule('every day 03:00').timeZone('UTC').onRun(async (context) => {
   console.log('📈 Starting price history downsampling job.');
   const db = admin.firestore();
   const batchSize = 200; // Process 200 documents at a time to stay within limits.
