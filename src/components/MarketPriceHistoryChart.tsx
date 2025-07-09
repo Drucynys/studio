@@ -2,10 +2,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Loader2, ServerCrash } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface PriceHistoryEntry {
   date: string;
@@ -22,6 +24,8 @@ interface ChartDataPoint {
   date: string;
   price?: number;
 }
+
+type Range = '30d' | '90d' | '180d' | '365d';
 
 const getPrimaryMarketPrice = (entry: PriceHistoryEntry): number | undefined => {
   const prices = entry.prices?.tcgplayer;
@@ -43,6 +47,7 @@ const getPrimaryMarketPrice = (entry: PriceHistoryEntry): number | undefined => 
 
 export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | null }) {
   const [data, setData] = useState<ChartDataPoint[]>([]);
+  const [range, setRange] = useState<Range>('30d');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +58,7 @@ export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | nul
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/price-history/${cardApiId}`);
+        const response = await fetch(`/api/price-history/${cardApiId}?range=${range}`);
         if (!response.ok) {
           throw new Error("Failed to fetch price history.");
         }
@@ -79,7 +84,7 @@ export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | nul
     };
 
     fetchData();
-  }, [cardApiId]);
+  }, [cardApiId, range]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -100,7 +105,7 @@ export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | nul
     if (data.length < 2) {
       return (
         <div className="flex items-center justify-center h-full text-muted-foreground">
-          <p className="text-xs text-center">Not enough price data to display a chart. Check back after the next daily sync.</p>
+          <p className="text-xs text-center">Not enough price data to display a chart for this range. Check back later.</p>
         </div>
       );
     }
@@ -130,10 +135,28 @@ export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | nul
 
   return (
     <div>
-        <CardTitle className="font-headline text-base text-muted-foreground flex items-center gap-2 mb-2">
-          <TrendingUp className="h-4 w-4" />
-          30-Day Price History
-        </CardTitle>
+        <div className="flex justify-between items-center mb-2">
+            <CardTitle className="font-headline text-base text-muted-foreground flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Price History
+            </CardTitle>
+            <div className="flex items-center gap-1 rounded-md bg-muted p-0.5">
+                {(['30d', '90d', '180d', '365d'] as const).map((r) => (
+                    <Button
+                        key={r}
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                            "h-6 px-2 text-xs",
+                            range === r && "bg-background shadow-sm"
+                        )}
+                        onClick={() => setRange(r)}
+                    >
+                        {r === '30d' ? '1M' : r === '90d' ? '3M' : r === '180d' ? '6M' : '1Y'}
+                    </Button>
+                ))}
+            </div>
+        </div>
       <div className="h-[200px]">
         {renderContent()}
       </div>

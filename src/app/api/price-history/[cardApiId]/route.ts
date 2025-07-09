@@ -27,6 +27,9 @@ function initializeFirebaseAdmin() {
 
 export async function GET(request: Request, { params }: { params: { cardApiId: string } }) {
     const { cardApiId } = params;
+    const { searchParams } = new URL(request.url);
+    const range = searchParams.get('range') || '30d'; // Default to 30 days
+
     if (!cardApiId) {
         return NextResponse.json({ message: 'Card API ID is required' }, { status: 400 });
     }
@@ -35,36 +38,36 @@ export async function GET(request: Request, { params }: { params: { cardApiId: s
         initializeFirebaseAdmin();
         const db = getFirestore();
         const historyRef = db.collection('priceHistory');
-        
-        // This query is simpler and avoids the need for a composite index.
-        // We will filter and sort the data in the backend after fetching.
+
+        let days;
+        switch (range) {
+            case '90d': days = 90; break;
+            case '180d': days = 180; break;
+            case '365d': days = 365; break;
+            default: days = 30;
+        }
+
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        // Firestore query to get all records for the card within the date range
         const querySnapshot = await historyRef
             .where('cardApiId', '==', cardApiId)
+            .where('date', '>=', startDate)
+            .orderBy('date', 'asc') // Order by date ascending
             .get();
 
         if (querySnapshot.empty) {
             return NextResponse.json([]);
         }
 
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const history = querySnapshot.docs
-            .map(doc => {
-                const data = doc.data();
-                // Keep the JS Date object for sorting and filtering
-                return { ...data, jsDate: data.date.toDate() };
-            })
-            .filter(entry => entry.jsDate >= thirtyDaysAgo) // Filter for the last 30 days
-            .sort((a, b) => a.jsDate.getTime() - b.jsDate.getTime()) // Sort by date ascending
-            .map(entry => {
-                // Now format the date for the client, removing the temporary jsDate field
-                const { jsDate, ...rest } = entry;
-                return {
-                    ...rest,
-                    date: entry.jsDate.toISOString().split('T')[0],
-                };
-            });
+        const history = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                ...data,
+                date: data.date.toDate().toISOString().split('T')[0], // Format date for client
+            };
+        });
 
         return NextResponse.json(history);
     } catch (error: any) {

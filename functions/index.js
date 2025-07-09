@@ -1,3 +1,4 @@
+
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const sharp = require('sharp'); // Import sharp for image processing
@@ -202,3 +203,82 @@ exports.notifyOnNewFollower = europeFunctions.firestore
       return null;
     }
   });
+
+
+/**
+ * A scheduled function that runs daily to downsample the priceHistory collection
+ * to save on storage costs, while preserving historical trends.
+ * - Keeps daily data for the last 30 days.
+ * - Keeps data every 3 days for 31-90 days old.
+ * - Keeps weekly data for 91-365 days old.
+ * - Deletes data older than 365 days.
+ */
+exports.downsamplePriceHistory = europeFunctions.pubsub.schedule('every 24 hours').onRun(async (context) => {
+  console.log('📈 Starting price history downsampling job.');
+  const db = admin.firestore();
+  const batchSize = 200; // Process 200 documents at a time to stay within limits.
+
+  // Helper function to process a query in batches and delete documents based on a condition.
+  async function processQuery(query, shouldDelete) {
+    let snapshot = await query.limit(batchSize).get();
+    let docsDeleted = 0;
+
+    while (snapshot.size > 0) {
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => {
+            if (shouldDelete(doc)) {
+                batch.delete(doc.ref);
+                docsDeleted++;
+            }
+        });
+        await batch.commit();
+
+        if (snapshot.docs.length < batchSize) {
+          break; // Last batch
+        }
+
+        const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+        snapshot = await query.startAfter(lastVisible).limit(batchSize).get();
+    }
+    console.log(`Deleted ${docsDeleted} documents for the current query.`);
+  }
+
+  const now = new Date();
+  const daysAgo = (days) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+  const thirtyDaysAgo = admin.firestore.Timestamp.fromDate(daysAgo(30));
+  const ninetyDaysAgo = admin.firestore.Timestamp.fromDate(daysAgo(90));
+  const oneYearAgo = admin.firestore.Timestamp.fromDate(daysAgo(365));
+
+  // --- Logic for data 31-90 days old (keep 1 every 3 days) ---
+  console.log('Processing data between 31 and 90 days old to sample every 3 days...');
+  const ninetyDayQuery = db.collection('priceHistory')
+      .where('date', '<=', thirtyDaysAgo)
+      .where('date', '>', ninetyDaysAgo);
+
+  await processQuery(ninetyDayQuery, (doc) => {
+      const date = doc.data().date.toDate();
+      // A simple sampling strategy: keep if day of the month is a multiple of 3 (e.g., 1st, 4th, 7th...)
+      return date.getDate() % 3 !== 1;
+  });
+
+  // --- Logic for data 91-365 days old (keep 1 every 7 days) ---
+  console.log('Processing data between 91 and 365 days old to sample weekly...');
+  const oneYearQuery = db.collection('priceHistory')
+      .where('date', '<=', ninetyDaysAgo)
+      .where('date', '>', oneYearAgo);
+
+  await processQuery(oneYearQuery, (doc) => {
+      const date = doc.data().date.toDate();
+      // Keep if it's the first day of the week (Sunday).
+      return date.getDay() !== 0; // 0 = Sunday
+  });
+
+  // --- Logic for data older than 365 days (delete all) ---
+  console.log('Deleting data older than 1 year...');
+  const deleteQuery = db.collection('priceHistory').where('date', '<=', oneYearAgo);
+  await processQuery(deleteQuery, (doc) => true); // Delete all matched documents
+
+  console.log('✅ Price history downsampling job finished.');
+  return null;
+});
