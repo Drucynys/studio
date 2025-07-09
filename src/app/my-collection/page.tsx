@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+import { CollectionUploadDialog } from "@/components/CollectionUploadDialog";
 
 const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
@@ -72,6 +73,8 @@ export default function MyCollectionPage() {
   
   const [masterCardData, setMasterCardData] = useState<Map<string, ApiPokemonCard>>(new Map());
   const [loadingMasterData, setLoadingMasterData] = useState(false);
+
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
 
   const { toast } = useToast();
@@ -339,11 +342,16 @@ export default function MyCollectionPage() {
         <section id="collection-summary" aria-labelledby="collection-summary-heading">
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle id="collection-summary-heading" className="text-2xl font-headline font-semibold text-foreground flex items-center gap-2">
-                <TrendingUp className="h-6 w-6 text-primary" />
-                Collection Summary
-              </CardTitle>
-              <CardDescription>An at-a-glance overview of your entire collection.</CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle id="collection-summary-heading" className="text-2xl font-headline font-semibold text-foreground flex items-center gap-2">
+                      <TrendingUp className="h-6 w-6 text-primary" />
+                      Collection Summary
+                    </CardTitle>
+                    <CardDescription>An at-a-glance overview of your entire collection.</CardDescription>
+                  </div>
+                  <Button onClick={() => setIsUploadDialogOpen(true)} className="mt-4 sm:mt-0">Upload from CSV</Button>
+                </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
@@ -427,6 +435,11 @@ export default function MyCollectionPage() {
           </div>
         )}
       </main>
+
+      <CollectionUploadDialog 
+        isOpen={isUploadDialogOpen}
+        onClose={() => setIsUploadDialogOpen(false)}
+      />
 
       {isFullScreenViewOpen && currentFullScreenCardIndex !== null && (
         <FullScreenCardView
