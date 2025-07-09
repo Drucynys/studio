@@ -36,29 +36,36 @@ export async function GET(request: Request, { params }: { params: { cardApiId: s
         const db = getFirestore();
         const historyRef = db.collection('priceHistory');
         
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const thirtyDaysAgoTimestamp = admin.firestore.Timestamp.fromDate(thirtyDaysAgo);
-
+        // This query is simpler and avoids the need for a composite index.
+        // We will filter and sort the data in the backend after fetching.
         const querySnapshot = await historyRef
             .where('cardApiId', '==', cardApiId)
-            .where('date', '>=', thirtyDaysAgoTimestamp)
-            .orderBy('date', 'asc')
             .get();
 
         if (querySnapshot.empty) {
             return NextResponse.json([]);
         }
 
-        const history = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            // Convert Firestore Timestamp to a more client-friendly format
-            if (data.date && data.date.toDate) {
-                data.date = data.date.toDate().toISOString().split('T')[0];
-            }
-            return data;
-        });
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
+        const history = querySnapshot.docs
+            .map(doc => {
+                const data = doc.data();
+                // Keep the JS Date object for sorting and filtering
+                return { ...data, jsDate: data.date.toDate() };
+            })
+            .filter(entry => entry.jsDate >= thirtyDaysAgo) // Filter for the last 30 days
+            .sort((a, b) => a.jsDate.getTime() - b.jsDate.getTime()) // Sort by date ascending
+            .map(entry => {
+                // Now format the date for the client, removing the temporary jsDate field
+                const { jsDate, ...rest } = entry;
+                return {
+                    ...rest,
+                    date: entry.jsDate.toISOString().split('T')[0],
+                };
+            });
+
         return NextResponse.json(history);
     } catch (error: any) {
         console.error(`Error fetching price history for ${cardApiId}:`, error);
