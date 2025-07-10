@@ -2,9 +2,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { CardList } from "@/components/CardList";
-import type { PokemonCard } from "@/types";
+import type { PokemonCard, WishlistItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -12,8 +13,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { FullScreenCardView } from "@/components/FullScreenCardView";
-import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library } from "lucide-react";
+import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library, Heart, Check, X, Redo } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 
 const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
@@ -53,18 +56,24 @@ export default function MyCollectionPage() {
     user, 
     loading, 
     collection, 
-    loadingCollection, 
+    loadingCollection,
+    wishlist,
+    loadingWishlist,
     updateCardInCollection, 
     removeCardFromCollection,
+    removeCardFromWishlist,
+    moveCardFromWishlistToCollection,
     openAuthModal
   } = useAuth();
   
   const [filteredCards, setFilteredCards] = useState<PokemonCard[]>([]);
+  const [filteredWishlist, setFilteredWishlist] = useState<WishlistItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("dateAddedDesc");
   const [cardToEdit, setCardToEdit] = useState<PokemonCard | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [cardToDelete, setCardToDelete] = useState<PokemonCard | null>(null);
+  const [itemToDeleteFromWishlist, setItemToDeleteFromWishlist] = useState<WishlistItem | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const [isFullScreenViewOpen, setIsFullScreenViewOpen] = useState(false);
@@ -78,22 +87,21 @@ export default function MyCollectionPage() {
 
   useEffect(() => {
     const fetchMasterData = async () => {
-      if (collection.length === 0) {
+      const allApiIds = [
+        ...new Set(collection.map(c => c.apiId).filter(Boolean)),
+        ...new Set(wishlist.map(w => w.apiId).filter(Boolean)),
+      ];
+      
+      if (allApiIds.length === 0) {
         setMasterCardData(new Map());
         return;
       }
       setLoadingMasterData(true);
       try {
-        const apiIds = [...new Set(collection.map(c => c.apiId).filter(Boolean))];
-        if (apiIds.length === 0) {
-           setMasterCardData(new Map());
-           return;
-        }
-
         const response = await fetch('/api/master-cards-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: apiIds }),
+          body: JSON.stringify({ ids: allApiIds }),
         });
 
         if (!response.ok) {
@@ -113,10 +121,10 @@ export default function MyCollectionPage() {
       }
     };
 
-    if (!loadingCollection) {
+    if (!loadingCollection && !loadingWishlist) {
       fetchMasterData();
     }
-  }, [collection, loadingCollection]);
+  }, [collection, wishlist, loadingCollection, loadingWishlist]);
 
 
   const collectionStats = useMemo(() => {
@@ -147,8 +155,8 @@ export default function MyCollectionPage() {
 
 
   useEffect(() => {
+    // Filter and sort collection
     let tempCards = [...collection];
-
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       tempCards = tempCards.filter(
@@ -158,89 +166,91 @@ export default function MyCollectionPage() {
           card.cardNumber.toLowerCase().includes(lowerSearchTerm)
       );
     }
-
+    // Sort logic remains the same for collection
     switch (sortOption) {
-      case "favorites":
-        tempCards.sort((a, b) => {
-          const aFav = a.isFavorite ? 1 : 0;
-          const bFav = b.isFavorite ? 1 : 0;
-          if (aFav !== bFav) return bFav - aFav;
-          const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
-          const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
-          return timeB - timeA;
-        });
-        break;
-      case "nameAsc":
-        tempCards.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-        break;
-      case "nameDesc":
-        tempCards.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
-        break;
-      case "valueDesc":
-        tempCards.sort((a, b) => {
-            const masterA = masterCardData.get(a.apiId);
-            const currentA = getMarketPrice(masterA, a.variant);
-            const masterB = masterCardData.get(b.apiId);
-            const currentB = getMarketPrice(masterB, b.variant);
-            return (currentB > 0 ? currentB : (b.value || 0)) - (currentA > 0 ? currentA : (a.value || 0));
-        });
-        break;
-      case "valueAsc":
-        tempCards.sort((a, b) => {
-            const masterA = masterCardData.get(a.apiId);
-            const currentA = getMarketPrice(masterA, a.variant);
-            const masterB = masterCardData.get(b.apiId);
-            const currentB = getMarketPrice(masterB, b.variant);
-            return (currentA > 0 ? currentA : (a.value || 0)) - (currentB > 0 ? currentB : (b.value || 0));
-        });
-        break;
-      case "setAsc":
-        tempCards.sort((a, b) => a.set.localeCompare(b.set) || (a.name || "").localeCompare(b.name || ""));
-        break;
-      case "dateAddedDesc":
-      default:
-        // Firestore data is already sorted by timestamp desc by default in context
-        break;
-      case "dateAddedAsc":
-        tempCards.reverse();
-        break;
-      case "quantityDesc":
-        tempCards.sort((a, b) => b.quantity - a.quantity);
-        break;
-      case "quantityAsc":
-        tempCards.sort((a, b) => a.quantity - b.quantity);
-        break;
+      case "favorites": tempCards.sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0)); break;
+      case "nameAsc": tempCards.sort((a, b) => (a.name || "").localeCompare(b.name || "")); break;
+      case "nameDesc": tempCards.sort((a, b) => (b.name || "").localeCompare(a.name || "")); break;
+      case "valueDesc": tempCards.sort((a, b) => (getMarketPrice(masterCardData.get(b.apiId), b.variant) || b.value || 0) - (getMarketPrice(masterCardData.get(a.apiId), a.variant) || a.value || 0)); break;
+      case "valueAsc": tempCards.sort((a, b) => (getMarketPrice(masterCardData.get(a.apiId), a.variant) || a.value || 0) - (getMarketPrice(masterCardData.get(b.apiId), b.variant) || b.value || 0)); break;
+      case "setAsc": tempCards.sort((a, b) => a.set.localeCompare(b.set) || (a.name || "").localeCompare(b.name || "")); break;
+      case "dateAddedDesc": /* Default sort from Firestore */ break;
+      case "dateAddedAsc": tempCards.reverse(); break;
+      case "quantityDesc": tempCards.sort((a, b) => (b.quantity || 1) - (a.quantity || 1)); break;
+      case "quantityAsc": tempCards.sort((a, b) => (a.quantity || 1) - (b.quantity || 1)); break;
     }
-
     setFilteredCards(tempCards);
-  }, [collection, searchTerm, sortOption, masterCardData]);
+
+    // Filter wishlist
+    let tempWishlist = [...wishlist];
+    if (searchTerm) {
+       const lowerSearchTerm = searchTerm.toLowerCase();
+       tempWishlist = tempWishlist.filter(
+         (item) =>
+          item.name?.toLowerCase().includes(lowerSearchTerm) ||
+          item.set.toLowerCase().includes(lowerSearchTerm) ||
+          item.cardNumber.toLowerCase().includes(lowerSearchTerm)
+       );
+    }
+    setFilteredWishlist(tempWishlist);
+
+  }, [collection, wishlist, searchTerm, sortOption, masterCardData]);
 
   const handleRemoveCard = (cardId: string) => {
     const cardToRemove = collection.find(c => c.id === cardId);
     if (cardToRemove) {
       setCardToDelete(cardToRemove);
+      setItemToDeleteFromWishlist(null);
       setIsDeleteDialogOpen(true);
     }
   };
 
-  const confirmRemoveCard = async () => {
-    if (!cardToDelete) return;
+  const handleRemoveFromWishlist = (itemId: string) => {
+    const itemToRemove = wishlist.find(i => i.id === itemId);
+    if (itemToRemove) {
+      setItemToDeleteFromWishlist(itemToRemove);
+      setCardToDelete(null);
+      setIsDeleteDialogOpen(true);
+    }
+  };
+
+  const handleMoveToCollection = async (item: WishlistItem) => {
     try {
-      await removeCardFromCollection(cardToDelete.id);
-      toast({
-        title: "Card Removed",
-        description: `${cardToDelete.name || cardToDelete.cardNumber} has been removed.`,
-      });
-    } catch (e: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not remove card: " + e.message,
-      });
+        await moveCardFromWishlistToCollection(item);
+        toast({
+            title: "Card Moved!",
+            description: `${item.name} has been moved from your wishlist to your collection. You can now edit its details.`,
+        });
+    } catch(e: any) {
+         toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not move card: " + e.message,
+        });
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (cardToDelete) {
+        try {
+          await removeCardFromCollection(cardToDelete.id);
+          toast({ title: "Card Removed", description: `${cardToDelete.name} has been removed.` });
+        } catch (e: any) {
+          toast({ variant: "destructive", title: "Error", description: "Could not remove card: " + e.message });
+        }
+    } else if (itemToDeleteFromWishlist) {
+        try {
+            await removeCardFromWishlist(itemToDeleteFromWishlist.id);
+            toast({ title: "Removed from Wishlist", description: `${itemToDeleteFromWishlist.name} has been removed.`});
+        } catch(e: any) {
+            toast({ variant: "destructive", title: "Error", description: "Could not remove from wishlist: " + e.message });
+        }
     }
     setIsDeleteDialogOpen(false);
     setCardToDelete(null);
+    setItemToDeleteFromWishlist(null);
   };
+
 
   const handleEditCard = (card: PokemonCard) => {
     setCardToEdit(card);
@@ -302,8 +312,24 @@ export default function MyCollectionPage() {
       });
     }
   };
+  
+  const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
+  const [isAddCardDialogOpen, setIsAddCardDialogOpen] = useState(false);
+  const handleViewOnWishlist = (item: WishlistItem) => {
+      const masterVersion = masterCardData.get(item.apiId);
+      if (masterVersion) {
+        setSelectedApiCard(masterVersion);
+        setIsAddCardDialogOpen(true);
+      } else {
+        toast({
+            variant: "destructive",
+            title: "Card Data Missing",
+            description: "Could not find the master data for this card to show details."
+        });
+      }
+  };
 
-  if (loading || loadingCollection) {
+  if (loading || loadingCollection || loadingWishlist) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -332,6 +358,7 @@ export default function MyCollectionPage() {
   }
 
   return (
+    <>
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8 space-y-6">
@@ -369,67 +396,102 @@ export default function MyCollectionPage() {
           </Card>
         </section>
 
-        <section id="collection-controls" aria-labelledby="collection-controls-heading" className="bg-card p-4 md:p-6 rounded-lg shadow">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-4">
-            <h2 id="collection-controls-heading" className="text-3xl font-headline font-semibold text-foreground flex items-center">
-              <PackageOpen className="h-8 w-8 mr-2 text-primary" /> My Pokémon Card Collection
-            </h2>
-            <div className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground font-medium">Filters & Sorting</p>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search collection..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-full"
-              />
-            </div>
-            <Select value={sortOption} onValueChange={setSortOption}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Sort by..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dateAddedDesc">Date Added (Newest)</SelectItem>
-                <SelectItem value="dateAddedAsc">Date Added (Oldest)</SelectItem>
-                <SelectItem value="favorites">Favorites First</SelectItem>
-                <SelectItem value="nameAsc">Name (A-Z)</SelectItem>
-                <SelectItem value="nameDesc">Name (Z-A)</SelectItem>
-                <SelectItem value="valueDesc">Value (High-Low)</SelectItem>
-                <SelectItem value="valueAsc">Value (Low-High)</SelectItem>
-                <SelectItem value="setAsc">Set Name (A-Z)</SelectItem>
-                <SelectItem value="quantityDesc">Quantity (High-Low)</SelectItem>
-                <SelectItem value="quantityAsc">Quantity (Low-High)</SelectItem>
-              </SelectContent>
-            </Select>
-             <Button onClick={resetFilters} variant="ghost" size="sm" className="mt-4 text-sm text-muted-foreground hover:text-primary justify-self-start sm:col-span-2 lg:col-span-1 lg:justify-self-end">
-              <ListRestart className="mr-2 h-4 w-4" /> Reset Filters
-            </Button>
-          </div>
-        </section>
-
-        <CardList
-          cards={filteredCards}
-          masterCardData={masterCardData}
-          onEditCard={handleEditCard}
-          onRemoveCard={handleRemoveCard}
-          onViewCard={openFullScreenView}
-          onToggleFavorite={handleToggleFavorite}
-          isLoadingMasterData={loadingMasterData}
-        />
-        
-        {filteredCards.length === 0 && searchTerm && (
-          <div className="text-center py-10 text-muted-foreground">
-            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg">No cards found matching your search criteria.</p>
-          </div>
-        )}
+        <Tabs defaultValue="collection" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="collection">
+                    <PackageOpen className="mr-2 h-4 w-4"/> My Collection ({collection.length})
+                </TabsTrigger>
+                <TabsTrigger value="wishlist">
+                    <Heart className="mr-2 h-4 w-4"/> Wishlist ({wishlist.length})
+                </TabsTrigger>
+            </TabsList>
+            <section id="collection-controls" aria-labelledby="collection-controls-heading" className="bg-card p-4 md:p-6 rounded-lg shadow mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 w-full"
+                  />
+                </div>
+                <Select value={sortOption} onValueChange={setSortOption}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sort by..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="dateAddedDesc">Date Added (Newest)</SelectItem>
+                    <SelectItem value="dateAddedAsc">Date Added (Oldest)</SelectItem>
+                    <SelectItem value="favorites">Favorites First</SelectItem>
+                    <SelectItem value="nameAsc">Name (A-Z)</SelectItem>
+                    <SelectItem value="nameDesc">Name (Z-A)</SelectItem>
+                    <SelectItem value="valueDesc">Value (High-Low)</SelectItem>
+                    <SelectItem value="valueAsc">Value (Low-High)</SelectItem>
+                    <SelectItem value="setAsc">Set Name (A-Z)</SelectItem>
+                    <SelectItem value="quantityDesc">Quantity (High-Low)</SelectItem>
+                    <SelectItem value="quantityAsc">Quantity (Low-High)</SelectItem>
+                  </SelectContent>
+                </Select>
+                 <Button onClick={resetFilters} variant="ghost" size="sm" className="text-sm text-muted-foreground hover:text-primary justify-self-start sm:col-span-2 lg:col-span-1 lg:justify-self-end">
+                  <ListRestart className="mr-2 h-4 w-4" /> Reset Filters
+                </Button>
+              </div>
+            </section>
+            
+            <TabsContent value="collection" className="mt-6">
+                <CardList
+                  cards={filteredCards}
+                  masterCardData={masterCardData}
+                  onEditCard={handleEditCard}
+                  onRemoveCard={handleRemoveCard}
+                  onViewCard={openFullScreenView}
+                  onToggleFavorite={handleToggleFavorite}
+                  isLoadingMasterData={loadingMasterData}
+                />
+            </TabsContent>
+            
+            <TabsContent value="wishlist" className="mt-6">
+              {filteredWishlist.length === 0 ? (
+                  <Card className="shadow-lg"><CardContent className="p-6">
+                    <div className="text-center py-8 flex flex-col items-center gap-2">
+                      <Heart className="h-12 w-12 text-muted-foreground opacity-70"/>
+                      <p className="text-muted-foreground">Your wishlist is empty.</p>
+                      <p className="text-sm text-muted-foreground">Use the search or browse pages to find and add cards you want.</p>
+                    </div>
+                  </CardContent></Card>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {filteredWishlist.map(item => (
+                       <Card key={item.id} className="relative group overflow-hidden">
+                           <div className="absolute top-1 right-1 z-10 flex gap-1">
+                                <Button size="icon" variant="destructive" className="h-7 w-7" onClick={() => handleRemoveFromWishlist(item.id)}>
+                                    <X className="h-4 w-4" />
+                                    <span className="sr-only">Remove from wishlist</span>
+                                </Button>
+                               <Button size="icon" className="h-7 w-7 bg-green-500 hover:bg-green-600" onClick={() => handleMoveToCollection(item)}>
+                                    <Check className="h-4 w-4"/>
+                                    <span className="sr-only">Move to collection</span>
+                                </Button>
+                           </div>
+                           <div className="cursor-pointer" onClick={() => handleViewOnWishlist(item)}>
+                                <Image
+                                  src={item.imageUrl || "https://placehold.co/250x350.png"}
+                                  alt={item.name || item.cardNumber}
+                                  width={250}
+                                  height={350}
+                                  className="object-contain w-full h-full transition-transform duration-200 group-hover:scale-105"
+                                  data-ai-hint="pokemon card front"
+                                />
+                           </div>
+                       </Card>
+                    ))}
+                  </div>
+                )
+              }
+            </TabsContent>
+        </Tabs>
       </main>
 
       {isFullScreenViewOpen && currentFullScreenCardIndex !== null && (
@@ -440,6 +502,16 @@ export default function MyCollectionPage() {
           currentIndex={currentFullScreenCardIndex}
           onNavigate={navigateFullScreen}
           masterCardData={masterCardData}
+        />
+      )}
+      
+      {selectedApiCard && (
+         <AddCardToCollectionDialog
+            isOpen={isAddCardDialogOpen}
+            onClose={() => setIsAddCardDialogOpen(false)}
+            cardName={selectedApiCard.name}
+            initialCardImageUrl={selectedApiCard.images.small}
+            pokemonTcgApiCard={selectedApiCard}
         />
       )}
 
@@ -455,19 +527,20 @@ export default function MyCollectionPage() {
         />
       )}
 
-      {cardToDelete && (
+      {isDeleteDialogOpen && (
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2"><AlertCircle className="text-destructive"/>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently remove the card <span className="font-semibold">{cardToDelete.name || cardToDelete.cardNumber} ({cardToDelete.set})</span> from your collection.
+                This action cannot be undone. This will permanently remove the card 
+                <span className="font-semibold"> {cardToDelete?.name || itemToDeleteFromWishlist?.name}</span> from your {cardToDelete ? 'collection' : 'wishlist'}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setCardToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmRemoveCard} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete Card
+              <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -478,5 +551,6 @@ export default function MyCollectionPage() {
         PokéTRKR &copy; {new Date().getFullYear()}
       </footer>
     </div>
+    </>
   );
 }

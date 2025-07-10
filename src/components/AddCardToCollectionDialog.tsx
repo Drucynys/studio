@@ -24,7 +24,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import type { ApiPokemonCard as PokemonTcgApiCard } from "@/app/sets/[setId]/page";
-import { Tag, Gem, DollarSign, Layers, Eye, Paintbrush, Hash, LogIn } from "lucide-react";
+import { Tag, Gem, DollarSign, Layers, Eye, Paintbrush, Hash, LogIn, Heart } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -50,7 +50,6 @@ type AddCardToCollectionDialogProps = {
   cardName: string;
   initialCardImageUrl?: string | null;
   pokemonTcgApiCard: PokemonTcgApiCard | null;
-  // onAddCard is now handled by the context
 };
 
 export function AddCardToCollectionDialog({
@@ -60,7 +59,7 @@ export function AddCardToCollectionDialog({
   initialCardImageUrl,
   pokemonTcgApiCard,
 }: AddCardToCollectionDialogProps) {
-  const { user, addCardToCollection, openAuthModal } = useAuth();
+  const { user, addCardToCollection, addCardToWishlist, openAuthModal, collection, wishlist } = useAuth();
   const { toast } = useToast();
 
   const [quantityInput, setQuantityInput] = useState<number>(1);
@@ -70,6 +69,16 @@ export function AddCardToCollectionDialog({
   const [selectedVariant, setSelectedVariant] = useState<string>("");
   const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+
+  const isAlreadyInCollection = useMemo(() => 
+    pokemonTcgApiCard ? collection.some(c => c.apiId === pokemonTcgApiCard.id) : false, 
+    [collection, pokemonTcgApiCard]
+  );
+  
+  const isAlreadyInWishlist = useMemo(() => 
+    pokemonTcgApiCard ? wishlist.some(w => w.apiId === pokemonTcgApiCard.id) : false,
+    [wishlist, pokemonTcgApiCard]
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -87,7 +96,6 @@ export function AddCardToCollectionDialog({
     const newPrices: DisplayPriceInfo[] = [];
     const pricedVariants: string[] = [];
 
-    // TCGPlayer Prices
     if (pokemonTcgApiCard?.tcgplayer?.prices) {
       imageUrlToSet = pokemonTcgApiCard.images.large || initialCardImageUrl || "https://placehold.co/200x280.png";
       const prices = pokemonTcgApiCard.tcgplayer.prices;
@@ -143,11 +151,8 @@ export function AddCardToCollectionDialog({
     return priceEntry?.market || 0;
   }, [selectedVariant, pokemonTcgApiCard]);
 
-  const handleSubmit = async () => {
-    if (!user) {
-      openAuthModal();
-      return;
-    }
+  const handleAddToCollection = async () => {
+    if (!user) { openAuthModal(); return; }
     if (!pokemonTcgApiCard) return;
 
     setIsAdding(true);
@@ -162,9 +167,8 @@ export function AddCardToCollectionDialog({
         variant: selectedVariant || null,
         quantity: quantityInput,
         imageUrl: pokemonTcgApiCard.images.large || null,
-        language: 'English', // Assuming English for now
+        language: 'English',
         artist: pokemonTcgApiCard.artist || null,
-        timestamp: new Date()
       });
       toast({
         title: "Card Added!",
@@ -176,6 +180,33 @@ export function AddCardToCollectionDialog({
       toast({ variant: "destructive", title: "Error", description: err.message });
     } finally {
       setIsAdding(false);
+    }
+  };
+  
+  const handleAddToWishlist = async () => {
+    if (!user) { openAuthModal(); return; }
+    if (!pokemonTcgApiCard) return;
+    
+    setIsAdding(true);
+    try {
+        await addCardToWishlist({
+            apiId: pokemonTcgApiCard.id,
+            name: pokemonTcgApiCard.name,
+            set: pokemonTcgApiCard.set.name,
+            cardNumber: pokemonTcgApiCard.number,
+            rarity: pokemonTcgApiCard.rarity || 'N/A',
+            imageUrl: pokemonTcgApiCard.images.large || null,
+            artist: pokemonTcgApiCard.artist || null,
+        });
+        toast({
+            title: "Added to Wishlist!",
+            description: `${pokemonTcgApiCard.name} is now on your want list.`,
+        });
+        onClose();
+    } catch(err: any) {
+         toast({ variant: "destructive", title: "Error", description: err.message });
+    } finally {
+        setIsAdding(false);
     }
   };
 
@@ -326,16 +357,24 @@ export function AddCardToCollectionDialog({
               
             </div>
           </ScrollArea>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
+             <Button
+                variant="secondary"
+                onClick={handleAddToWishlist}
+                disabled={isAdding || isAlreadyInWishlist}
+            >
+                {isAdding ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Heart className="mr-2 h-4 w-4"/>}
+                {isAlreadyInWishlist ? 'Already on Wishlist' : 'Add to Wishlist'}
+            </Button>
             <Button
               type="submit"
-              onClick={handleSubmit}
-              disabled={isAddButtonDisabled}
+              onClick={handleAddToCollection}
+              disabled={isAddButtonDisabled || isAlreadyInCollection}
               className="bg-accent hover:bg-accent/90 text-accent-foreground"
             >
               {isAdding ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : user ? null : <LogIn className="mr-2 h-4 w-4"/>}
-              {user ? 'Add to Collection' : 'Login to Add'}
+              {isAlreadyInCollection ? 'Already in Collection' : user ? 'Add to Collection' : 'Login to Add'}
             </Button>
           </DialogFooter>
         </DialogContent>

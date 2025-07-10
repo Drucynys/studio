@@ -20,7 +20,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc, orderBy, writeBatch } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
-import { PokemonCard } from '@/types';
+import { PokemonCard, WishlistItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
@@ -44,6 +44,8 @@ export interface AuthContextType {
   role: string | null;
   collection: PokemonCard[];
   loadingCollection: boolean;
+  wishlist: WishlistItem[];
+  loadingWishlist: boolean;
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
@@ -54,6 +56,9 @@ export interface AuthContextType {
   addCardToCollection: (card: Omit<PokemonCard, 'id' | 'userId'>) => Promise<void>;
   updateCardInCollection: (card: PokemonCard) => Promise<void>;
   removeCardFromCollection: (cardId: string) => Promise<void>;
+  addCardToWishlist: (card: Omit<WishlistItem, 'id' | 'userId'>) => Promise<void>;
+  removeCardFromWishlist: (wishlistItemId: string) => Promise<void>;
+  moveCardFromWishlistToCollection: (item: WishlistItem) => Promise<void>;
   updateUserDisplayName: (newName: string) => Promise<void>;
   reauthenticate: (password: string) => Promise<void>;
   updateUserEmail: (newEmail: string) => Promise<void>;
@@ -77,6 +82,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [userCollection, setUserCollection] = useState<PokemonCard[]>([]);
   const [loadingCollection, setLoadingCollection] = useState(true);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
+  const [loadingWishlist, setLoadingWishlist] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [privacySetting, setPrivacySetting] = useState<PrivacySetting | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -204,6 +211,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await setDoc(newCardRef, cardDataWithMetadata);
   };
 
+  const addCardToWishlist = async (item: Omit<WishlistItem, 'id' | 'userId'>) => {
+    if (!user) throw new Error("You must be logged in to add to a wishlist.");
+
+    const userWishlistRef = collection(db, 'users', user.uid, 'wishlist');
+    const newWishlistItemRef = doc(userWishlistRef);
+
+    const wishlistItemData = {
+        ...item,
+        id: newWishlistItemRef.id,
+        userId: user.uid,
+        timestamp: new Date(),
+    };
+
+    await setDoc(newWishlistItemRef, wishlistItemData);
+  };
+
+  const removeCardFromWishlist = async (wishlistItemId: string) => {
+    if (!user) throw new Error("You must be logged in to remove from a wishlist.");
+    const wishlistItemRef = doc(db, 'users', user.uid, 'wishlist', wishlistItemId);
+    await deleteDoc(wishlistItemRef);
+  };
+
+  const moveCardFromWishlistToCollection = async (item: WishlistItem) => {
+    if (!user) throw new Error("You must be logged in.");
+
+    // Add to collection with default quantity 1 and value 0
+    await addCardToCollection({
+        apiId: item.apiId,
+        name: item.name,
+        set: item.set,
+        cardNumber: item.cardNumber,
+        rarity: item.rarity,
+        language: 'English',
+        variant: null, // User can edit this later
+        imageUrl: item.imageUrl,
+        value: 0,
+        quantity: 1,
+        artist: item.artist,
+    });
+    
+    // Remove from wishlist
+    await removeCardFromWishlist(item.id);
+  };
+
   const updateCardInCollection = async (card: PokemonCard) => {
      if (!user || user.uid !== card.userId) throw new Error("Not authorized to update this card.");
      const cardRef = doc(db, 'users', user.uid, 'cards', card.id);
@@ -324,6 +375,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ variant: 'destructive', title: 'Error', description: 'Could not load your collection.'});
         setLoadingCollection(false);
       });
+      
+      setLoadingWishlist(true);
+      const wishlistRef = collection(db, "users", user.uid, "wishlist");
+      const qWishlist = query(wishlistRef, orderBy("timestamp", "desc"));
+      const unsubscribeWishlist = onSnapshot(qWishlist, (snapshot) => {
+          const userWishlist = snapshot.docs.map(doc => doc.data() as WishlistItem);
+          setWishlist(userWishlist);
+          setLoadingWishlist(false);
+      }, (error) => {
+          console.error("Error fetching wishlist:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'Could not load your wishlist.'});
+          setLoadingWishlist(false);
+      });
 
       setLoadingFollowing(true);
       const followingRef = collection(db, "users", user.uid, "following");
@@ -353,14 +417,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       return () => {
         unsubscribeCards();
+        unsubscribeWishlist();
         unsubscribeFollowing();
         unsubscribeNotifications();
       };
     } else {
       setUserCollection([]);
+      setWishlist([]);
       setFollowing([]);
       setNotifications([]);
       setLoadingCollection(false);
+      setLoadingWishlist(false);
       setLoadingFollowing(false);
       setLoadingNotifications(false);
     }
@@ -372,6 +439,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     role,
     collection: userCollection,
     loadingCollection,
+    wishlist,
+    loadingWishlist,
     isAuthModalOpen,
     openAuthModal,
     closeAuthModal,
@@ -382,6 +451,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     addCardToCollection,
     updateCardInCollection,
     removeCardFromCollection,
+    addCardToWishlist,
+    removeCardFromWishlist,
+    moveCardFromWishlistToCollection,
     updateUserDisplayName,
     reauthenticate,
     updateUserEmail,

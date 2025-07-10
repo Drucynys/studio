@@ -16,3 +16,16 @@ export interface PokemonCard {
   timestamp?: any; // Firestore ServerTimestamp
   isFavorite?: boolean;
 }
+
+export interface WishlistItem {
+  id: string; // Firestore document ID
+  apiId: string; // The ID from the pokemontcg.io API
+  userId: string;
+  set: string;
+  cardNumber: string;
+  name: string;
+  rarity: string;
+  imageUrl: string | null;
+  artist: string | null;
+  timestamp?: any; // Firestore ServerTimestamp
+}
