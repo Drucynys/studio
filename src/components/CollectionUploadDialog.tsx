@@ -1,3 +1,4 @@
+
 // src/components/CollectionUploadDialog.tsx
 "use client";
 
@@ -90,7 +91,7 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
 
             const data = rows.map(row => {
                 // This regex handles commas inside quoted fields
-                const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)?.map(v => v.trim().replace(/"/g, '')) || row.split(',');
+                const values = row.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g)?.map(v => v.trim().replace(/"/g, '')) || row.split(',');
                 const rowData: any = {};
                 headers.forEach((header, index) => {
                     const normalizedHeader = header === 'cardnumber' ? 'cardNumber' : header;

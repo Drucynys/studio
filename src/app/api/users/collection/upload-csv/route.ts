@@ -1,3 +1,4 @@
+
 // src/app/api/users/collection/upload-csv/route.ts
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
         }
 
         const masterCardsRef = db.collection('pokemon-tcg-cards');
-        const userCardsRef = db.collection('users', userId, 'cards');
+        const userCardsRef = db.collection('users').doc(userId).collection('cards');
         const batch = db.batch();
         const notFound: any[] = [];
         let addedCount = 0;
