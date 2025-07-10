@@ -1,48 +1,58 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users can read public profiles but only write to their own
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create, update, delete: if request.auth.uid == userId;
-
-      // Collection data is private by default
-      match /cards/{cardId} {
-        allow read, create, update, delete: if request.auth.uid == userId;
-      }
-      
-      // Following/Followers lists can be written to by authenticated users
-      // to establish the relationship.
-      match /following/{targetId} {
-        allow read, create, delete: if request.auth.uid == userId;
-      }
-      match /followers/{followerId} {
-        allow read, create, delete: if request.auth.uid == followerId || request.auth.uid == userId;
-      }
-      
-      // Notifications can only be read, created (by functions), and updated by the owner
-      match /notifications/{notificationId} {
-        allow read, update, create: if request.auth.uid == userId;
-      }
-    }
-
-    // Public collections that can be read by anyone
+    // Publicly readable collections
     match /pokemon-tcg-sets/{setId} {
       allow read: if true;
-      allow write: if false; // Only server-side sync can write
+      allow write: if false; // Only backend/admin can write
     }
     match /pokemon-tcg-cards/{cardId} {
       allow read: if true;
-      allow write: if false; // Only server-side sync can write
+      allow write: if false; // Only backend/admin can write
     }
-    match /pokemon-tcg-artists/{artistId} {
+     match /pokemon-tcg-artists/{artistId} {
       allow read: if true;
-      allow write: if false; // Only server-side sync can write
+      allow write: if false; // Only backend/admin can write
     }
     match /pokedex/{pokemonId} {
-        allow read: if true;
-        allow write: if false; // Only sync can write
+      allow read: if true;
+      allow write: if false; // Only backend/admin can write
+    }
+     match /priceHistory/{historyId} {
+      allow read: if true;
+      allow write: if false; // Only backend/admin can write
+    }
+
+    // User-specific data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Allow users to manage their own card collection
+      match /cards/{cardId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Allow users to manage their own wishlist
+      match /wishlist/{itemId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      
+      // Allow users to manage their followers and following lists
+      match /followers/{followerId} {
+        allow read: if true; // Anyone can see who follows a user
+        allow write: if request.auth != null && request.auth.uid == followerId; // Only the follower can write
+      }
+      
+      match /following/{followedId} {
+         allow read: if true; // Anyone can see who a user follows
+         allow write: if request.auth != null && request.auth.uid == userId; // Only the user can write to their own following list
+      }
+      
+      // Allow users to read their own notifications
+      match /notifications/{notificationId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
   }
 }
