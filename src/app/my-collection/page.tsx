@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { FullScreenCardView } from "@/components/FullScreenCardView";
-import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library } from "lucide-react";
+import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   AlertDialog,
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { CollectionUploadDialog } from "@/components/CollectionUploadDialog";
+import { format } from "date-fns";
 
 const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
@@ -75,6 +76,7 @@ export default function MyCollectionPage() {
   const [loadingMasterData, setLoadingMasterData] = useState(false);
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
 
   const { toast } = useToast();
@@ -306,6 +308,56 @@ export default function MyCollectionPage() {
     }
   };
 
+  const handleExport = async () => {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    setIsExporting(true);
+    toast({
+      title: "Preparing Export...",
+      description: "Generating your collection CSV file.",
+    });
+
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/users/collection/export-csv', {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Server responded with ${response.status}` }));
+        throw new Error(errorData.message || "An unknown error occurred during export.");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const formattedDate = format(new Date(), 'yyyy-MM-dd');
+      a.href = url;
+      a.download = `poketrkr_collection_${formattedDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export Successful!",
+        description: `Your collection has been downloaded.`,
+        className: "bg-secondary text-secondary-foreground"
+      });
+
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: err.message,
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (loading || loadingCollection) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
@@ -350,7 +402,13 @@ export default function MyCollectionPage() {
                     </CardTitle>
                     <CardDescription>An at-a-glance overview of your entire collection.</CardDescription>
                   </div>
-                  <Button onClick={() => setIsUploadDialogOpen(true)} className="mt-4 sm:mt-0">Upload from CSV</Button>
+                  <div className="flex gap-2 mt-4 sm:mt-0">
+                    <Button onClick={() => setIsUploadDialogOpen(true)} variant="outline">Import CSV</Button>
+                    <Button onClick={handleExport} disabled={isExporting || collection.length === 0}>
+                      {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
+                      Export CSV
+                    </Button>
+                  </div>
                 </div>
             </CardHeader>
             <CardContent>

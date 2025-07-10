@@ -1,0 +1,90 @@
+// src/app/api/users/collection/export-csv/route.ts
+import { NextResponse } from 'next/server';
+import admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
+import type { PokemonCard } from '@/types';
+
+function initializeFirebaseAdmin() {
+    if (admin.apps.length > 0) { return; }
+    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+    if (!serviceAccountJson) {
+        throw new Error("Firebase credentials are not set in environment variables.");
+    }
+    const serviceAccount = JSON.parse(serviceAccountJson);
+     if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+    });
+}
+
+function convertToCsv(data: PokemonCard[]): string {
+    if (data.length === 0) {
+        return "";
+    }
+
+    const headers = [
+        "name", "set", "cardNumber", "quantity", "value", 
+        "variant", "language", "rarity", "artist", "isFavorite"
+    ];
+    
+    const replacer = (key: string, value: any) => value === null ? '' : value;
+    
+    const csvRows = data.map(row => {
+        return headers.map(fieldName => {
+            let cell = (row as any)[fieldName];
+            // Handle cases where a value might be null or undefined
+            if (cell === null || cell === undefined) {
+                cell = '';
+            }
+            let cellString = String(cell);
+            // Escape quotes by doubling them, and wrap in quotes if it contains commas, quotes, or newlines
+            if (cellString.search(/("|,|\n)/g) >= 0) {
+                cellString = `"${cellString.replace(/"/g, '""')}"`;
+            }
+            return cellString;
+        }).join(',');
+    });
+
+    return [headers.join(','), ...csvRows].join('\r\n');
+}
+
+export async function GET(request: Request) {
+    try {
+        initializeFirebaseAdmin();
+        const db = getFirestore();
+
+        const authorization = request.headers.get("Authorization");
+        if (!authorization?.startsWith("Bearer ")) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+        const idToken = authorization.split("Bearer ")[1];
+        const decodedToken = await getAuth().verifyIdToken(idToken);
+        const userId = decodedToken.uid;
+
+        const collectionRef = db.collection('users', userId, 'cards');
+        const snapshot = await collectionRef.orderBy('timestamp', 'desc').get();
+
+        if (snapshot.empty) {
+            return new Response("Your collection is empty.", { status: 200, headers: { 'Content-Type': 'text/plain' } });
+        }
+
+        const collectionData = snapshot.docs.map(doc => doc.data() as PokemonCard);
+        const csvData = convertToCsv(collectionData);
+
+        const headers = new Headers();
+        headers.set('Content-Type', 'text/csv');
+        headers.set('Content-Disposition', 'attachment; filename="poketrkr_collection.csv"');
+
+        return new Response(csvData, { status: 200, headers });
+
+    } catch (error: any) {
+        console.error(`[API] FATAL Error in export-csv:`, error);
+        if (error.code === 'auth/id-token-expired' || error.code === 'auth/argument-error') {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+        return NextResponse.json({ message: error.message || 'An unknown server error occurred.' }, { status: 500 });
+    }
+}
