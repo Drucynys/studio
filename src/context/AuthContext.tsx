@@ -18,9 +18,9 @@ import {
   updateEmail,
   updatePassword,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc, orderBy, writeBatch, serverTimestamp, addDoc } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
-import { PokemonCard, WishlistItem } from '@/types';
+import { PokemonCard, WishlistItem, ExchangeItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
@@ -46,6 +46,8 @@ export interface AuthContextType {
   loadingCollection: boolean;
   wishlist: WishlistItem[];
   loadingWishlist: boolean;
+  myExchangeItems: ExchangeItem[];
+  loadingMyExchangeItems: boolean;
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
@@ -59,6 +61,8 @@ export interface AuthContextType {
   addCardToWishlist: (card: Omit<WishlistItem, 'id' | 'userId'>) => Promise<void>;
   removeCardFromWishlist: (wishlistItemId: string) => Promise<void>;
   moveCardFromWishlistToCollection: (item: WishlistItem) => Promise<void>;
+  addCardToExchange: (card: PokemonCard) => Promise<void>;
+  removeCardFromExchange: (exchangeItemId: string) => Promise<void>;
   updateUserDisplayName: (newName: string) => Promise<void>;
   reauthenticate: (password: string) => Promise<void>;
   updateUserEmail: (newEmail: string) => Promise<void>;
@@ -84,6 +88,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingCollection, setLoadingCollection] = useState(true);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [loadingWishlist, setLoadingWishlist] = useState(true);
+  const [myExchangeItems, setMyExchangeItems] = useState<ExchangeItem[]>([]);
+  const [loadingMyExchangeItems, setLoadingMyExchangeItems] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [privacySetting, setPrivacySetting] = useState<PrivacySetting | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -192,6 +198,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signOut(auth);
     setUserCollection([]);
     setFollowing([]);
+    setWishlist([]);
+    setMyExchangeItems([]);
     router.push('/');
   };
 
@@ -265,6 +273,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!user) throw new Error("You must be logged in to remove cards.");
       const cardRef = doc(db, 'users', user.uid, 'cards', cardId);
       await deleteDoc(cardRef);
+  };
+
+  const addCardToExchange = async (card: PokemonCard) => {
+    if (!user) throw new Error("You must be logged in to add a card to the exchange.");
+    const exchangeRef = collection(db, 'exchange');
+
+    // Create a new document in the 'exchange' collection
+    const newExchangeDoc = await addDoc(exchangeRef, {
+        ...card,
+        ownerId: user.uid,
+        ownerDisplayName: user.displayName || user.email,
+        listedAt: serverTimestamp(),
+    });
+
+    // We store the ID from the top-level collection in the document itself for easy removal
+    await setDoc(newExchangeDoc, { exchangeId: newExchangeDoc.id }, { merge: true });
+  };
+
+  const removeCardFromExchange = async (exchangeItemId: string) => {
+    if (!user) throw new Error("You must be logged in to remove a card from the exchange.");
+    const exchangeItemRef = doc(db, 'exchange', exchangeItemId);
+    await deleteDoc(exchangeItemRef);
   };
 
   const updateUserDisplayName = async (newName: string) => {
@@ -389,6 +419,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setLoadingWishlist(false);
       });
 
+      setLoadingMyExchangeItems(true);
+      const exchangeQuery = query(collection(db, 'exchange'), where('ownerId', '==', user.uid));
+      const unsubscribeExchange = onSnapshot(exchangeQuery, (snapshot) => {
+        const items = snapshot.docs.map(doc => doc.data() as ExchangeItem);
+        setMyExchangeItems(items);
+        setLoadingMyExchangeItems(false);
+      }, (error) => {
+        console.error("Error fetching user's exchange items:", error);
+        toast({ variant: 'destructive', title: 'Error', description: "Could not load your exchange items." });
+        setLoadingMyExchangeItems(false);
+      });
+
       setLoadingFollowing(true);
       const followingRef = collection(db, "users", user.uid, "following");
       const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
@@ -418,6 +460,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return () => {
         unsubscribeCards();
         unsubscribeWishlist();
+        unsubscribeExchange();
         unsubscribeFollowing();
         unsubscribeNotifications();
       };
@@ -426,10 +469,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setWishlist([]);
       setFollowing([]);
       setNotifications([]);
+      setMyExchangeItems([]);
       setLoadingCollection(false);
       setLoadingWishlist(false);
       setLoadingFollowing(false);
       setLoadingNotifications(false);
+      setLoadingMyExchangeItems(false);
     }
   }, [user, toast]);
 
@@ -441,6 +486,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loadingCollection,
     wishlist,
     loadingWishlist,
+    myExchangeItems,
+    loadingMyExchangeItems,
     isAuthModalOpen,
     openAuthModal,
     closeAuthModal,
@@ -454,6 +501,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     addCardToWishlist,
     removeCardFromWishlist,
     moveCardFromWishlistToCollection,
+    addCardToExchange,
+    removeCardFromExchange,
     updateUserDisplayName,
     reauthenticate,
     updateUserEmail,
@@ -469,5 +518,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-    

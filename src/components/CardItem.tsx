@@ -1,10 +1,9 @@
-
 import type { PokemonCard } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Sparkles, ExternalLink, Palette, Edit3, Trash2, Layers, Eye, Languages, Paintbrush, Star, ArrowDown, ArrowRight, ArrowUp, DollarSign } from "lucide-react";
+import { Sparkles, ExternalLink, Palette, Edit3, Trash2, Layers, Eye, Languages, Paintbrush, Star, ArrowDown, ArrowRight, ArrowUp, DollarSign, Replace } from "lucide-react";
 import React from "react";
 import { cn } from "@/lib/utils";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
@@ -17,6 +16,7 @@ type CardItemProps = {
   onRemove: () => void;
   onView: (cardIndex: number) => void; // Handler for viewing the card
   onToggleFavorite: () => void;
+  onAddToExchange: () => void;
 };
 
 const formatDisplayVariant = (variantKey?: string): string | null => {
@@ -49,7 +49,7 @@ const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | 
 };
 
 
-export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView, onToggleFavorite }: CardItemProps) {
+export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView, onToggleFavorite, onAddToExchange }: CardItemProps) {
   if (!card) return null;
 
   const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant || '') : ''}&view=grid`;
@@ -163,6 +163,9 @@ export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView
             <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
           </Button>
         </div>
+         <Button variant="secondary" size="sm" onClick={onAddToExchange} className="w-full">
+            <Replace className="mr-1.5 h-3.5 w-3.5" /> Add to Exchange
+          </Button>
       </CardFooter>
     </Card>
   );

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch, LayoutList, Search, Bell, Users, UserPlus } from "lucide-react";
+import { PackageSearch, LayoutList, Search, Bell, Users, UserPlus, Replace } from "lucide-react";
 import { AuthButton } from "./AuthButton";
 import { PokedexIcon } from "./icons/PokedexIcon";
 import { useAuth } from "@/hooks/useAuth";
@@ -59,6 +59,12 @@ export function AppHeader() {
             <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground px-2 md:px-3">
               <PokedexIcon className="mr-0 md:mr-2 h-5 w-5" />
               <span className="hidden md:inline">Pokédex</span>
+            </Button>
+          </Link>
+          <Link href="/exchange">
+            <Button variant="ghost" className="hover:bg-primary-foreground/10 text-primary-foreground px-2 md:px-3">
+              <Replace className="mr-0 md:mr-2 h-5 w-5" />
+              <span className="hidden md:inline">Exchange</span>
             </Button>
           </Link>
           <Link href="/friends">

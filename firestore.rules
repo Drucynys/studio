@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -27,6 +26,22 @@ service cloud.firestore {
       allow write: if false;
     }
     
+    // Price History - read-only for everyone, only backend can write
+    match /priceHistory/{historyId} {
+        allow read: if true;
+        allow write: if false; // Managed by Cloud Functions
+    }
+    
+    // Public Exchange Collection
+    match /exchange/{exchangeId} {
+      // Any authenticated user can read the exchange listings
+      allow read: if request.auth != null;
+      // Users can only create/delete their own exchange listings
+      allow create, delete: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      // No updates allowed, must delete and re-create
+      allow update: if false;
+    }
+
     // User data
     match /users/{userId} {
       // Users can read/write their own profile
@@ -36,7 +51,7 @@ service cloud.firestore {
       
       // User's card collection - only owner can access
       match /cards/{cardId} {
-        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
       
       // User's wishlist collection - only owner can access
@@ -63,8 +78,6 @@ service cloud.firestore {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
         // Allow Cloud Functions and Admin SDK to create notifications
         allow create: if true;
-        
-      
       }
     }
   }

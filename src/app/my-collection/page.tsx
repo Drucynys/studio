@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { CardList } from "@/components/CardList";
-import type { PokemonCard, WishlistItem } from "@/types";
+import type { PokemonCard, WishlistItem, ExchangeItem } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { FullScreenCardView } from "@/components/FullScreenCardView";
-import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library, Heart, Check, X, Redo } from "lucide-react";
+import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library, Heart, Check, X, Redo, Replace } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -59,21 +59,27 @@ export default function MyCollectionPage() {
     loadingCollection,
     wishlist,
     loadingWishlist,
+    myExchangeItems,
+    loadingMyExchangeItems,
     updateCardInCollection, 
     removeCardFromCollection,
     removeCardFromWishlist,
     moveCardFromWishlistToCollection,
+    addCardToExchange,
+    removeCardFromExchange,
     openAuthModal
   } = useAuth();
   
   const [filteredCards, setFilteredCards] = useState<PokemonCard[]>([]);
   const [filteredWishlist, setFilteredWishlist] = useState<WishlistItem[]>([]);
+  const [filteredExchangeItems, setFilteredExchangeItems] = useState<ExchangeItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("dateAddedDesc");
   const [cardToEdit, setCardToEdit] = useState<PokemonCard | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [cardToDelete, setCardToDelete] = useState<PokemonCard | null>(null);
   const [itemToDeleteFromWishlist, setItemToDeleteFromWishlist] = useState<WishlistItem | null>(null);
+  const [itemToDeleteFromExchange, setItemToDeleteFromExchange] = useState<ExchangeItem | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const [isFullScreenViewOpen, setIsFullScreenViewOpen] = useState(false);
@@ -90,6 +96,7 @@ export default function MyCollectionPage() {
       const allApiIds = [
         ...new Set(collection.map(c => c.apiId).filter(Boolean)),
         ...new Set(wishlist.map(w => w.apiId).filter(Boolean)),
+        ...new Set(myExchangeItems.map(e => e.apiId).filter(Boolean)),
       ];
       
       if (allApiIds.length === 0) {
@@ -121,10 +128,10 @@ export default function MyCollectionPage() {
       }
     };
 
-    if (!loadingCollection && !loadingWishlist) {
+    if (!loadingCollection && !loadingWishlist && !loadingMyExchangeItems) {
       fetchMasterData();
     }
-  }, [collection, wishlist, loadingCollection, loadingWishlist]);
+  }, [collection, wishlist, myExchangeItems, loadingCollection, loadingWishlist, loadingMyExchangeItems]);
 
 
   const collectionStats = useMemo(() => {
@@ -181,26 +188,28 @@ export default function MyCollectionPage() {
     }
     setFilteredCards(tempCards);
 
-    // Filter wishlist
-    let tempWishlist = [...wishlist];
-    if (searchTerm) {
-       const lowerSearchTerm = searchTerm.toLowerCase();
-       tempWishlist = tempWishlist.filter(
-         (item) =>
-          item.name?.toLowerCase().includes(lowerSearchTerm) ||
-          item.set.toLowerCase().includes(lowerSearchTerm) ||
-          item.cardNumber.toLowerCase().includes(lowerSearchTerm)
-       );
-    }
-    setFilteredWishlist(tempWishlist);
+    const filterGeneric = (items: any[]) => {
+      if (!searchTerm) return items;
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      return items.filter(
+        (item) =>
+         item.name?.toLowerCase().includes(lowerSearchTerm) ||
+         item.set.toLowerCase().includes(lowerSearchTerm) ||
+         item.cardNumber.toLowerCase().includes(lowerSearchTerm)
+      );
+    };
 
-  }, [collection, wishlist, searchTerm, sortOption, masterCardData]);
+    setFilteredWishlist(filterGeneric(wishlist));
+    setFilteredExchangeItems(filterGeneric(myExchangeItems));
+
+  }, [collection, wishlist, myExchangeItems, searchTerm, sortOption, masterCardData]);
 
   const handleRemoveCard = (cardId: string) => {
     const cardToRemove = collection.find(c => c.id === cardId);
     if (cardToRemove) {
       setCardToDelete(cardToRemove);
       setItemToDeleteFromWishlist(null);
+      setItemToDeleteFromExchange(null);
       setIsDeleteDialogOpen(true);
     }
   };
@@ -210,8 +219,16 @@ export default function MyCollectionPage() {
     if (itemToRemove) {
       setItemToDeleteFromWishlist(itemToRemove);
       setCardToDelete(null);
+      setItemToDeleteFromExchange(null);
       setIsDeleteDialogOpen(true);
     }
+  };
+
+  const handleRemoveFromExchange = (item: ExchangeItem) => {
+      setItemToDeleteFromExchange(item);
+      setCardToDelete(null);
+      setItemToDeleteFromWishlist(null);
+      setIsDeleteDialogOpen(true);
   };
 
   const handleMoveToCollection = async (item: WishlistItem) => {
@@ -245,10 +262,18 @@ export default function MyCollectionPage() {
         } catch(e: any) {
             toast({ variant: "destructive", title: "Error", description: "Could not remove from wishlist: " + e.message });
         }
+    } else if (itemToDeleteFromExchange) {
+        try {
+            await removeCardFromExchange(itemToDeleteFromExchange.exchangeId);
+            toast({ title: "Removed from Exchange", description: `${itemToDeleteFromExchange.name} has been removed from public trade listings.`});
+        } catch(e: any) {
+            toast({ variant: "destructive", title: "Error", description: "Could not remove from exchange: " + e.message });
+        }
     }
     setIsDeleteDialogOpen(false);
     setCardToDelete(null);
     setItemToDeleteFromWishlist(null);
+    setItemToDeleteFromExchange(null);
   };
 
 
@@ -273,6 +298,31 @@ export default function MyCollectionPage() {
     }
     setIsEditDialogOpen(false);
     setCardToEdit(null);
+  };
+
+  const handleAddToExchange = async (card: PokemonCard) => {
+    if (myExchangeItems.some(item => item.id === card.id)) {
+        toast({
+            variant: "default",
+            title: "Already Listed",
+            description: "This card is already in your exchange list.",
+        });
+        return;
+    }
+
+    try {
+        await addCardToExchange(card);
+        toast({
+            title: "Card Listed for Exchange!",
+            description: `${card.name} is now visible to other users for trade.`,
+        });
+    } catch (e: any) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not list card for exchange: " + e.message,
+        });
+    }
   };
 
   const resetFilters = () => {
@@ -329,7 +379,7 @@ export default function MyCollectionPage() {
       }
   };
 
-  if (loading || loadingCollection || loadingWishlist) {
+  if (loading || loadingCollection || loadingWishlist || loadingMyExchangeItems) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -397,12 +447,15 @@ export default function MyCollectionPage() {
         </section>
 
         <Tabs defaultValue="collection" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="collection">
                     <PackageOpen className="mr-2 h-4 w-4"/> My Collection ({collection.length})
                 </TabsTrigger>
                 <TabsTrigger value="wishlist">
                     <Heart className="mr-2 h-4 w-4"/> Wishlist ({wishlist.length})
+                </TabsTrigger>
+                <TabsTrigger value="exchange">
+                    <Replace className="mr-2 h-4 w-4"/> For Exchange ({myExchangeItems.length})
                 </TabsTrigger>
             </TabsList>
             <section id="collection-controls" aria-labelledby="collection-controls-heading" className="bg-card p-4 md:p-6 rounded-lg shadow mt-4">
@@ -448,6 +501,7 @@ export default function MyCollectionPage() {
                   onRemoveCard={handleRemoveCard}
                   onViewCard={openFullScreenView}
                   onToggleFavorite={handleToggleFavorite}
+                  onAddToExchange={handleAddToExchange}
                   isLoadingMasterData={loadingMasterData}
                 />
             </TabsContent>
@@ -482,6 +536,42 @@ export default function MyCollectionPage() {
                                   width={250}
                                   height={350}
                                   className="object-contain w-full h-full transition-transform duration-200 group-hover:scale-105"
+                                  data-ai-hint="pokemon card front"
+                                />
+                           </div>
+                       </Card>
+                    ))}
+                  </div>
+                )
+              }
+            </TabsContent>
+
+            <TabsContent value="exchange" className="mt-6">
+              {filteredExchangeItems.length === 0 ? (
+                  <Card className="shadow-lg"><CardContent className="p-6">
+                    <div className="text-center py-8 flex flex-col items-center gap-2">
+                      <Replace className="h-12 w-12 text-muted-foreground opacity-70"/>
+                      <p className="text-muted-foreground">You have no cards listed for exchange.</p>
+                      <p className="text-sm text-muted-foreground">Go to your collection and click the "Add to Exchange" button on a card to list it.</p>
+                    </div>
+                  </CardContent></Card>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {filteredExchangeItems.map(item => (
+                       <Card key={item.exchangeId} className="relative group overflow-hidden">
+                           <div className="absolute top-1 right-1 z-10 flex gap-1">
+                                <Button size="icon" variant="destructive" className="h-7 w-7" onClick={() => handleRemoveFromExchange(item)}>
+                                    <X className="h-4 w-4" />
+                                    <span className="sr-only">Remove from exchange</span>
+                                </Button>
+                           </div>
+                           <div className="cursor-pointer">
+                                <Image
+                                  src={item.imageUrl || "https://placehold.co/250x350.png"}
+                                  alt={item.name || item.cardNumber}
+                                  width={250}
+                                  height={350}
+                                  className="object-contain w-full h-full"
                                   data-ai-hint="pokemon card front"
                                 />
                            </div>
@@ -534,7 +624,7 @@ export default function MyCollectionPage() {
               <AlertDialogTitle className="flex items-center gap-2"><AlertCircle className="text-destructive"/>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
                 This action cannot be undone. This will permanently remove the card 
-                <span className="font-semibold"> {cardToDelete?.name || itemToDeleteFromWishlist?.name}</span> from your {cardToDelete ? 'collection' : 'wishlist'}.
+                <span className="font-semibold"> {cardToDelete?.name || itemToDeleteFromWishlist?.name || itemToDeleteFromExchange?.name}</span> from your {cardToDelete ? 'collection' : itemToDeleteFromWishlist ? 'wishlist' : 'exchange list'}.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

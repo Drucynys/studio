@@ -17,10 +17,11 @@ type CardListProps = {
   onRemoveCard: (cardId: string) => void;
   onViewCard: (cardIndex: number) => void;
   onToggleFavorite: (card: PokemonCard) => void;
+  onAddToExchange: (card: PokemonCard) => void;
   isLoadingMasterData: boolean;
 };
 
-export function CardList({ cards, masterCardData, onEditCard, onRemoveCard, onViewCard, onToggleFavorite, isLoadingMasterData }: CardListProps) {
+export function CardList({ cards, masterCardData, onEditCard, onRemoveCard, onViewCard, onToggleFavorite, onAddToExchange, isLoadingMasterData }: CardListProps) {
   if (cards.length === 0) {
     return (
       <Card className="shadow-lg">
@@ -70,6 +71,7 @@ export function CardList({ cards, masterCardData, onEditCard, onRemoveCard, onVi
                 onRemove={() => onRemoveCard(card.id)}
                 onView={onViewCard}
                 onToggleFavorite={() => onToggleFavorite(card)}
+                onAddToExchange={() => onAddToExchange(card)}
               />
             ))}
           </div>

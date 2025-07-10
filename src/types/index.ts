@@ -29,3 +29,9 @@ export interface WishlistItem {
   artist: string | null;
   timestamp?: any; // Firestore ServerTimestamp
 }
+
+export interface ExchangeItem extends PokemonCard {
+  ownerId: string;
+  ownerDisplayName: string;
+  exchangeId: string; // The document ID from the top-level 'exchange' collection
+}
