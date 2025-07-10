@@ -11,6 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, ListX } from "lucide-react";
 
+interface CollectionUploadDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+
 interface CsvRow {
     name: string;
     set: string;
@@ -65,8 +71,10 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
         const reader = new FileReader();
         reader.onload = (e) => {
             const text = e.target?.result as string;
-            const rows = text.split('\n').filter(row => row.trim() !== '');
-            const headers = rows.shift()?.toLowerCase().split(',').map(h => h.trim().replace(/"/g, '')) || [];
+            // Normalize line endings to handle CRLF (\r\n) from some exports
+            const rows = text.replace(/\r\n/g, '\n').split('\n').filter(row => row.trim() !== '');
+            const headerRow = rows.shift()?.toLowerCase() || '';
+            const headers = headerRow.split(',').map(h => h.trim().replace(/"/g, ''));
             
             const requiredHeaders = ['name', 'set', 'cardNumber'];
             if (!requiredHeaders.every(h => headers.includes(h))) {
