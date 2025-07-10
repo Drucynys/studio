@@ -1,17 +1,8 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Public exchange listings
-    match /exchange/{exchangeId} {
-      // Anyone logged in can see the cards available for trade.
-      allow read: if request.auth != null;
-      // A user can create a new listing if they are logged in and the new document's ownerId is their own UID.
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
-      // A user can only update or delete a listing if they are the original owner.
-      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
-    }
-
     // Pokemon data (Pokedex) - read-only for everyone
     match /pokedex/{pokemonId} {
       allow read: if true;
@@ -35,11 +26,21 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
-    
-    // Price history data - read-only for everyone
+
+    // Price History - Can only be written to by backend/admin, read by anyone
     match /priceHistory/{historyId} {
-        allow read: if true;
-        allow write: if false; // Only backend functions should write to this
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // Public exchange listings
+    match /exchange/{exchangeId} {
+      // Anyone logged in can see the cards available for trade.
+      allow read: if request.auth != null;
+      // A user can create a new listing if they are logged in and the new document's ownerId is their own UID.
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      // A user can only update or delete a listing if they are the original owner.
+      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
     }
     
     // User data
@@ -51,14 +52,14 @@ service cloud.firestore {
       
       // User's card collection - only owner can access
       match /cards/{cardId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
       
       // User's wishlist collection - only owner can access
       match /wishlist/{wishlistItemId} {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
-      
+       
       // Following - owner can read/write, others can read for social features
       match /following/{followingUserId} {
         allow read: if request.auth != null;
@@ -76,8 +77,6 @@ service cloud.firestore {
       // Notifications - owner can read/write/delete their notifications
       match /notifications/{notificationId} {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
-        // Allow Cloud Functions and Admin SDK to create notifications
-        allow create: if true;
       }
     }
   }
