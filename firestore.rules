@@ -2,6 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Public exchange listings
+    match /exchange/{exchangeId} {
+      // Anyone logged in can see the cards available for trade.
+      allow read: if request.auth != null;
+      // A user can create a new listing if they are logged in and the new document's ownerId is their own UID.
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      // A user can only update or delete a listing if they are the original owner.
+      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+    }
+
     // Pokemon data (Pokedex) - read-only for everyone
     match /pokedex/{pokemonId} {
       allow read: if true;
@@ -26,22 +36,12 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // Price History - read-only for everyone, only backend can write
+    // Price history data - read-only for everyone
     match /priceHistory/{historyId} {
         allow read: if true;
-        allow write: if false; // Managed by Cloud Functions
+        allow write: if false; // Only backend functions should write to this
     }
     
-    // Public Exchange Collection
-    match /exchange/{exchangeId} {
-      // Any authenticated user can read the exchange listings
-      allow read: if request.auth != null;
-      // Users can only create/delete their own exchange listings
-      allow create, delete: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
-      // No updates allowed, must delete and re-create
-      allow update: if false;
-    }
-
     // User data
     match /users/{userId} {
       // Users can read/write their own profile
