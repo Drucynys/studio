@@ -11,19 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, Loader2, CheckCircle, AlertCircle, ListX } from "lucide-react";
 
-interface CollectionUploadDialogProps {
-    isOpen: boolean;
-    onClose: () => void;
-}
-
 interface CsvRow {
     name: string;
     set: string;
     cardNumber: string;
     quantity: number;
-    value?: number;
     variant?: string;
     language?: 'English' | 'Japanese';
+    isFavorite?: string; // Booleans are read as strings from CSV
 }
 
 export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDialogProps) {
@@ -86,23 +81,25 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
             }
 
             const data = rows.map(row => {
-                const values = row.split(',').map(v => v.trim().replace(/"/g, ''));
+                // This regex handles commas inside quoted fields
+                const values = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g)?.map(v => v.trim().replace(/"/g, '')) || row.split(',');
                 const rowData: any = {};
                 headers.forEach((header, index) => {
-                    // Normalize cardnumber header
                     const normalizedHeader = header === 'cardnumber' ? 'cardNumber' : header;
-                    rowData[normalizedHeader] = values[index];
+                    if (values[index]) {
+                        rowData[normalizedHeader] = values[index];
+                    }
                 });
                 return {
                     name: rowData.name,
                     set: rowData.set,
                     cardNumber: rowData.cardNumber,
                     quantity: parseInt(rowData.quantity, 10) || 1,
-                    value: rowData.value ? parseFloat(rowData.value) : undefined,
                     variant: rowData.variant || undefined,
                     language: rowData.language === 'Japanese' ? 'Japanese' : 'English',
+                    isFavorite: rowData.isFavorite,
                 };
-            });
+            }).filter(d => d.name && d.set && d.cardNumber); // Ensure basic data exists
             setParsedData(data);
             setIsParsing(false);
         };
@@ -165,7 +162,7 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
                         <br/>
                         <b>Required columns:</b> <code className="bg-muted px-1 py-0.5 rounded">name</code>, <code className="bg-muted px-1 py-0.5 rounded">set</code>, <code className="bg-muted px-1 py-0.5 rounded">cardNumber</code>.
                         <br/>
-                        <b>Optional columns:</b> <code className="bg-muted px-1 py-0.5 rounded">quantity</code>, <code className="bg-muted px-1 py-0.5 rounded">variant</code>, <code className="bg-muted px-1 py-0.5 rounded">language</code>, <code className="bg-muted px-1 py-0.5 rounded">value</code>.
+                        <b>Optional columns:</b> <code className="bg-muted px-1 py-0.5 rounded">quantity</code>, <code className="bg-muted px-1 py-0.5 rounded">variant</code>, <code className="bg-muted px-1 py-0.5 rounded">language</code>, <code className="bg-muted px-1 py-0.5 rounded">isFavorite</code>.
                     </DialogDescription>
                 </DialogHeader>
                 

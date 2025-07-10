@@ -95,12 +95,12 @@ export async function POST(request: Request) {
                         rarity: masterCardData.rarity || 'N/A',
                         imageUrl: masterCardData.images?.large || masterCardData.images?.small || null,
                         quantity: card.quantity || 1,
-                        value: card.value ?? cardValue,
+                        value: cardValue, // Always use the fetched market price
                         variant: card.variant ?? cardVariant ?? null,
                         language: card.language || 'English',
                         artist: masterCardData.artist || null,
                         timestamp: admin.firestore.FieldValue.serverTimestamp(),
-                        isFavorite: false,
+                        isFavorite: card.isFavorite === 'true' || false,
                     };
                     batch.set(newCardDocRef, newCard);
                     addedCount++;
