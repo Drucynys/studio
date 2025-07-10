@@ -55,10 +55,10 @@ export interface AuthContextType {
   signIn: (email: string, pass: string) => Promise<any>;
   signInWithGoogle: () => Promise<any>;
   logOut: () => Promise<void>;
-  addCardToCollection: (card: Omit<PokemonCard, 'id' | 'userId'>) => Promise<void>;
+  addCardToCollection: (card: Omit<PokemonCard, 'id' | 'userId' | 'timestamp'>) => Promise<void>;
   updateCardInCollection: (card: PokemonCard) => Promise<void>;
   removeCardFromCollection: (cardId: string) => Promise<void>;
-  addCardToWishlist: (card: Omit<WishlistItem, 'id' | 'userId'>) => Promise<void>;
+  addCardToWishlist: (card: Omit<WishlistItem, 'id' | 'userId' | 'timestamp'>) => Promise<void>;
   removeCardFromWishlist: (wishlistItemId: string) => Promise<void>;
   moveCardFromWishlistToCollection: (item: WishlistItem) => Promise<void>;
   addCardToExchange: (card: PokemonCard) => Promise<void>;
@@ -203,7 +203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.push('/');
   };
 
-  const addCardToCollection = async (card: Omit<PokemonCard, 'id' | 'userId'>) => {
+  const addCardToCollection = async (card: Omit<PokemonCard, 'id' | 'userId' | 'timestamp'>) => {
     if (!user) throw new Error("You must be logged in to add cards.");
     
     const userCardsRef = collection(db, 'users', user.uid, 'cards');
@@ -219,7 +219,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await setDoc(newCardRef, cardDataWithMetadata);
   };
 
-  const addCardToWishlist = async (item: Omit<WishlistItem, 'id' | 'userId'>) => {
+  const addCardToWishlist = async (item: Omit<WishlistItem, 'id' | 'userId' | 'timestamp'>) => {
     if (!user) throw new Error("You must be logged in to add to a wishlist.");
 
     const userWishlistRef = collection(db, 'users', user.uid, 'wishlist');
@@ -277,18 +277,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const addCardToExchange = async (card: PokemonCard) => {
     if (!user) throw new Error("You must be logged in to add a card to the exchange.");
-    const exchangeRef = collection(db, 'exchange');
+    
+    // Generate a new document reference in the 'exchange' collection *first*.
+    const newExchangeDocRef = doc(collection(db, 'exchange'));
 
-    // Create a new document in the 'exchange' collection
-    const newExchangeDoc = await addDoc(exchangeRef, {
-        ...card,
-        ownerId: user.uid,
-        ownerDisplayName: user.displayName || user.email,
-        listedAt: serverTimestamp(),
-    });
+    // Prepare the full data object, including the new exchangeId.
+    const exchangeItemData = {
+      ...card,
+      ownerId: user.uid,
+      ownerDisplayName: user.displayName || user.email,
+      listedAt: serverTimestamp(),
+      exchangeId: newExchangeDocRef.id, // Include the ID in the document itself.
+    };
 
-    // We store the ID from the top-level collection in the document itself for easy removal
-    await setDoc(newExchangeDoc, { exchangeId: newExchangeDoc.id }, { merge: true });
+    // Use a single `setDoc` operation to create the document with all data.
+    // This is atomic and ensures the security rules are met on creation.
+    await setDoc(newExchangeDocRef, exchangeItemData);
   };
 
   const removeCardFromExchange = async (exchangeItemId: string) => {
