@@ -18,7 +18,7 @@ import {
   updateEmail,
   updatePassword,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc, orderBy, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getFirestore, collection, onSnapshot, query, where, deleteDoc, orderBy, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { app } from '@/lib/firebase';
 import { PokemonCard, WishlistItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -205,7 +205,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ...card,
       id: newCardRef.id,
       userId: user.uid,
-      timestamp: new Date()
+      timestamp: serverTimestamp()
     };
     
     await setDoc(newCardRef, cardDataWithMetadata);
@@ -221,7 +221,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...item,
         id: newWishlistItemRef.id,
         userId: user.uid,
-        timestamp: new Date(),
+        timestamp: serverTimestamp(),
     };
 
     await setDoc(newWishlistItemRef, wishlistItemData);
@@ -469,3 +469,5 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+    
