@@ -8,13 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Loader2, User, Settings as SettingsIcon } from "lucide-react";
+import { Loader2, User, Settings as SettingsIcon, Download, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
+import { CollectionUploadDialog } from "@/components/CollectionUploadDialog";
 
 const profileFormSchema = z.object({
   displayName: z
@@ -60,6 +62,7 @@ export default function SettingsPage() {
   const { 
     user, 
     loading, 
+    collection,
     updateUserDisplayName, 
     reauthenticate, 
     updateUserEmail, 
@@ -71,6 +74,9 @@ export default function SettingsPage() {
 
   const { toast } = useToast();
   const router = useRouter();
+
+  const [isExporting, setIsExporting] = useState(false);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
 
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
@@ -148,6 +154,56 @@ export default function SettingsPage() {
       toast({ variant: "destructive", title: "Error", description: error.message });
     }
   };
+
+  const handleExport = async () => {
+    if (!user) {
+      openAuthModal();
+      return;
+    }
+    setIsExporting(true);
+    toast({
+      title: "Preparing Export...",
+      description: "Generating your collection CSV file.",
+    });
+
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/users/collection/export-csv', {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Server responded with ${response.status}` }));
+        throw new Error(errorData.message || "An unknown error occurred during export.");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const formattedDate = format(new Date(), 'yyyy-MM-dd');
+      a.href = url;
+      a.download = `poketrkr_collection_${formattedDate}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export Successful!",
+        description: `Your collection has been downloaded.`,
+        className: "bg-secondary text-secondary-foreground"
+      });
+
+    } catch (err: any) {
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: err.message,
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
   
   if (loading || !user) {
     return (
@@ -161,6 +217,7 @@ export default function SettingsPage() {
   }
 
   return (
+    <>
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
@@ -253,6 +310,22 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
+          {/* Data Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Data Management</CardTitle>
+              <CardDescription>Import or export your collection data.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col sm:flex-row gap-4">
+              <Button onClick={() => setIsUploadDialogOpen(true)} variant="outline" className="w-full sm:w-auto">
+                <Upload className="mr-2 h-4 w-4" /> Import from CSV
+              </Button>
+              <Button onClick={handleExport} disabled={isExporting || collection.length === 0} className="w-full sm:w-auto">
+                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
+                Export to CSV
+              </Button>
+            </CardContent>
+          </Card>
 
           {/* Email Settings */}
           <Card>
@@ -357,5 +430,10 @@ export default function SettingsPage() {
         </div>
       </main>
     </div>
+    <CollectionUploadDialog 
+      isOpen={isUploadDialogOpen}
+      onClose={() => setIsUploadDialogOpen(false)}
+    />
+    </>
   );
 }
