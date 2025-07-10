@@ -25,10 +25,10 @@ function convertToCsv(data: PokemonCard[]): string {
         return "";
     }
 
-    // Explicitly define headers to control order and exclude complex objects like timestamp
+    // Explicitly define headers to control order and exclude unwanted columns
     const headers = [
-        "name", "set", "cardNumber", "quantity", "value", 
-        "variant", "language", "rarity", "artist", "isFavorite"
+        "name", "set", "cardNumber", "quantity", 
+        "variant", "language", "isFavorite"
     ];
     
     const csvRows = data.map(row => {
@@ -85,7 +85,7 @@ export async function GET(request: Request) {
             const headers = new Headers();
             headers.set('Content-Type', 'text/csv');
             headers.set('Content-Disposition', 'attachment; filename="poketrkr_collection.csv"');
-            const emptyCsv = "name,set,cardNumber,quantity,value,variant,language,rarity,artist,isFavorite";
+            const emptyCsv = "name,set,cardNumber,quantity,variant,language,isFavorite";
             return new Response(emptyCsv, { status: 200, headers });
         }
 
