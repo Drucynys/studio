@@ -23,7 +23,7 @@ function initializeFirebaseAdmin() {
 const getDefaultMarketPrice = (apiCard: any): { value: number, variant?: string } => {
     if (!apiCard || !apiCard.tcgplayer?.prices) return { value: 0 };
     const prices = apiCard.tcgplayer.prices;
-    const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
+    const variantPriority = ['holofoil', 'reverseHolofoil', '1stEditionHolofoil', 'unlimitedHolofoil', 'normal', '1stEditionNormal', 'unlimitedNormal'];
     for (const variant of variantPriority) {
         if (prices[variant]?.market && typeof prices[variant]!.market === 'number') {
             return { value: prices[variant]!.market!, variant: variant };

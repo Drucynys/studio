@@ -89,12 +89,14 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
                 const values = row.split(',').map(v => v.trim().replace(/"/g, ''));
                 const rowData: any = {};
                 headers.forEach((header, index) => {
-                    rowData[header] = values[index];
+                    // Normalize cardnumber header
+                    const normalizedHeader = header === 'cardnumber' ? 'cardNumber' : header;
+                    rowData[normalizedHeader] = values[index];
                 });
                 return {
                     name: rowData.name,
                     set: rowData.set,
-                    cardNumber: rowData.cardnumber,
+                    cardNumber: rowData.cardNumber,
                     quantity: parseInt(rowData.quantity, 10) || 1,
                     value: rowData.value ? parseFloat(rowData.value) : undefined,
                     variant: rowData.variant || undefined,
@@ -159,7 +161,11 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2"><Upload className="h-5 w-5"/> Upload Collection from CSV</DialogTitle>
                     <DialogDescription>
-                        Import your collection by uploading a CSV file. The file must contain columns: <code className="bg-muted px-1 py-0.5 rounded">name</code>, <code className="bg-muted px-1 py-0.5 rounded">set</code>, and <code className="bg-muted px-1 py-0.5 rounded">cardNumber</code>.
+                        Import your collection by uploading a CSV file.
+                        <br/>
+                        <b>Required columns:</b> <code className="bg-muted px-1 py-0.5 rounded">name</code>, <code className="bg-muted px-1 py-0.5 rounded">set</code>, <code className="bg-muted px-1 py-0.5 rounded">cardNumber</code>.
+                        <br/>
+                        <b>Optional columns:</b> <code className="bg-muted px-1 py-0.5 rounded">quantity</code>, <code className="bg-muted px-1 py-0.5 rounded">variant</code>, <code className="bg-muted px-1 py-0.5 rounded">language</code>, <code className="bg-muted px-1 py-0.5 rounded">value</code>.
                     </DialogDescription>
                 </DialogHeader>
                 
@@ -209,7 +215,7 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
                                     <details className="text-xs mt-2">
                                         <summary className="cursor-pointer">View un-matched cards</summary>
                                         <ul className="list-disc pl-4 mt-1">
-                                            {uploadResult.notFound.slice(0, 5).map((card, i) => (
+                                            {uploadResult.notFound.slice(0, 5).map((card: any, i: number) => (
                                                 <li key={i}>{card.name} - {card.set} - {card.cardNumber}</li>
                                             ))}
                                             {uploadResult.notFound.length > 5 && <li>...and {uploadResult.notFound.length - 5} more.</li>}
