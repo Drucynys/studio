@@ -95,7 +95,6 @@ export async function POST(request: Request) {
                     const docRef = cardsCollection.doc(card.id);
                     const priceData = {
                         tcgplayer: card.tcgplayer || null,
-                        cardmarket: card.cardmarket || null,
                     };
                     // Use set with merge to update only these fields in the master card list.
                     batch.set(docRef, priceData, { merge: true });

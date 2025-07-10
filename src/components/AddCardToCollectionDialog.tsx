@@ -132,31 +132,6 @@ export function AddCardToCollectionDialog({
       setSelectedVariant("");
     }
     
-    // Cardmarket Prices
-    if (pokemonTcgApiCard?.cardmarket?.prices) {
-      if (!imageUrlToSet.startsWith('https')) { // if TCGPlayer didn't set image, maybe cardmarket can
-          imageUrlToSet = pokemonTcgApiCard.images.large || initialCardImageUrl || "https://placehold.co/200x280.png";
-      }
-      const cmPrices = pokemonTcgApiCard.cardmarket.prices;
-      const priceMap = {
-          'Trend Price': cmPrices.trendPrice,
-          'Average Sell Price': cmPrices.averageSellPrice,
-          'Low Price': cmPrices.lowPrice,
-          'Reverse Holo Trend': cmPrices.reverseHoloTrend,
-      };
-
-      for (const [name, price] of Object.entries(priceMap)) {
-          if (typeof price === 'number' && price > 0 && !isNaN(price)) {
-              newPrices.push({
-                  variantKey: `cardmarket-${name.toLowerCase().replace(/\s/g, '-')}`,
-                  variantName: `Cardmarket - ${name}`,
-                  price: price,
-                  currencySymbol: '€'
-              });
-          }
-      }
-    }
-    
     setFinalDisplayImageUrl(imageUrlToSet);
     setDisplayPrices(newPrices);
     setQuantityInput(1);

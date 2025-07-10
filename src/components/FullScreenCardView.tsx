@@ -75,7 +75,6 @@ export function FullScreenCardView({
 
   const allAvailablePrices = useMemo(() => {
     const tcgPlayerPrices: { name: string; value: number; currency: string }[] = [];
-    const cardmarketPrices: { name: string; value: number; currency: string }[] = [];
 
     // TCGPlayer
     if (masterCard?.tcgplayer?.prices) {
@@ -93,23 +92,7 @@ export function FullScreenCardView({
       }
     }
 
-    // Cardmarket
-    if (masterCard?.cardmarket?.prices) {
-        for (const [key, value] of Object.entries(masterCard.cardmarket.prices)) {
-            if (value !== undefined && value !== null) {
-                const numericValue = parseFloat(value as any);
-                if (!isNaN(numericValue) && numericValue > 0) {
-                    cardmarketPrices.push({
-                        name: formatVariantKey(key),
-                        value: numericValue,
-                        currency: '€'
-                    });
-                }
-            }
-        }
-    }
-
-    return { tcgPlayerPrices, cardmarketPrices };
+    return { tcgPlayerPrices };
   }, [masterCard]);
 
 
@@ -323,11 +306,11 @@ export function FullScreenCardView({
                         <div className="space-y-2">
                             <h4 className="font-medium leading-none">Market Prices</h4>
                             <p className="text-sm text-muted-foreground">
-                                Live prices from TCGPlayer & Cardmarket.
+                                Live prices from TCGPlayer.
                             </p>
                         </div>
                         <div className="mt-4 max-h-40 overflow-y-auto pr-2">
-                            {allAvailablePrices.tcgPlayerPrices.length === 0 && allAvailablePrices.cardmarketPrices.length === 0 ? (
+                            {allAvailablePrices.tcgPlayerPrices.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center">No price data available.</p>
                             ) : (
                                 <div className="space-y-4">
@@ -337,20 +320,6 @@ export function FullScreenCardView({
                                             <div className="space-y-1">
                                                 {allAvailablePrices.tcgPlayerPrices.map((price, index) => (
                                                     <div key={`tcg-${index}`} className="grid grid-cols-[1fr,auto] items-center gap-4 text-sm">
-                                                        <span className="text-muted-foreground">{price.name}</span>
-                                                        <span className="font-semibold text-right">{price.currency}{price.value.toFixed(2)}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {allAvailablePrices.tcgPlayerPrices.length > 0 && allAvailablePrices.cardmarketPrices.length > 0 && <Separator />}
-                                    {allAvailablePrices.cardmarketPrices.length > 0 && (
-                                        <div>
-                                            <p className="text-xs font-semibold text-muted-foreground mb-1">Cardmarket</p>
-                                            <div className="space-y-1">
-                                                {allAvailablePrices.cardmarketPrices.map((price, index) => (
-                                                    <div key={`cm-${index}`} className="grid grid-cols-[1fr,auto] items-center gap-4 text-sm">
                                                         <span className="text-muted-foreground">{price.name}</span>
                                                         <span className="font-semibold text-right">{price.currency}{price.value.toFixed(2)}</span>
                                                     </div>
