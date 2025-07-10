@@ -25,6 +25,7 @@ function convertToCsv(data: PokemonCard[]): string {
         return "";
     }
 
+    // Explicitly define headers to control order and exclude complex objects like timestamp
     const headers = [
         "name", "set", "cardNumber", "quantity", "value", 
         "variant", "language", "rarity", "artist", "isFavorite"
@@ -34,6 +35,12 @@ function convertToCsv(data: PokemonCard[]): string {
         return headers.map(fieldName => {
             // Use a type-safe key access
             const key = fieldName as keyof PokemonCard;
+            
+            // This is the key fix: We are explicitly skipping the timestamp object.
+            if (key === 'timestamp') {
+                return ''; // Or a formatted date if needed, but for now we skip.
+            }
+
             let cell = row[key];
             
             // Handle cases where a value might be null or undefined, including booleans
@@ -73,7 +80,12 @@ export async function GET(request: Request) {
         const snapshot = await collectionRef.orderBy('timestamp', 'desc').get();
 
         if (snapshot.empty) {
-            return new Response("Your collection is empty.", { status: 200, headers: { 'Content-Type': 'text/plain' } });
+            // To ensure a file is downloaded even if empty, send back headers with just the header row.
+            const headers = new Headers();
+            headers.set('Content-Type', 'text/csv');
+            headers.set('Content-Disposition', 'attachment; filename="poketrkr_collection.csv"');
+            const emptyCsv = "name,set,cardNumber,quantity,value,variant,language,rarity,artist,isFavorite";
+            return new Response(emptyCsv, { status: 200, headers });
         }
 
         const collectionData = snapshot.docs.map(doc => doc.data() as PokemonCard);
