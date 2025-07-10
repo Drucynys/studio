@@ -76,7 +76,8 @@ export async function GET(request: Request) {
         const decodedToken = await getAuth().verifyIdToken(idToken);
         const userId = decodedToken.uid;
 
-        const collectionRef = db.collection('users', userId, 'cards');
+        // *** FIX: Corrected the path to the user's sub-collection ***
+        const collectionRef = db.collection('users').doc(userId).collection('cards');
         const snapshot = await collectionRef.orderBy('timestamp', 'desc').get();
 
         if (snapshot.empty) {
