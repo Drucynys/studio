@@ -74,16 +74,25 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
             const text = e.target?.result as string;
             // Normalize line endings to handle CRLF (\r\n) from some exports
             const rows = text.replace(/\r\n/g, '\n').split('\n').filter(row => row.trim() !== '');
+            if (rows.length < 1) {
+                toast({ variant: 'destructive', title: 'Invalid File', description: 'The CSV file is empty or invalid.' });
+                setIsParsing(false);
+                setFile(null);
+                return;
+            }
+
             const headerRow = rows.shift()?.toLowerCase() || '';
-            const headers = headerRow.split(',').map(h => h.trim().replace(/"/g, ''));
+            // Robust header parsing: trim whitespace and remove quotes from each header.
+            const headers = headerRow.split(',').map(h => h.trim().replace(/^"|"$/g, ''));
             
-            const requiredHeaders = ['name', 'set', 'cardNumber'];
+            const requiredHeaders = ['name', 'set', 'cardnumber']; // cardNumber is exported without uppercase N
             if (!requiredHeaders.every(h => headers.includes(h))) {
                 toast({
                     variant: 'destructive',
                     title: 'Invalid CSV format',
                     description: 'Your CSV must contain "name", "set", and "cardNumber" columns.',
                 });
+                console.error("Header check failed. Headers found:", headers);
                 setIsParsing(false);
                 setFile(null);
                 return;
@@ -106,7 +115,7 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
                     quantity: parseInt(rowData.quantity, 10) || 1,
                     variant: rowData.variant || undefined,
                     language: rowData.language === 'Japanese' ? 'Japanese' : 'English',
-                    isFavorite: rowData.isFavorite,
+                    isFavorite: rowData.isfavorite, // csv headers are lowercased
                 };
             }).filter(d => d.name && d.set && d.cardNumber); // Ensure basic data exists
             setParsedData(data);
