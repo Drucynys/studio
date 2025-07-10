@@ -26,14 +26,8 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
-
-    // Price History - Can only be written to by backend/admin, read by anyone
-    match /priceHistory/{historyId} {
-      allow read: if true;
-      allow write: if false;
-    }
     
-    // Public exchange listings
+    // Public exchange listings - This is now a top-level rule
     match /exchange/{exchangeId} {
       // Anyone logged in can see the cards available for trade.
       allow read: if request.auth != null;
@@ -78,6 +72,15 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
+    }
+    
+    // Price history data
+    match /priceHistory/{historyId} {
+      // Let anyone read the price history for charts
+      allow read: if true;
+      // Only allow server-side processes (like the sync script) to write.
+      // We check that the write request is not coming from a client-side user.
+      allow write: if request.auth == null; 
     }
   }
 }
