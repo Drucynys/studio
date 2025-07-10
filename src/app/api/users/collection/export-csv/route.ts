@@ -30,16 +30,21 @@ function convertToCsv(data: PokemonCard[]): string {
         "variant", "language", "rarity", "artist", "isFavorite"
     ];
     
-    const replacer = (key: string, value: any) => value === null ? '' : value;
-    
     const csvRows = data.map(row => {
         return headers.map(fieldName => {
-            let cell = (row as any)[fieldName];
-            // Handle cases where a value might be null or undefined
+            // Use a type-safe key access
+            const key = fieldName as keyof PokemonCard;
+            let cell = row[key];
+            
+            // Handle cases where a value might be null or undefined, including booleans
             if (cell === null || cell === undefined) {
                 cell = '';
+            } else if (typeof cell === 'boolean') {
+                cell = cell ? 'true' : 'false';
             }
+            
             let cellString = String(cell);
+            
             // Escape quotes by doubling them, and wrap in quotes if it contains commas, quotes, or newlines
             if (cellString.search(/("|,|\n)/g) >= 0) {
                 cellString = `"${cellString.replace(/"/g, '""')}"`;
