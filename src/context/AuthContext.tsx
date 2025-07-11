@@ -278,20 +278,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const addCardToExchange = async (card: PokemonCard) => {
     if (!user) throw new Error("You must be logged in to add a card to the exchange.");
     
-    // Generate a new document reference in the 'exchange' collection *first*.
     const newExchangeDocRef = doc(collection(db, 'exchange'));
 
-    // Prepare the full data object, including the new exchangeId.
     const exchangeItemData = {
       ...card,
       ownerId: user.uid,
-      ownerDisplayName: user.displayName || user.email,
+      ownerDisplayName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
       listedAt: serverTimestamp(),
-      exchangeId: newExchangeDocRef.id, // Include the ID in the document itself.
+      exchangeId: newExchangeDocRef.id,
     };
 
-    // Use a single `setDoc` operation to create the document with all data.
-    // This is atomic and ensures the security rules are met on creation.
     await setDoc(newExchangeDocRef, exchangeItemData);
   };
 

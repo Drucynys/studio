@@ -40,7 +40,10 @@ export async function POST() {
     try {
         serviceAccount = JSON.parse(serviceAccountJson);
         if (serviceAccount.private_key) {
-            serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+            const serviceAccount = JSON.parse(serviceAccountJson);
+if (serviceAccount.private_key) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+}
         } else {
             throw new Error("Parsed JSON is missing the 'private_key' field.");
         }
@@ -79,12 +82,14 @@ export async function POST() {
     // Check 7: Perform a test read from Firestore
     logs.push("- Performing Final Pre-flight Check -");
     try {
-      await db.collection('pokemon-tcg-sets').limit(1).get();
+      // Robust check: attempt to read a non-existent document in a test collection.
+      // This validates the connection and permissions without failing if a collection doesn't exist.
+      await db.collection('_internal_test_').doc('connection_test').get();
       logs.push("✅ [Check 7] Successfully connected to Firestore and performed a test read.");
-  } catch (e: any) {
-      logs.push(`❌ [Check 7] FATAL: Test read from Firestore FAILED. This is the root cause. Error: ${e.message}`);
-      throw new Error(`Firestore test read failed: ${e.message}`);
-  }
+    } catch (e: any) {
+        logs.push(`❌ [Check 7] FATAL: Test read from Firestore FAILED. This is the root cause. Error: ${e.message}`);
+        throw new Error(`Firestore test read failed: ${e.message}`);
+    }
     
     logs.push("- Checklist Complete. Starting Main Operation -");
     

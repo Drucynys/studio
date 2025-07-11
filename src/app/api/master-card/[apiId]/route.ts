@@ -18,7 +18,7 @@ function initializeFirebaseAdmin() {
 
     const serviceAccount = JSON.parse(serviceAccountJson);
     if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
     }
 
     admin.initializeApp({
@@ -27,8 +27,11 @@ function initializeFirebaseAdmin() {
     });
 }
 
-export async function GET(request: Request, { params }: { params: { apiId: string } }) {
-    const { apiId } = params;
+export async function GET(
+    request: Request,
+    context: { params: Promise<{ apiId: string }> }
+) {
+    const { apiId } = await context.params;
     if (!apiId) {
         return NextResponse.json({ message: 'Card API ID is required' }, { status: 400 });
     }
@@ -39,7 +42,7 @@ export async function GET(request: Request, { params }: { params: { apiId: strin
         const cardRef = db.collection('pokemon-tcg-cards').doc(apiId);
         const docSnap = await cardRef.get();
 
-        if (!docSnap.exists()) {
+        if (!docSnap.exists) {
             return NextResponse.json({ message: 'Card not found in master database. It may not have been synced yet.' }, { status: 404 });
         }
 

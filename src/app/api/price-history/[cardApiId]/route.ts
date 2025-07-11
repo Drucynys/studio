@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -25,8 +24,11 @@ function initializeFirebaseAdmin() {
     });
 }
 
-export async function GET(request: Request, { params }: { params: { cardApiId: string } }) {
-    const { cardApiId } = params;
+export async function GET(
+    request: Request,
+    context: { params: Promise<{ cardApiId: string }> }
+) {
+    const { cardApiId } = await context.params;
     const { searchParams } = new URL(request.url);
     const range = searchParams.get('range') || '30d'; // Default to 30 days
 

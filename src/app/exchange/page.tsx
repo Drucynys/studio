@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Search, Replace, Info, Mail } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { getFirestore, collection, onSnapshot, query, orderBy, limit, startAfter, getDocs, DocumentData } from "firebase/firestore";
 import { app } from "@/lib/firebase";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -81,14 +81,6 @@ export default function ExchangePage() {
     // Filter out user's own items from the main view
     setFilteredItems(filtered.filter(item => item.ownerId !== user?.uid));
   }, [items, searchTerm, user?.uid]);
-
-  const handleContactOwner = (ownerEmail: string | null | undefined, cardName: string) => {
-    if (!ownerEmail) {
-        alert("Owner's email is not available.");
-        return;
-    }
-    window.location.href = `mailto:${ownerEmail}?subject=PokéTRKR Trade Inquiry: ${cardName}`;
-  };
 
   if (loading) {
     return (
@@ -165,10 +157,6 @@ export default function ExchangePage() {
                                     <p className="font-semibold truncate">{item.ownerDisplayName}</p>
                                 </div>
                             </div>
-                             <Button className="w-full" onClick={() => user ? handleContactOwner(item.email, item.name) : openAuthModal()}>
-                                <Mail className="mr-2 h-4 w-4"/>
-                                Contact Owner
-                            </Button>
                         </CardFooter>
                     </Card>
                 ))}
