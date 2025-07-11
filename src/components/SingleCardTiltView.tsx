@@ -67,7 +67,7 @@ export function SingleCardTiltView({
         onPointerDownOutside={onClose} 
         onInteractOutside={onClose} 
       >
-        <DialogHeader className="sr-only"> {/* Added for accessibility */}
+        <DialogHeader className="sr-only">
             <DialogTitle>Full Screen Card View: {altText}</DialogTitle>
         </DialogHeader>
         <div

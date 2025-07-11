@@ -12,6 +12,7 @@ import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { MarketPriceHistoryChart } from "./MarketPriceHistoryChart";
+import { cn } from "@/lib/utils";
 
 const getMarketPrice = (apiCard: ApiPokemonCard | undefined | null, variant?: string | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
