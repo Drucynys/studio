@@ -95,13 +95,6 @@ export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <strong>Rarity:</strong> <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{card.rarity}</Badge>
         </div>
-        {card.artist && (
-          <div className="flex items-center gap-2 text-xs">
-            <Paintbrush className="h-3.5 w-3.5 text-cyan-500" />
-            <strong className="flex-shrink-0">Artist:</strong>
-            <span className="truncate text-muted-foreground">{card.artist}</span>
-          </div>
-        )}
         {displayVariant && (
           <div className="flex items-center gap-2 text-xs">
             <Palette className="h-3.5 w-3.5 text-blue-500" />
@@ -116,6 +109,13 @@ export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView
           <Layers className="h-3.5 w-3.5 text-purple-500" />
           <strong>Quantity:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-purple-500/50 text-purple-600">{cardQuantity}</Badge>
         </div>
+        {card.artist && (
+          <div className="flex items-center gap-2 text-xs">
+            <Paintbrush className="h-3.5 w-3.5 text-cyan-500" />
+            <strong>Artist:</strong>
+            <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-cyan-500/50 text-cyan-600 truncate">{card.artist}</Badge>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex-col items-start space-y-2 pt-3">
          <div className="w-full space-y-1">
