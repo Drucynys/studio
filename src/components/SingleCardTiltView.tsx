@@ -1,12 +1,9 @@
-
+// src/components/SingleCardTiltView.tsx
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // Added DialogHeader, DialogTitle
-
-const MAX_ROTATION = 10;
-const MIN_DIMENSION_FOR_TILT_EFFECT = 50;
+import { useEffect, useRef } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type SingleCardTiltViewProps = {
   isOpen: boolean;
@@ -22,17 +19,6 @@ export function SingleCardTiltView({
   altText,
 }: SingleCardTiltViewProps) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [isHovering, setIsHovering] = useState(false);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [cardDimensions, setCardDimensions] = useState({ width: 1, height: 1 });
-
-  useEffect(() => {
-    if (!isOpen) {
-      setCardDimensions({ width: 1, height: 1 });
-      setIsHovering(false);
-      setMousePosition({ x: 0, y: 0 });
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -48,80 +34,30 @@ export function SingleCardTiltView({
   }, [isOpen, onClose]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current || !isOpen) {
-      if (isHovering) setIsHovering(false);
-      return;
-    }
-    const currentWidth = cardRef.current.offsetWidth;
-    const currentHeight = cardRef.current.offsetHeight;
+    const cardNode = cardRef.current;
+    if (!cardNode) return;
+    const rect = cardNode.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const mx = x / rect.width;
+    const my = y / rect.height;
 
-    if (currentWidth > MIN_DIMENSION_FOR_TILT_EFFECT && currentHeight > MIN_DIMENSION_FOR_TILT_EFFECT) {
-      if (cardDimensions.width !== currentWidth || cardDimensions.height !== currentHeight) {
-        setCardDimensions({ width: currentWidth, height: currentHeight });
-      }
-    } else {
-      if (isHovering) setIsHovering(false);
-      return;
-    }
-    if (!isHovering) setIsHovering(true);
-    const rect = cardRef.current.getBoundingClientRect();
-    setMousePosition({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    });
+    const rY = (mx - 0.5) * -20;
+    const rX = (my - 0.5) * 20;
+
+    cardNode.style.setProperty('--mx', `${mx}`);
+    cardNode.style.setProperty('--my', `${my}`);
+    cardNode.style.setProperty('--posx', `${x}px`);
+    cardNode.style.setProperty('--posy', `${y}px`);
+    cardNode.style.setProperty('--rx', `${rX}deg`);
+    cardNode.style.setProperty('--ry', `${rY}deg`);
   };
 
   const handleMouseLeave = () => {
-    setIsHovering(false);
-  };
-
-  let dynamicCardTransform = "scale(1.0)";
-  let shineBackground = "transparent";
-  let shineOpacity = 0;
-
-  if (
-    isHovering &&
-    cardRef.current &&
-    cardDimensions.width > MIN_DIMENSION_FOR_TILT_EFFECT &&
-    cardDimensions.height > MIN_DIMENSION_FOR_TILT_EFFECT
-  ) {
-    const centerX = cardDimensions.width / 2;
-    const centerY = cardDimensions.height / 2;
-    const mouseXFromCenter = mousePosition.x - centerX;
-    const mouseYFromCenter = mousePosition.y - centerY;
-
-    const rotateY = (mouseXFromCenter / centerX) * MAX_ROTATION;
-    const rotateX = (mouseYFromCenter / centerY) * -MAX_ROTATION;
-    dynamicCardTransform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(20px)`;
-    
-    const shineXPercent = (mousePosition.x / cardDimensions.width) * 100;
-    const shineYPercent = (mousePosition.y / cardDimensions.height) * 100;
-
-    shineBackground = `radial-gradient(circle farthest-corner at ${shineXPercent}% ${shineYPercent}%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 60%)`;
-    shineOpacity = 0.6;
-  }
-
-  const cardStyle: React.CSSProperties = {
-    transform: dynamicCardTransform,
-    transformStyle: "preserve-3d",
-    transition: "transform 0.05s linear",
-  };
-
-  const shineStyle: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    background: shineBackground,
-    opacity: shineOpacity,
-    mixBlendMode: "color-dodge",
-    pointerEvents: "none",
-    zIndex: 10,
-    transition: "opacity 0.05s linear",
-    borderRadius: 'inherit',
-  };
-
-
-  const tiltContainerStyle: React.CSSProperties = {
-    perspective: "1500px",
+    const cardNode = cardRef.current;
+    if (!cardNode) return;
+    cardNode.style.setProperty('--rx', '0deg');
+    cardNode.style.setProperty('--ry', '0deg');
   };
 
   return (
@@ -135,16 +71,14 @@ export function SingleCardTiltView({
             <DialogTitle>Full Screen Card View: {altText}</DialogTitle>
         </DialogHeader>
         <div
-          className="flex-grow flex items-center justify-center relative overflow-hidden h-full w-full"
-          style={tiltContainerStyle}
+          className="flex-grow flex items-center justify-center relative overflow-hidden h-full w-full card-container"
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onClick={onClose} 
         >
           <div
             ref={cardRef}
-            style={cardStyle}
-            className="relative aspect-[2.5/3.5] h-[72vh] max-h-[680px] w-auto rounded-xl overflow-hidden shadow-2xl cursor-pointer"
+            className="card aspect-[2.5/3.5] h-[72vh] max-h-[680px] w-auto cursor-pointer"
             data-ai-hint="pokemon card front large interactive"
             onClick={(e) => e.stopPropagation()} 
           >
@@ -154,9 +88,9 @@ export function SingleCardTiltView({
               layout="fill"
               objectFit="cover"
               priority
-              className="rounded-xl z-[1]" // Ensure image is below shine
+              className="card-image"
             />
-            <div style={shineStyle} />
+            <div className="shine" />
           </div>
         </div>
       </DialogContent>
