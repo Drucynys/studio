@@ -46,13 +46,20 @@ export function AuthModal() {
 
     } catch (err: any) {
       console.error(err);
-      let friendlyMessage = 'An unknown error occurred.';
-      if (err.message && (err.message.includes("match") || err.message.includes("valid"))) {
-          friendlyMessage = err.message;
-      } else if (err.code) {
-          friendlyMessage = err.code.replace('auth/', '').replace(/-/g, ' ');
+
+      // Gracefully handle popup closed by user
+      if (err.code === 'auth/popup-closed-by-user') {
+        // Don't show an error message for this case
+        setError(null);
+      } else {
+        let friendlyMessage = 'An unknown error occurred.';
+        if (err.message && (err.message.includes("match") || err.message.includes("valid"))) {
+            friendlyMessage = err.message;
+        } else if (err.code) {
+            friendlyMessage = err.code.replace('auth/', '').replace(/-/g, ' ');
+        }
+        setError(friendlyMessage.charAt(0).toUpperCase() + friendlyMessage.slice(1));
       }
-      setError(friendlyMessage.charAt(0).toUpperCase() + friendlyMessage.slice(1));
     } finally {
       setLoading(false);
     }
