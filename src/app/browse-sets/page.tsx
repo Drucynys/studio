@@ -189,9 +189,9 @@ const BrowsePageContent: NextPage = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <Card className="shadow-xl">
             <CardHeader>
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <CardTitle className="font-headline text-3xl text-foreground">Browse TCG Catalog</CardTitle>
-                    <TabsList className="grid w-full md:w-auto md:grid-cols-2">
+                    <TabsList className="grid w-full sm:w-auto grid-cols-2">
                         <TabsTrigger value="sets"><Package className="mr-2 h-4 w-4"/>By Set</TabsTrigger>
                         <TabsTrigger value="artists"><Paintbrush className="mr-2 h-4 w-4"/>By Artist</TabsTrigger>
                     </TabsList>
