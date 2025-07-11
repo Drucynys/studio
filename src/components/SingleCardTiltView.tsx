@@ -2,8 +2,11 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "./ui/button";
+import { Move3d } from "lucide-react";
 
 type SingleCardTiltViewProps = {
   isOpen: boolean;
@@ -19,21 +22,11 @@ export function SingleCardTiltView({
   altText,
 }: SingleCardTiltViewProps) {
   const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isOpen) return;
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-
+  const isMobile = useIsMobile();
+  const [motionPermission, setMotionPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+  
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobile) return;
     const cardNode = cardRef.current;
     if (!cardNode) return;
     const rect = cardNode.getBoundingClientRect();
@@ -45,20 +38,73 @@ export function SingleCardTiltView({
     const rY = (mx - 0.5) * -20;
     const rX = (my - 0.5) * 20;
 
-    cardNode.style.setProperty('--mx', `${mx}`);
-    cardNode.style.setProperty('--my', `${my}`);
-    cardNode.style.setProperty('--posx', `${x}px`);
-    cardNode.style.setProperty('--posy', `${y}px`);
     cardNode.style.setProperty('--rx', `${rX}deg`);
     cardNode.style.setProperty('--ry', `${rY}deg`);
   };
 
   const handleMouseLeave = () => {
+    if (isMobile) return;
     const cardNode = cardRef.current;
     if (!cardNode) return;
     cardNode.style.setProperty('--rx', '0deg');
     cardNode.style.setProperty('--ry', '0deg');
   };
+  
+  const handleDeviceMotion = useCallback((event: DeviceOrientationEvent) => {
+    const cardNode = cardRef.current;
+    if (!cardNode || !event.beta || !event.gamma) return;
+    
+    let gamma = event.gamma;
+    let beta = event.beta;
+
+    const maxTilt = 25;
+    gamma = Math.max(-maxTilt, Math.min(maxTilt, gamma));
+    beta = Math.max(-maxTilt, Math.min(maxTilt, beta));
+
+    const rY = (gamma / maxTilt) * 15;
+    const rX = (beta / maxTilt) * -15;
+
+    cardNode.style.setProperty('--rx', `${rX}deg`);
+    cardNode.style.setProperty('--ry', `${rY}deg`);
+  }, []);
+
+  const requestMotionPermission = async () => {
+    // @ts-ignore
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        // @ts-ignore
+        const permissionState = await DeviceOrientationEvent.requestPermission();
+        if (permissionState === 'granted') {
+          setMotionPermission('granted');
+          window.addEventListener('deviceorientation', handleDeviceMotion);
+        } else {
+          setMotionPermission('denied');
+        }
+      } catch (error) {
+        console.error("Device motion permission request failed:", error);
+        setMotionPermission('denied');
+      }
+    } else {
+      setMotionPermission('granted');
+      window.addEventListener('deviceorientation', handleDeviceMotion);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isOpen) return;
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    
+    // Cleanup motion listener when component closes
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('deviceorientation', handleDeviceMotion);
+    };
+  }, [isOpen, onClose, handleDeviceMotion]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -92,6 +138,18 @@ export function SingleCardTiltView({
             />
             <div className="shine" />
           </div>
+          {isMobile && motionPermission === 'prompt' && (
+            <Button
+              variant="secondary"
+              className="absolute top-4 z-30"
+              onClick={(e) => {
+                e.stopPropagation();
+                requestMotionPermission();
+              }}
+            >
+              <Move3d className="mr-2 h-4 w-4" /> Enable Tilt Effect
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

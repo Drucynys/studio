@@ -3,16 +3,17 @@
 
 import type { PokemonCard } from "@/types";
 import Image from "next/image";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Languages, DollarSign } from "lucide-react";
+import { ChevronLeft, ChevronRight, Languages, DollarSign, Move3d } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { MarketPriceHistoryChart } from "./MarketPriceHistoryChart";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const getMarketPrice = (apiCard: ApiPokemonCard | undefined | null, variant?: string | null): number => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
@@ -64,6 +65,8 @@ export function FullScreenCardView({
   masterCardData,
 }: FullScreenCardViewProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+  const [motionPermission, setMotionPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   
   const currentCard = currentIndex !== null ? cards[currentIndex] : null;
   const masterCard = currentCard ? masterCardData.get(currentCard.apiId) : null;
@@ -91,6 +94,76 @@ export function FullScreenCardView({
   }, [masterCard]);
 
 
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobile) return;
+    const cardNode = cardRef.current;
+    if (!cardNode) return;
+    const rect = cardNode.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const mx = x / rect.width;
+    const my = y / rect.height;
+
+    const rY = (mx - 0.5) * -20;
+    const rX = (my - 0.5) * 20;
+
+    cardNode.style.setProperty('--rx', `${rX}deg`);
+    cardNode.style.setProperty('--ry', `${rY}deg`);
+  };
+
+  const handleMouseLeave = () => {
+    if (isMobile) return;
+    const cardNode = cardRef.current;
+    if (!cardNode) return;
+    cardNode.style.setProperty('--rx', '0deg');
+    cardNode.style.setProperty('--ry', '0deg');
+  };
+  
+  const handleDeviceMotion = useCallback((event: DeviceOrientationEvent) => {
+    const cardNode = cardRef.current;
+    if (!cardNode || !event.beta || !event.gamma) return;
+    
+    // Gamma: -180 to 180 (left to right tilt)
+    // Beta: -90 to 90 (front to back tilt)
+    let gamma = event.gamma;
+    let beta = event.beta;
+
+    // Clamp values for stability
+    const maxTilt = 25;
+    gamma = Math.max(-maxTilt, Math.min(maxTilt, gamma));
+    beta = Math.max(-maxTilt, Math.min(maxTilt, beta));
+
+    const rY = (gamma / maxTilt) * 15; // Map gamma to Y rotation
+    const rX = (beta / maxTilt) * -15;  // Map beta to X rotation
+
+    cardNode.style.setProperty('--rx', `${rX}deg`);
+    cardNode.style.setProperty('--ry', `${rY}deg`);
+  }, []);
+  
+  const requestMotionPermission = async () => {
+    // @ts-ignore
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        // @ts-ignore
+        const permissionState = await DeviceOrientationEvent.requestPermission();
+        if (permissionState === 'granted') {
+          setMotionPermission('granted');
+          window.addEventListener('deviceorientation', handleDeviceMotion);
+        } else {
+          setMotionPermission('denied');
+        }
+      } catch (error) {
+        console.error("Device motion permission request failed:", error);
+        setMotionPermission('denied');
+      }
+    } else {
+      // For non-iOS 13+ browsers
+      setMotionPermission('granted');
+      window.addEventListener('deviceorientation', handleDeviceMotion);
+    }
+  };
+
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isOpen || currentIndex === null) return;
@@ -108,37 +181,14 @@ export function FullScreenCardView({
     };
 
     window.addEventListener("keydown", handleKeyDown);
+    
+    // Cleanup motion listener when component closes
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('deviceorientation', handleDeviceMotion);
     };
-  }, [isOpen, currentIndex, cards.length, onNavigate, onClose]);
+  }, [isOpen, currentIndex, cards.length, onNavigate, onClose, handleDeviceMotion]);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const cardNode = cardRef.current;
-    if (!cardNode) return;
-    const rect = cardNode.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const mx = x / rect.width;
-    const my = y / rect.height;
-
-    const rY = (mx - 0.5) * -20;
-    const rX = (my - 0.5) * 20;
-
-    cardNode.style.setProperty('--mx', `${mx}`);
-    cardNode.style.setProperty('--my', `${my}`);
-    cardNode.style.setProperty('--posx', `${x}px`);
-    cardNode.style.setProperty('--posy', `${y}px`);
-    cardNode.style.setProperty('--rx', `${rX}deg`);
-    cardNode.style.setProperty('--ry', `${rY}deg`);
-  };
-
-  const handleMouseLeave = () => {
-    const cardNode = cardRef.current;
-    if (!cardNode) return;
-    cardNode.style.setProperty('--rx', '0deg');
-    cardNode.style.setProperty('--ry', '0deg');
-  };
 
   const displayVariant = formatVariantKey(currentCard?.variant ?? '');
   const currentMarketValue = getMarketPrice(masterCard, currentCard?.variant);
@@ -151,10 +201,8 @@ export function FullScreenCardView({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-none rounded-none sm:rounded-none">
-        <DialogHeader className="p-2 flex-row items-center justify-end border-b border-border/20 absolute top-0 left-0 right-0 z-20 bg-transparent">
-           <DialogTitle className="sr-only">
-             Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}
-          </DialogTitle>
+        <DialogHeader className="sr-only">
+          <DialogTitle>Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}</DialogTitle>
         </DialogHeader>
 
         <div
@@ -201,6 +249,16 @@ export function FullScreenCardView({
               aria-label="Next Card"
             >
               <ChevronRight className="h-7 w-7 md:h-8 md:w-8" />
+            </Button>
+          )}
+
+          {isMobile && motionPermission === 'prompt' && (
+            <Button
+              variant="secondary"
+              className="absolute top-4 z-30"
+              onClick={requestMotionPermission}
+            >
+              <Move3d className="mr-2 h-4 w-4" /> Enable Tilt Effect
             </Button>
           )}
         </div>
