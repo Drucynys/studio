@@ -152,7 +152,7 @@ export function SingleCardTiltView({
               src={imageUrl}
               alt={altText}
               layout="fill"
-              objectFit="contain"
+              objectFit="cover"
               priority
               className="rounded-xl z-[1]" // Ensure image is below shine
             />

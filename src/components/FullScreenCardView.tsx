@@ -26,12 +26,12 @@ const getMarketPrice = (apiCard: ApiPokemonCard | undefined | null, variant?: st
   const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
   for (const v of variantPriority) {
     if (prices[v]?.market) {
-      return prices[v].market;
+      return prices[v]!.market!;
     }
   }
   for (const key in prices) {
     if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market) {
-      return prices[key].market;
+      return prices[key]!.market!;
     }
   }
   return 0;
@@ -260,7 +260,7 @@ export function FullScreenCardView({
                 src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
                 alt={currentCard.name || "Pokémon Card"}
                 layout="fill"
-                objectFit="contain"
+                objectFit="cover"
                 priority
                 className="rounded-xl"
               />
