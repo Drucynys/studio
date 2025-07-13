@@ -39,8 +39,13 @@ export function SingleCardTiltView({
     const rY = (mx - 0.5) * -20;
     const rX = (my - 0.5) * 20;
 
+    const posX = (mx * 100).toFixed(2);
+    const posY = (my * 100).toFixed(2);
+
     cardNode.style.setProperty('--rx', `${rX}deg`);
     cardNode.style.setProperty('--ry', `${rY}deg`);
+    cardNode.style.setProperty('--posx', `${posX}%`);
+    cardNode.style.setProperty('--posy', `${posY}%`);
   };
 
   const handleMouseLeave = () => {
@@ -49,6 +54,8 @@ export function SingleCardTiltView({
     if (!cardNode) return;
     cardNode.style.setProperty('--rx', '0deg');
     cardNode.style.setProperty('--ry', '0deg');
+    cardNode.style.setProperty('--posx', `50%`);
+    cardNode.style.setProperty('--posy', `50%`);
   };
   
   const handleDeviceMotion = useCallback((event: DeviceOrientationEvent) => {
@@ -113,8 +120,6 @@ export function SingleCardTiltView({
         className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-none rounded-none sm:rounded-none items-center justify-center"
         onPointerDownOutside={onClose} 
         onInteractOutside={onClose}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
       >
         <DialogHeader className="sr-only">
             <DialogTitle>Full Screen Card View: {altText}</DialogTitle>
@@ -122,6 +127,8 @@ export function SingleCardTiltView({
         <div
           className="flex-grow flex items-center justify-center relative overflow-hidden h-full w-full card-container"
           onClick={onClose} 
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
         >
           <div
             ref={cardRef}
