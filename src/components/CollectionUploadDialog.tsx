@@ -114,7 +114,7 @@ export function CollectionUploadDialog({ isOpen, onClose }: CollectionUploadDial
                     cardNumber: rowData.cardNumber,
                     quantity: parseInt(rowData.quantity, 10) || 1,
                     variant: rowData.variant || undefined,
-                    language: rowData.language === 'Japanese' ? 'Japanese' : 'English',
+                    language: rowData.language === 'Japanese' ? 'Japanese' as const : 'English' as const,
                     isFavorite: rowData.isfavorite, // csv headers are lowercased
                 };
             }).filter(d => d.name && d.set && d.cardNumber); // Ensure basic data exists
