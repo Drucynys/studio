@@ -423,6 +423,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
         value: cardValue,
         quantity: values.quantity,
         artist: selectedEnglishCardData.artist || null,
+        apiId: selectedEnglishCardData.id,
       };
     } else { 
       const selectedSet = japaneseSets.find(s => s.id === values.selectedSetId);
@@ -441,6 +442,7 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
         value: 0, 
         quantity: values.quantity,
         artist: selectedJapaneseCardData.artist || null,
+        apiId: selectedJapaneseCardData.id,
       };
     }
     
