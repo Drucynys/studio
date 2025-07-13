@@ -1,3 +1,4 @@
+
 // src/components/SingleCardTiltView.tsx
 "use client";
 
@@ -111,15 +112,15 @@ export function SingleCardTiltView({
       <DialogContent 
         className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-none rounded-none sm:rounded-none items-center justify-center"
         onPointerDownOutside={onClose} 
-        onInteractOutside={onClose} 
+        onInteractOutside={onClose}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
       >
         <DialogHeader className="sr-only">
             <DialogTitle>Full Screen Card View: {altText}</DialogTitle>
         </DialogHeader>
         <div
           className="flex-grow flex items-center justify-center relative overflow-hidden h-full w-full card-container"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
           onClick={onClose} 
         >
           <div

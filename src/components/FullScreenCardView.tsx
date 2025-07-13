@@ -1,3 +1,4 @@
+
 // src/components/FullScreenCardView.tsx
 "use client";
 
@@ -200,15 +201,17 @@ export function FullScreenCardView({
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-none rounded-none sm:rounded-none">
+      <DialogContent 
+        className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-none rounded-none sm:rounded-none"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}</DialogTitle>
         </DialogHeader>
 
         <div
             className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28 h-full w-full card-container"
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
         >
           {currentIndex !== null && currentIndex > 0 && (
             <Button
