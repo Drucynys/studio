@@ -1,69 +1,47 @@
 
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { dbAdmin } from '@/lib/firebase-admin';
 
 const ARTISTS_COLLECTION = 'pokemon-tcg-artists';
 const CARDS_COLLECTION = 'pokemon-tcg-cards';
 const BATCH_SIZE = 450; // Firestore batch writes are limited to 500 operations
 
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) { return; }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson || !projectId) {
-        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
-    }
-    
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        const serviceAccount = JSON.parse(serviceAccountJson);
-if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-}
-    }
-    
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
-
 /**
  * GET handler: Fetches the pre-generated list of artists from the 'pokemon-tcg-artists' collection.
  * This is used by the front-end browse pages.
- * This version fetches all artists and sorts them in-memory to avoid needing a composite index.
+ * This version uses a proper Firestore query with 'orderBy' for performance and scalability.
  */
 export async function GET() {
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-        const artistsCollection = db.collection(ARTISTS_COLLECTION);
+        const artistsCollection = dbAdmin.collection(ARTISTS_COLLECTION);
         
-        // Fetch all documents without a specific order from Firestore.
-        const snapshot = await artistsCollection.get();
+        // Use a Firestore query to order the data. This requires a composite index.
+        // Index: collection='pokemon-tcg-artists', fields: 'cardCount' (desc), 'name' (asc)
+        const snapshot = await artistsCollection
+            .orderBy('cardCount', 'desc')
+            .orderBy('name', 'asc')
+            .get();
 
         if (snapshot.empty) {
             return NextResponse.json([]);
         }
 
         const artists = snapshot.docs.map(doc => doc.data());
-
-        // Sort the results in-memory on the server.
-        artists.sort((a: any, b: any) => {
-            // Primary sort: cardCount descending
-            if (a.cardCount > b.cardCount) return -1;
-            if (a.cardCount < b.cardCount) return 1;
-
-            // Secondary sort (tie-breaker): name ascending
-            return a.name.localeCompare(b.name);
-        });
         
         return NextResponse.json(artists);
 
     } catch (error: any) {
         console.error('Error fetching artists:', error);
+        // Provide a more helpful error message if it's an index issue.
+        if (error.message && error.message.includes('requires an index')) {
+             return NextResponse.json(
+                { 
+                    message: 'A database index is required for this query. Please create a composite index in your Firestore settings for the `pokemon-tcg-artists` collection on `cardCount` (descending) and `name` (ascending).',
+                    details: error.message
+                },
+                { status: 500 }
+            );
+        }
         return NextResponse.json(
             { message: error.message || 'An unknown server error occurred while fetching artists.' },
             { status: 500 }
@@ -79,13 +57,11 @@ export async function GET() {
 export async function POST() {
     const logs: string[] = ["- Starting Artist Database Generation -"];
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
         logs.push("✅ Firebase Admin SDK initialized.");
 
         logs.push(`Scanning '${CARDS_COLLECTION}' collection for artists... This may take a moment.`);
         // Use .select('artist') to only fetch the artist field, which is much more efficient
-        const snapshot = await db.collection(CARDS_COLLECTION).select('artist').get();
+        const snapshot = await dbAdmin.collection(CARDS_COLLECTION).select('artist').get();
         logs.push(`✅ Found ${snapshot.size} total card documents to scan.`);
 
         if (snapshot.empty) {
@@ -107,11 +83,11 @@ export async function POST() {
         }));
         
         logs.push(`Writing ${artistList.length} artists to the '${ARTISTS_COLLECTION}' collection...`);
-        const artistsCollection = db.collection(ARTISTS_COLLECTION);
+        const artistsCollection = dbAdmin.collection(ARTISTS_COLLECTION);
         const batchPromises: Promise<any>[] = [];
 
         for (let i = 0; i < artistList.length; i += BATCH_SIZE) {
-            const batch = db.batch();
+            const batch = dbAdmin.batch();
             const chunk = artistList.slice(i, i + BATCH_SIZE);
             chunk.forEach(artist => {
                 // Sanitize the artist name to create a valid Firestore document ID.

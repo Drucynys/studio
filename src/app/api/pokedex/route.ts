@@ -1,43 +1,16 @@
 
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { dbAdmin } from '@/lib/firebase-admin';
 
-// Safe initialization function
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) {
-        return;
-    }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson) {
-        throw new Error("CRITICAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.");
-    }
-    if (!projectId) {
-        throw new Error("CRITICAL: The FIREBASE_PROJECT_ID environment variable is not set.");
-    }
-
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        const serviceAccount = JSON.parse(serviceAccountJson);
-if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-}
-    }
-
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
-
+/**
+ * GET handler to fetch the entire Pokédex, ordered by national Pokédex ID.
+ * This now uses a proper Firestore query with 'orderBy' for performance.
+ */
 export async function GET() {
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-        const pokedexCollection = db.collection('pokedex');
-        // Fetch all documents and order them by the 'id' field, which is numeric
+        const pokedexCollection = dbAdmin.collection('pokedex');
+        // Fetch all documents and order them by the 'id' field, which is the numeric Pokédex ID.
+        // This requires a single-field index on 'id' (ascending), which Firestore can create automatically.
         const snapshot = await pokedexCollection.orderBy('id').get();
 
         if (snapshot.empty) {
@@ -55,5 +28,3 @@ export async function GET() {
         );
     }
 }
-
-    

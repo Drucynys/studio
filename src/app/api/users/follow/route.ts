@@ -1,48 +1,27 @@
 
 // src/app/api/users/follow/route.ts
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-
-// Initialize Firebase Admin SDK
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) { return; }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-
-    if (!serviceAccountJson) {
-        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
-    }
-    const serviceAccount = JSON.parse(serviceAccountJson);
-     if (serviceAccount.private_key) {
-        const serviceAccount = JSON.parse(serviceAccountJson);
-if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-}
-    }
-    // Relying solely on the credential from the service account JSON is more robust.
-    // The project ID is included within the service account file.
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-    });
-}
+import { dbAdmin, authAdmin } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
     console.log('[API] /api/users/follow endpoint hit.');
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-        console.log('[API] Firebase Admin initialized.');
-
-
-        // 1. Authenticate the current user
+        // 1. Authenticate the current user making the request
         const authorization = request.headers.get("Authorization");
         if (!authorization?.startsWith("Bearer ")) {
             console.error('[API] Unauthorized: Missing or invalid Authorization header.');
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ message: 'Unauthorized: No token provided.' }, { status: 401 });
         }
         const idToken = authorization.split("Bearer ")[1];
-        const decodedToken = await getAuth().verifyIdToken(idToken);
+        
+        let decodedToken;
+        try {
+            decodedToken = await authAdmin.verifyIdToken(idToken);
+        } catch (error) {
+            console.error('[API] Unauthorized: Invalid token.', error);
+            return NextResponse.json({ message: 'Unauthorized: Invalid token.' }, { status: 401 });
+        }
+        
         const currentUserId = decodedToken.uid;
         console.log(`[API] Authenticated user: ${currentUserId}`);
 
@@ -60,10 +39,10 @@ export async function POST(request: Request) {
         }
         
         // 3. Perform the follow/unfollow action using a batched write for atomicity
-        const currentUserFollowingRef = db.collection('users').doc(currentUserId).collection('following').doc(targetUserId);
-        const targetUserFollowersRef = db.collection('users').doc(targetUserId).collection('followers').doc(currentUserId);
+        const currentUserFollowingRef = dbAdmin.collection('users').doc(currentUserId).collection('following').doc(targetUserId);
+        const targetUserFollowersRef = dbAdmin.collection('users').doc(targetUserId).collection('followers').doc(currentUserId);
         
-        const batch = db.batch();
+        const batch = dbAdmin.batch();
 
         if (action === 'follow') {
             console.log('[API] Batch: Following user.');

@@ -41,7 +41,7 @@ interface Artist {
 
 const BrowsePageContent: NextPage = () => {
   const searchParams = useSearchParams();
-  const { collection, loading, user } = useAuth();
+  const { collection, loading: authLoading, user } = useAuth();
 
   const tabParam = searchParams.get('tab');
   const initialTab = tabParam === 'artists' ? 'artists' : 'sets';
@@ -49,43 +49,61 @@ const BrowsePageContent: NextPage = () => {
 
   const [allSets, setAllSets] = useState<ApiSet[]>([]);
   const [filteredSets, setFilteredSets] = useState<ApiSet[]>([]);
+  const [loadingSets, setLoadingSets] = useState(true);
+  const [setsError, setSetsError] = useState<string | null>(null);
   
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
-  
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingArtists, setLoadingArtists] = useState(false);
+  const [artistsError, setArtistsError] = useState<string | null>(null);
 
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
+  
+  const isLoading = loadingSets || loadingArtists || authLoading;
 
-  const fetchAllData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const fetchSets = useCallback(async () => {
+    setLoadingSets(true);
+    setSetsError(null);
     try {
-      const [setsResponse, artistsResponse] = await Promise.all([
-        fetch('/api/sets'),
-        fetch('/api/artists'),
-      ]);
-
-      if (!setsResponse.ok) {
-        const errorData = await setsResponse.json().catch(() => ({ message: `Failed to fetch sets from the database. Status: ${setsResponse.statusText}` }));
+      const response = await fetch('/api/sets');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Failed to fetch sets. Status: ${response.statusText}` }));
         throw new Error(errorData.message);
       }
-       if (!artistsResponse.ok) {
-        const errorData = await artistsResponse.json().catch(() => ({ message: `Failed to fetch artists from the database. Status: ${artistsResponse.statusText}` }));
-        throw new Error(errorData.message);
-      }
-      
-      const fetchedSets: ApiSet[] = await setsResponse.json();
-      const fetchedArtists: Artist[] = await artistsResponse.json();
-
+      const fetchedSets: ApiSet[] = await response.json();
       if (!fetchedSets || fetchedSets.length === 0) {
-        throw new Error("No sets found in the database. Please sync the sets in the Admin page first.");
+        throw new Error("No sets found in the database. Please sync them in the Admin page first.");
       }
-      if (!fetchedArtists || fetchedArtists.length === 0) {
+      setAllSets(fetchedSets);
+      setFilteredSets(fetchedSets);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An unknown error occurred while fetching sets.";
+      setSetsError(message);
+      toast({
+        variant: "destructive",
+        title: "Could Not Load Sets",
+        description: message,
+        duration: 10000,
+        action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
+      });
+    } finally {
+      setLoadingSets(false);
+    }
+  }, [toast]);
+
+  const fetchArtists = useCallback(async () => {
+    setLoadingArtists(true);
+    setArtistsError(null);
+    try {
+      const response = await fetch('/api/artists');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Failed to fetch artists. Status: ${response.statusText}` }));
+        throw new Error(errorData.message);
+      }
+      const fetchedArtists: Artist[] = await response.json();
+       if (!fetchedArtists || fetchedArtists.length === 0) {
         toast({
             variant: "default",
             title: "Artists Not Found",
@@ -94,31 +112,33 @@ const BrowsePageContent: NextPage = () => {
             action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
         });
       }
-
-      setAllSets(fetchedSets);
-      setFilteredSets(fetchedSets);
       setAllArtists(fetchedArtists);
       setFilteredArtists(fetchedArtists);
-
     } catch (err) {
-      console.error(`Error fetching data:`, err);
-      let detailedError = err instanceof Error ? err.message : "An unknown error occurred while fetching data.";
-      setError(detailedError);
+      const message = err instanceof Error ? err.message : "An unknown error occurred while fetching artists.";
+      setArtistsError(message);
       toast({
         variant: "destructive",
-        title: "Could Not Load Data",
-        description: detailedError,
+        title: "Could Not Load Artists",
+        description: message,
         duration: 10000,
         action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
       });
     } finally {
-      setIsLoading(false);
+      setLoadingArtists(false);
     }
   }, [toast]);
 
+
+  // Fetch initial data based on the active tab
   useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+    if (activeTab === 'sets') {
+      if (allSets.length === 0) fetchSets();
+    } else {
+      if (allArtists.length === 0) fetchArtists();
+    }
+  }, [activeTab, fetchSets, fetchArtists, allSets, allArtists]);
+
 
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
@@ -170,7 +190,7 @@ const BrowsePageContent: NextPage = () => {
     return map;
   }, [collection, allArtists, user]);
 
-  if (isLoading || loading) {
+  if (isLoading) {
      return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
@@ -189,7 +209,7 @@ const BrowsePageContent: NextPage = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <Card className="shadow-xl">
             <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <CardTitle className="font-headline text-3xl text-foreground">Browse TCG Catalog</CardTitle>
                     <TabsList className="grid w-full sm:w-auto grid-cols-2">
                         <TabsTrigger value="sets"><Package className="mr-2 h-4 w-4"/>By Set</TabsTrigger>
@@ -229,15 +249,15 @@ const BrowsePageContent: NextPage = () => {
             </CardHeader>
             <CardContent>
                 <TabsContent value="sets">
-                    {error && (
+                    {setsError && (
                     <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
                         <ServerCrash className="h-16 w-16 mx-auto mb-4" />
                         <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                        <p className="mt-2 max-w-md">{error}</p>
-                         <Button onClick={fetchAllData} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
+                        <p className="mt-2 max-w-md">{setsError}</p>
+                         <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
                     </div>
                     )}
-                    {!isLoading && !error && (
+                    {!loadingSets && !setsError && (
                     <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
                         {filteredSets.length > 0 ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
@@ -266,29 +286,39 @@ const BrowsePageContent: NextPage = () => {
                     )}
                 </TabsContent>
                 <TabsContent value="artists">
-                  <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
-                      {filteredArtists.length > 0 ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
-                          {filteredArtists.map((artist) => {
-                            const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
-                            return (
-                              <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
-                                <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                                  <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
-                                  <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
-                                  {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
-                                      <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
-                                      <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
-                                        {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
-                                    </div>)}
-                                  <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
-                                </Card>
-                              </Link>
-                            );
-                          })}
-                          </div>
-                      ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No artists found matching your search.</p></div> )}
-                  </ScrollArea>
+                  {artistsError && (
+                    <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
+                        <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                        <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                        <p className="mt-2 max-w-md">{artistsError}</p>
+                         <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
+                    </div>
+                    )}
+                  {!loadingArtists && !artistsError && (
+                    <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
+                        {filteredArtists.length > 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
+                            {filteredArtists.map((artist) => {
+                              const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
+                              return (
+                                <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
+                                  <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
+                                    <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
+                                    <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
+                                    {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
+                                        <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
+                                        <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
+                                          {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
+                                      </div>)}
+                                    <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
+                                  </Card>
+                                </Link>
+                              );
+                            })}
+                            </div>
+                        ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No artists found matching your search.</p></div> )}
+                    </ScrollArea>
+                  )}
                 </TabsContent>
             </CardContent>
             </Card>
