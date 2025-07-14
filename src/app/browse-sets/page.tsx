@@ -296,20 +296,18 @@ const BrowsePageContent: NextPage = () => {
                                      {groupedSets[seriesName].map((set) => {
                                        const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
                                        const linkHref = `/sets/${set.id}`;
-                                       const isCompleted = completion.percentage >= 100 && completion.total > 0;
                                        return (
-                                           <Link key={set.id} href={linkHref} className="block group">
+                                            <Link key={set.id} href={linkHref} className="block group">
                                                 <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center", "group-hover:z-10 relative")}>
-                                                    <div className="flex justify-between items-start text-xs text-muted-foreground w-full">
-                                                        <Badge variant="secondary" className="font-mono text-xs">{set.id.toUpperCase()}</Badge>
+                                                    <div className="flex justify-between items-start w-full">
+                                                        <div className="relative h-6 w-6">
+                                                            {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
+                                                        </div>
                                                         {user && (
-                                                          <div className="flex items-center gap-1.5">
-                                                            <span>{completion.collected} / {completion.total}</span>
-                                                            <div className={cn(
-                                                              "h-3 w-3 rounded-full",
-                                                              isCompleted ? "bg-primary" : "border-2 border-muted"
-                                                            )}></div>
-                                                          </div>
+                                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                                <span>{completion.collected}/{completion.total}</span>
+                                                                <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
+                                                            </div>
                                                         )}
                                                     </div>
                                                     <div className="flex-grow flex items-center justify-center w-full h-24 my-2">
