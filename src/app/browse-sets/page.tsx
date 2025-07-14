@@ -292,7 +292,7 @@ const BrowsePageContent: NextPage = () => {
                                      {seriesName} Series
                                    </h2>
                                    <Separator className="mb-4 mx-4" />
-                                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 pt-4 px-4">
+                                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
                                      {groupedSets[seriesName].map((set) => {
                                        const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
                                        const linkHref = `/sets/${set.id}`;
