@@ -10,7 +10,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw } from "lucide-react";
+import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw, Hash } from "lucide-react";
 import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 
 interface ApiSet {
   id: string;
@@ -190,6 +191,27 @@ const BrowsePageContent: NextPage = () => {
     return map;
   }, [collection, allArtists, user]);
 
+  const groupedSets = useMemo(() => {
+    return filteredSets.reduce((acc, set) => {
+        const series = set.series || "Uncategorized";
+        if (!acc[series]) {
+            acc[series] = [];
+        }
+        acc[series].push(set);
+        return acc;
+    }, {} as Record<string, ApiSet[]>);
+  }, [filteredSets]);
+
+  const sortedSeriesKeys = useMemo(() => {
+      return Object.keys(groupedSets).sort((a, b) => {
+          if (!groupedSets[a][0] || !groupedSets[b][0]) return 0;
+          const dateA = new Date(groupedSets[a][0].releaseDate).getTime();
+          const dateB = new Date(groupedSets[b][0].releaseDate).getTime();
+          return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      });
+  }, [groupedSets, sortOrder]);
+
+
   if (isLoading) {
      return (
       <div className="flex flex-col min-h-screen bg-background">
@@ -259,28 +281,35 @@ const BrowsePageContent: NextPage = () => {
                     )}
                     {!loadingSets && !setsError && (
                     <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
-                        {filteredSets.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
-                            {filteredSets.map((set) => {
-                            const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
-                            const linkHref = `/sets/${set.id}`;
-                            return (
-                                <Link key={set.id} href={linkHref} className="block group">
-                                    <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full", "group-hover:z-10 relative")}>
-                                    {set.images.logo ? (<div className="relative w-32 h-16 mb-3"><Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/></div>) : (<div className="w-32 h-16 mb-3 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder"><span className="text-xs text-muted-foreground">No Logo</span></div>)}
-                                    <p className="font-semibold text-card-foreground group-hover:text-primary">{set.name}</p>
-                                    {set.series && <p className="text-xs text-muted-foreground">{set.series} Series</p>}
-                                    <p className="text-xs text-muted-foreground">{new Date(set.releaseDate).toLocaleDateString()}</p>
-                                    {user && <div className="w-full mt-4 mb-3 px-2 flex-grow flex flex-col justify-end">
-                                        <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
-                                        <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
-                                        {completion.percentage >= 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
-                                    </div>}
-                                    </Card>
-                                </Link>
-                            );
-                            })}
-                            </div>
+                        {sortedSeriesKeys.length > 0 ? (
+                           sortedSeriesKeys.map(seriesName => (
+                               <div key={seriesName} className="mb-8">
+                                   <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
+                                     {seriesName} Series
+                                   </h2>
+                                   <Separator className="mb-4 mx-4" />
+                                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4 px-4">
+                                     {groupedSets[seriesName].map((set) => {
+                                       const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
+                                       const linkHref = `/sets/${set.id}`;
+                                       return (
+                                           <Link key={set.id} href={linkHref} className="block group">
+                                               <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full", "group-hover:z-10 relative")}>
+                                               {set.images.logo ? (<div className="relative w-32 h-16 mb-3"><Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/></div>) : (<div className="w-32 h-16 mb-3 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder"><span className="text-xs text-muted-foreground">No Logo</span></div>)}
+                                               <p className="font-semibold text-card-foreground group-hover:text-primary">{set.name}</p>
+                                               <p className="text-xs text-muted-foreground">{new Date(set.releaseDate).toLocaleDateString()}</p>
+                                               {user && <div className="w-full mt-4 mb-3 px-2 flex-grow flex flex-col justify-end">
+                                                   <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
+                                                   <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
+                                                   {completion.percentage >= 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
+                                               </div>}
+                                               </Card>
+                                           </Link>
+                                       );
+                                     })}
+                                   </div>
+                               </div>
+                           ))
                         ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No sets found matching your search criteria.</p></div> )}
                     </ScrollArea>
                     )}
