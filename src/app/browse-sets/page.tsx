@@ -296,29 +296,31 @@ const BrowsePageContent: NextPage = () => {
                                        const linkHref = `/sets/${set.id}`;
                                        return (
                                            <Link key={set.id} href={linkHref} className="block group">
-                                               <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center aspect-square", "group-hover:z-10 relative")}>
-                                               <div className="absolute inset-4 flex flex-col items-center justify-center gap-2">
-                                                   {set.images.logo ? (
-                                                       <div className="relative w-full h-1/2">
-                                                           <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
-                                                       </div>
-                                                   ) : (
-                                                       <div className="w-full h-1/2 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
-                                                           <span className="text-xs text-muted-foreground">No Logo</span>
-                                                       </div>
-                                                   )}
-
-                                                   {user && (
-                                                     <div className="relative">
-                                                        <CircularProgress value={completion.percentage} size={60} strokeWidth={6} />
-                                                        <div className="absolute inset-0 flex items-center justify-center">
-                                                          <span className="text-xs font-bold text-primary">{Math.round(completion.percentage)}%</span>
+                                                <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-between p-4 text-center aspect-square", "group-hover:z-10 relative")}>
+                                                    {user && (
+                                                        <div className="absolute top-2 right-2 text-right">
+                                                            <div className="relative">
+                                                                <CircularProgress value={completion.percentage} size={40} strokeWidth={4} />
+                                                                <div className="absolute inset-0 flex items-center justify-center">
+                                                                    <span className="text-[10px] font-bold text-primary">{Math.round(completion.percentage)}%</span>
+                                                                </div>
+                                                            </div>
+                                                            <p className="text-[10px] text-muted-foreground -mt-1">{completion.collected}/{completion.total}</p>
                                                         </div>
-                                                     </div>
-                                                   )}
-                                               </div>
-                                               {user && <div className="absolute bottom-2 left-2 right-2 text-center text-xs text-muted-foreground">{completion.collected} / {completion.total}</div>}
-                                               </Card>
+                                                    )}
+                                                    <div className="flex-grow flex items-center justify-center w-full h-full">
+                                                      {set.images.logo ? (
+                                                          <div className="relative w-full h-1/2">
+                                                              <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
+                                                          </div>
+                                                      ) : (
+                                                          <div className="w-full h-1/2 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
+                                                              <span className="text-xs text-muted-foreground">No Logo</span>
+                                                          </div>
+                                                      )}
+                                                    </div>
+                                                    <p className="font-semibold text-xs mt-2 truncate w-full">{set.name}</p>
+                                                </Card>
                                            </Link>
                                        );
                                      })}
