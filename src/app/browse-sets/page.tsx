@@ -1,3 +1,4 @@
+
 // src/app/browse-sets/page.tsx
 "use client";
 
@@ -22,6 +23,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { CircularProgress } from "@/components/ui/circular-progress";
+import { Badge } from "@/components/ui/badge";
 
 
 interface ApiSet {
@@ -294,32 +296,34 @@ const BrowsePageContent: NextPage = () => {
                                      {groupedSets[seriesName].map((set) => {
                                        const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
                                        const linkHref = `/sets/${set.id}`;
+                                       const isCompleted = completion.percentage >= 100 && completion.total > 0;
                                        return (
                                            <Link key={set.id} href={linkHref} className="block group">
-                                                <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-between p-4 text-center aspect-square", "group-hover:z-10 relative")}>
-                                                    {user && (
-                                                        <div className="absolute top-2 right-2 text-right">
-                                                            <div className="relative">
-                                                                <CircularProgress value={completion.percentage} size={40} strokeWidth={4} />
-                                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                                    <span className="text-[10px] font-bold text-primary">{Math.round(completion.percentage)}%</span>
-                                                                </div>
-                                                            </div>
-                                                            <p className="text-[10px] text-muted-foreground -mt-1">{completion.collected}/{completion.total}</p>
-                                                        </div>
-                                                    )}
-                                                    <div className="flex-grow flex items-center justify-center w-full h-full">
+                                                <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center", "group-hover:z-10 relative")}>
+                                                    <div className="flex justify-between items-start text-xs text-muted-foreground w-full">
+                                                        <Badge variant="secondary" className="font-mono text-xs">{set.id.toUpperCase()}</Badge>
+                                                        {user && (
+                                                          <div className="flex items-center gap-1.5">
+                                                            <span>{completion.collected} / {completion.total}</span>
+                                                            <div className={cn(
+                                                              "h-3 w-3 rounded-full",
+                                                              isCompleted ? "bg-primary" : "border-2 border-muted"
+                                                            )}></div>
+                                                          </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-grow flex items-center justify-center w-full h-24 my-2">
                                                       {set.images.logo ? (
-                                                          <div className="relative w-full h-1/2">
+                                                          <div className="relative w-full h-full">
                                                               <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
                                                           </div>
                                                       ) : (
-                                                          <div className="w-full h-1/2 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
+                                                          <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
                                                               <span className="text-xs text-muted-foreground">No Logo</span>
                                                           </div>
                                                       )}
                                                     </div>
-                                                    <p className="font-semibold text-xs mt-2 truncate w-full">{set.name}</p>
+                                                    <p className="font-semibold text-sm mt-auto truncate w-full">{set.name}</p>
                                                 </Card>
                                            </Link>
                                        );
