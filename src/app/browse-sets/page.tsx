@@ -298,7 +298,7 @@ const BrowsePageContent: NextPage = () => {
                                        const linkHref = `/sets/${set.id}`;
                                        return (
                                             <Link key={set.id} href={linkHref} className="block group">
-                                                <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center", "group-hover:z-10 relative")}>
+                                                <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
                                                     <div className="flex justify-between items-start w-full">
                                                         <div className="relative h-6 w-6">
                                                             {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
@@ -310,7 +310,7 @@ const BrowsePageContent: NextPage = () => {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="flex-grow flex items-center justify-center w-full h-24 my-2">
+                                                    <div className="flex-grow flex items-center justify-center w-full my-2">
                                                       {set.images.logo ? (
                                                           <div className="relative w-full h-full">
                                                               <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
