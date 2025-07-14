@@ -288,17 +288,16 @@ const BrowsePageContent: NextPage = () => {
                                      {seriesName} Series
                                    </h2>
                                    <Separator className="mb-4 mx-4" />
-                                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 pt-4 px-4">
+                                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 pt-4 px-4">
                                      {groupedSets[seriesName].map((set) => {
                                        const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
                                        const linkHref = `/sets/${set.id}`;
                                        return (
                                            <Link key={set.id} href={linkHref} className="block group">
-                                               <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full", "group-hover:z-10 relative")}>
-                                               {set.images.logo ? (<div className="relative w-32 h-16 mb-3"><Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/></div>) : (<div className="w-32 h-16 mb-3 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder"><span className="text-xs text-muted-foreground">No Logo</span></div>)}
-                                               <p className="font-semibold text-card-foreground group-hover:text-primary">{set.name}</p>
-                                               <p className="text-xs text-muted-foreground">{new Date(set.releaseDate).toLocaleDateString()}</p>
-                                               {user && <div className="w-full mt-4 mb-3 px-2 flex-grow flex flex-col justify-end">
+                                               <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center aspect-square", "group-hover:z-10 relative")}>
+                                               {set.images.logo ? (<div className="relative w-full h-1/2 mb-3"><Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/></div>) : (<div className="w-full h-1/2 mb-3 bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder"><span className="text-xs text-muted-foreground">No Logo</span></div>)}
+                                               
+                                               {user && <div className="w-full mt-auto mb-3 px-2 flex-grow flex flex-col justify-end">
                                                    <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
                                                    <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
                                                    {completion.percentage >= 100 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
