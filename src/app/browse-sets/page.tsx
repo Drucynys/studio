@@ -24,6 +24,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { CircularProgress } from "@/components/ui/circular-progress";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 interface ApiSet {
@@ -64,6 +72,7 @@ const BrowsePageContent: NextPage = () => {
 
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
   const { toast } = useToast();
   
   const isLoading = loadingSets || loadingArtists || authLoading;
@@ -148,11 +157,18 @@ const BrowsePageContent: NextPage = () => {
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
     if (activeTab === 'sets') {
-      const filteredData = allSets.filter(item =>
-        item.name.toLowerCase().includes(lowercasedFilter) ||
-        (item.series && item.series.toLowerCase().includes(lowercasedFilter)) ||
-        item.id.toLowerCase().includes(lowercasedFilter)
-      );
+      let filteredData = allSets;
+
+      if (selectedSeries.length > 0) {
+        filteredData = filteredData.filter(set => selectedSeries.includes(set.series));
+      }
+
+      if (searchTerm) {
+          filteredData = filteredData.filter(item =>
+            item.name.toLowerCase().includes(lowercasedFilter) ||
+            item.id.toLowerCase().includes(lowercasedFilter)
+          );
+      }
 
       filteredData.sort((a, b) => {
         const dateA = new Date(a.releaseDate).getTime();
@@ -167,7 +183,13 @@ const BrowsePageContent: NextPage = () => {
       );
       setFilteredArtists(filteredData);
     }
-  }, [searchTerm, allSets, allArtists, activeTab, sortOrder]);
+  }, [searchTerm, allSets, allArtists, activeTab, sortOrder, selectedSeries]);
+  
+  const availableSeries = useMemo(() => {
+    const seriesSet = new Set(allSets.map(set => set.series));
+    return Array.from(seriesSet).sort((a,b) => b.localeCompare(a)); // Sort alphabetically or by another logic if needed
+  }, [allSets]);
+
 
   const setCompletions = useMemo(() => {
     if (!user) return new Map();
@@ -227,6 +249,17 @@ const BrowsePageContent: NextPage = () => {
       </div>
     );
   }
+  
+  const handleSeriesToggle = (series: string) => {
+    setSelectedSeries(prev => {
+        const isSelected = prev.includes(series);
+        if (isSelected) {
+            return prev.filter(s => s !== series);
+        } else {
+            return [...prev, series];
+        }
+    });
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -259,7 +292,37 @@ const BrowsePageContent: NextPage = () => {
                     />
                   </div>
                   {activeTab === 'sets' && (
-                    <div className="flex-shrink-0">
+                    <div className="flex flex-shrink-0 gap-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                           <Button variant="outline" className="w-full md:w-auto">
+                              <span>Series</span>
+                              {selectedSeries.length > 0 && (
+                                <Badge variant="secondary" className="ml-2">{selectedSeries.length} selected</Badge>
+                              )}
+                           </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by Series</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                           <DropdownMenuCheckboxItem
+                              checked={selectedSeries.length === 0}
+                              onCheckedChange={() => setSelectedSeries([])}
+                           >
+                              All Series
+                           </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {availableSeries.map(series => (
+                             <DropdownMenuCheckboxItem
+                                key={series}
+                                checked={selectedSeries.includes(series)}
+                                onCheckedChange={() => handleSeriesToggle(series)}
+                             >
+                                {series}
+                             </DropdownMenuCheckboxItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
                           <SelectTrigger className="w-full md:w-[180px]">
                               <SelectValue placeholder="Sort by year" />
