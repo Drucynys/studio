@@ -34,12 +34,13 @@ const ArtistDetailPage = () => {
         headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
       }
       
+      const encodedArtistName = encodeURIComponent(artistName);
       let allCards: ApiPokemonCard[] = [];
       let page = 1;
       let hasMore = true;
 
       while(hasMore) {
-        const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=artist:"${artistName}"&page=${page}&pageSize=250&orderBy=set.releaseDate,number`, { headers });
+        const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=artist:"${encodedArtistName}"&page=${page}&pageSize=250&orderBy=set.releaseDate,number`, { headers });
         if (!response.ok) {
           throw new Error(`Failed to fetch cards: ${response.statusText} (status: ${response.status})`);
         }
