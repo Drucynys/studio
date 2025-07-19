@@ -1,3 +1,4 @@
+
 // src/app/browse-artists/[artistName]/page.tsx
 "use client";
 
@@ -30,23 +31,16 @@ const ArtistDetailPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const headers: HeadersInit = {};
-      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
-        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-      }
-      
-      const fullQuery = `artist:"${artistName}"`;
-      
-      // Fetch only the first 250 cards to prevent API timeouts on large queries.
-      const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(fullQuery)}&pageSize=250&orderBy=set.releaseDate,number`, { headers });
+      // Fetch from our new internal API endpoint
+      const response = await fetch(`/api/cards/by-artist/${encodeURIComponent(artistName)}`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `Failed to fetch cards: ${response.statusText} (status: ${response.status})`);
+        throw new Error(errorData.message || `Failed to fetch cards: ${response.statusText} (status: ${response.status})`);
       }
       
       const data = await response.json();
-      setCardsByArtist(data.data as ApiPokemonCard[]);
+      setCardsByArtist(data as ApiPokemonCard[]);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
