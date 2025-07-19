@@ -19,7 +19,8 @@ export async function GET(
         
         // This query requires a single-field index on 'artist'. 
         // Firestore can usually create this automatically, but sometimes it needs to be done manually.
-        const querySnapshot = await cardsRef.where('artist', '==', decodedArtistName).get();
+        // We limit the results to 100 to ensure performance.
+        const querySnapshot = await cardsRef.where('artist', '==', decodedArtistName).limit(100).get();
 
         if (querySnapshot.empty) {
             return NextResponse.json([]);
