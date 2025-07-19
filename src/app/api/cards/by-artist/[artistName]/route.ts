@@ -18,7 +18,7 @@ export async function GET(
         const cardsRef = dbAdmin.collection('pokemon-tcg-cards');
         
         // This query requires a single-field index on 'artist'. 
-        // Firestore can usually create this automatically.
+        // Firestore can usually create this automatically, but sometimes it needs to be done manually.
         const querySnapshot = await cardsRef.where('artist', '==', decodedArtistName).get();
 
         if (querySnapshot.empty) {
@@ -30,6 +30,7 @@ export async function GET(
     } catch (error: any) {
         console.error(`Error fetching cards for artist ${decodedArtistName}:`, error);
         
+        // Specific check for the "requires an index" error from Firestore
         if (error.message && error.message.includes('requires an index')) {
              return NextResponse.json(
                 { 
