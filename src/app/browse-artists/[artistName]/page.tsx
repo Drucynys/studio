@@ -24,6 +24,7 @@ const ArtistDetailPage = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const artistName = decodeURIComponent(artistNameParam);
+  
   const fetchCardsByArtist = useCallback(async () => {
     if (!artistName) return;
     setIsLoading(true);
@@ -34,32 +35,26 @@ const ArtistDetailPage = () => {
         headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
       }
       
-      // Construct the full query string first
       const fullQuery = `artist:"${artistName}"`;
       
-      let allCards: ApiPokemonCard[] = [];
-      let page = 1;
-      let hasMore = true;
+      // Fetch only the first 250 cards to prevent API timeouts on large queries.
+      const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(fullQuery)}&pageSize=250&orderBy=set.releaseDate,number`, { headers });
 
-      while(hasMore) {
-        // Now encode the entire query string and construct the URL
-        const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(fullQuery)}&page=${page}&pageSize=250&orderBy=set.releaseDate,number`, { headers });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch cards: ${response.statusText} (status: ${response.status})`);
-        }
-        const data = await response.json();
-        allCards = allCards.concat(data.data as ApiPokemonCard[]);
-        page++;
-        hasMore = data.page * data.pageSize < data.totalCount;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `Failed to fetch cards: ${response.statusText} (status: ${response.status})`);
       }
+      
+      const data = await response.json();
+      setCardsByArtist(data.data as ApiPokemonCard[]);
 
-      setCardsByArtist(allCards);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred");
     } finally {
       setIsLoading(false);
     }
   }, [artistName]);
+
 
   useEffect(() => {
     fetchCardsByArtist();
@@ -95,7 +90,7 @@ const ArtistDetailPage = () => {
             )}
             {error && (
               <div className="text-center py-10 text-destructive">
-                <ServerCrash className="h-16 w-16 mb-4" />
+                <ServerCrash className="h-16 w-16 mx-auto mb-4" />
                 <p className="text-xl font-semibold">Could not load cards for {artistName}.</p>
                 <p>{error}</p>
               </div>
@@ -116,7 +111,7 @@ const ArtistDetailPage = () => {
                         <Image
                           src={card.images.small}
                           alt={card.name}
-                          layout="fill"
+                          fill
                           objectFit="contain"
                           data-ai-hint="pokemon card front"
                         />
