@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import { Loader2, ServerCrash, ArrowLeft, Images, Paintbrush } from "lucide-react";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+import { dbAdmin } from "@/lib/firebase-admin";
 
 const ArtistDetailPage = () => {
   const params = useParams();
