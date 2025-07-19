@@ -19,7 +19,6 @@ export async function GET() {
         // Index: collection='pokemon-tcg-artists', fields: 'cardCount' (desc), 'name' (asc)
         const snapshot = await artistsCollection
             .orderBy('cardCount', 'desc')
-            .orderBy('name', 'asc')
             .get();
 
         if (snapshot.empty) {
