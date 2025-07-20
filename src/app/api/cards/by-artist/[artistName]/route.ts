@@ -1,12 +1,39 @@
-
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// Safe initialization function (same as your working set API)
+function initializeFirebaseAdmin() {
+    if (admin.apps.length > 0) {
+        return;
+    }
+    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    
+    if (!serviceAccountJson) {
+        throw new Error("CRITICAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set. The sync tool cannot authenticate with the database.");
+    }
+    if (!projectId) {
+        throw new Error("CRITICAL: The FIREBASE_PROJECT_ID environment variable is not set.");
+    }
+    
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+    
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        projectId: projectId,
+    });
+}
 
 export async function GET(
     request: Request,
-    { params }: { params: { artistName: string } }
+    { params }: { params: Promise<{ artistName: string }> }
 ) {
-    const { artistName } = params;
+    const { artistName } = await params;
+    
     if (!artistName) {
         return NextResponse.json({ message: 'Artist name is required' }, { status: 400 });
     }
@@ -15,7 +42,9 @@ export async function GET(
     const decodedArtistName = decodeURIComponent(artistName);
 
     try {
-        const cardsRef = dbAdmin.collection('pokemon-tcg-cards');
+        initializeFirebaseAdmin();
+        const db = getFirestore();
+        const cardsRef = db.collection('pokemon-tcg-cards');
         
         // This query requires a single-field index on 'artist'. 
         // Firestore can usually create this automatically, but sometimes it needs to be done manually.
