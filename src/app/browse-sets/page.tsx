@@ -1,3 +1,4 @@
+
 // src/app/browse-sets/page.tsx
 "use client";
 
@@ -524,5 +525,3 @@ const BrowsePage: NextPage = () => (
 );
 
 export default BrowsePage;
-
-    
