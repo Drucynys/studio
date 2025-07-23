@@ -2,7 +2,7 @@
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback, Suspense, useMemo } from "react";
+import { useEffect, useState, useCallback, Suspense, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,10 @@ interface Artist {
 const BrowsePageContent: NextPage = () => {
   const searchParams = useSearchParams();
   const { collection, loading: authLoading, user } = useAuth();
+  
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
   const tabParam = searchParams.get('tab');
   const initialTab = tabParam === 'artists' ? 'artists' : 'sets';
@@ -83,6 +87,19 @@ const BrowsePageContent: NextPage = () => {
   const { toast } = useToast();
   
   const isLoading = loadingSets || loadingArtists || authLoading;
+
+  const handleScroll = useCallback(() => {
+      const currentScrollY = scrollAreaRef.current?.querySelector('div[data-radix-scroll-area-viewport]')?.scrollTop ?? 0;
+      
+      if (Math.abs(currentScrollY - lastScrollY) < 10) return;
+
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+          setIsHeaderVisible(false); // scrolling down
+      } else {
+          setIsHeaderVisible(true); // scrolling up
+      }
+      setLastScrollY(currentScrollY);
+  }, [lastScrollY]);
 
   const fetchSets = useCallback(async () => {
     setLoadingSets(true);
@@ -323,7 +340,10 @@ const BrowsePageContent: NextPage = () => {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6">
+            <div className={cn(
+              "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-[65px] md:top-[77px] z-40 transition-transform duration-300",
+              !isHeaderVisible && "-translate-y-full"
+              )}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="space-y-1">
                       <h1 className="font-headline text-3xl text-foreground">Browse TCG Catalog</h1>
@@ -397,7 +417,7 @@ const BrowsePageContent: NextPage = () => {
                      <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
                 </div>
                 ) : (
-                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
+                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]" ref={scrollAreaRef} onScroll={handleScroll}>
                     {sortedSeriesKeys.length > 0 ? (
                        sortedSeriesKeys.map(seriesName => (
                            <div key={seriesName} className="mb-8">
@@ -455,7 +475,7 @@ const BrowsePageContent: NextPage = () => {
                      <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
                 </div>
                 ) : (
-                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
+                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]" onScroll={handleScroll}>
                     {filteredArtists.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
                         {filteredArtists.map((artist) => {
@@ -504,3 +524,5 @@ const BrowsePage: NextPage = () => (
 );
 
 export default BrowsePage;
+
+    
