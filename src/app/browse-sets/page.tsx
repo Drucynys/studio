@@ -1,4 +1,3 @@
-
 // src/app/browse-sets/page.tsx
 "use client";
 
@@ -11,7 +10,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw, Hash } from "lucide-react";
+import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw, Hash, Filter } from "lucide-react";
 import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +31,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter
+} from "@/components/ui/sheet";
 
 
 interface ApiSet {
@@ -261,6 +268,56 @@ const BrowsePageContent: NextPage = () => {
     });
   };
 
+  const FilterControls = ({ isSheet = false }: { isSheet?: boolean }) => (
+    <>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Sort Order</label>
+        <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
+            <SelectTrigger>
+                <SelectValue placeholder="Sort by year" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="desc">Newest First</SelectItem>
+                <SelectItem value="asc">Oldest First</SelectItem>
+            </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Filter by Series</label>
+         <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+               <Button variant="outline" className="w-full justify-between">
+                  <span>{selectedSeries.length === 0 ? "All Series" : `${selectedSeries.length} selected`}</span>
+                  {selectedSeries.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">{selectedSeries.length}</Badge>
+                  )}
+               </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+              <DropdownMenuLabel>Filter by Series</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+               <DropdownMenuCheckboxItem
+                  checked={selectedSeries.length === 0}
+                  onCheckedChange={() => setSelectedSeries([])}
+               >
+                  All Series
+               </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              {availableSeries.map(series => (
+                 <DropdownMenuCheckboxItem
+                    key={series}
+                    checked={selectedSeries.includes(series)}
+                    onCheckedChange={() => handleSeriesToggle(series)}
+                 >
+                    {series}
+                 </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+      </div>
+    </>
+  );
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
@@ -292,47 +349,39 @@ const BrowsePageContent: NextPage = () => {
                     />
                   </div>
                   {activeTab === 'sets' && (
-                    <div className="flex flex-shrink-0 gap-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                           <Button variant="outline" className="w-full md:w-auto">
-                              <span>Series</span>
-                              {selectedSeries.length > 0 && (
-                                <Badge variant="secondary" className="ml-2">{selectedSeries.length} selected</Badge>
-                              )}
-                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                          <DropdownMenuLabel>Filter by Series</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                           <DropdownMenuCheckboxItem
-                              checked={selectedSeries.length === 0}
-                              onCheckedChange={() => setSelectedSeries([])}
-                           >
-                              All Series
-                           </DropdownMenuCheckboxItem>
-                          <DropdownMenuSeparator />
-                          {availableSeries.map(series => (
-                             <DropdownMenuCheckboxItem
-                                key={series}
-                                checked={selectedSeries.includes(series)}
-                                onCheckedChange={() => handleSeriesToggle(series)}
-                             >
-                                {series}
-                             </DropdownMenuCheckboxItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
-                          <SelectTrigger className="w-full md:w-[180px]">
-                              <SelectValue placeholder="Sort by year" />
-                          </SelectTrigger>
-                          <SelectContent>
-                              <SelectItem value="desc">Newest First</SelectItem>
-                              <SelectItem value="asc">Oldest First</SelectItem>
-                          </SelectContent>
-                      </Select>
-                    </div>
+                    <>
+                      {/* Desktop Filters */}
+                      <div className="hidden md:flex flex-shrink-0 gap-4">
+                         <FilterControls />
+                      </div>
+                       {/* Mobile Filter Button */}
+                       <div className="md:hidden">
+                          <Sheet>
+                              <SheetTrigger asChild>
+                                <Button variant="outline" className="w-full relative">
+                                  <Filter className="mr-2 h-4 w-4" />
+                                  Filter
+                                  {selectedSeries.length > 0 && (
+                                      <Badge variant="destructive" className="absolute -top-2 -right-2 px-2">{selectedSeries.length}</Badge>
+                                  )}
+                                </Button>
+                              </SheetTrigger>
+                              <SheetContent side="bottom" className="rounded-t-lg">
+                                <SheetHeader>
+                                  <SheetTitle>Filter & Sort</SheetTitle>
+                                </SheetHeader>
+                                <div className="grid gap-4 py-4">
+                                  <FilterControls isSheet={true} />
+                                </div>
+                                <SheetFooter>
+                                  <SheetTrigger asChild>
+                                    <Button className="w-full">Done</Button>
+                                  </SheetTrigger>
+                                </SheetFooter>
+                              </SheetContent>
+                          </Sheet>
+                       </div>
+                    </>
                   )}
                 </div>
             </CardHeader>
