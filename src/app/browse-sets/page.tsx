@@ -323,20 +323,22 @@ const BrowsePageContent: NextPage = () => {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <Card className="shadow-xl">
-            <CardHeader>
+            <div className="p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <CardTitle className="font-headline text-3xl text-foreground">Browse TCG Catalog</CardTitle>
+                    <div className="space-y-1">
+                      <h1 className="font-headline text-3xl text-foreground">Browse TCG Catalog</h1>
+                      <p className="text-muted-foreground">
+                        {activeTab === 'sets' 
+                          ? 'Explore different Pokémon TCG sets from throughout history.' 
+                          : 'Explore the entire catalog through the lens of its talented illustrators.'}
+                      </p>
+                    </div>
                     <TabsList className="grid w-full sm:w-auto grid-cols-2">
                         <TabsTrigger value="sets"><Package className="mr-2 h-4 w-4"/>By Set</TabsTrigger>
                         <TabsTrigger value="artists"><Paintbrush className="mr-2 h-4 w-4"/>By Artist</TabsTrigger>
                     </TabsList>
                 </div>
-                <CardDescription>
-                  {activeTab === 'sets' 
-                    ? 'Explore different Pokémon TCG sets from throughout history.' 
-                    : 'Explore the entire catalog through the lens of its talented illustrators.'}
-                </CardDescription>
+                
                 <div className="flex flex-col md:flex-row gap-4 mt-4">
                   <div className="relative flex-grow">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -384,104 +386,100 @@ const BrowsePageContent: NextPage = () => {
                     </>
                   )}
                 </div>
-            </CardHeader>
-            <CardContent>
-                <TabsContent value="sets">
-                    {setsError && (
-                    <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
-                        <ServerCrash className="h-16 w-16 mx-auto mb-4" />
-                        <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                        <p className="mt-2 max-w-md">{setsError}</p>
-                         <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
-                    </div>
-                    )}
-                    {!loadingSets && !setsError && (
-                    <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
-                        {sortedSeriesKeys.length > 0 ? (
-                           sortedSeriesKeys.map(seriesName => (
-                               <div key={seriesName} className="mb-8">
-                                   <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
-                                     {seriesName} Series
-                                   </h2>
-                                   <Separator className="mb-4 mx-4" />
-                                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
-                                     {groupedSets[seriesName].map((set) => {
-                                       const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
-                                       const linkHref = `/sets/${set.id}`;
-                                       return (
-                                            <Link key={set.id} href={linkHref} className="block group">
-                                                <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
-                                                    <div className="flex justify-between items-start w-full">
-                                                        <div className="relative h-6 w-6">
-                                                            {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
+            </div>
+
+            <TabsContent value="sets">
+                {setsError ? (
+                <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
+                    <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                    <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                    <p className="mt-2 max-w-md">{setsError}</p>
+                     <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
+                </div>
+                ) : (
+                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
+                    {sortedSeriesKeys.length > 0 ? (
+                       sortedSeriesKeys.map(seriesName => (
+                           <div key={seriesName} className="mb-8">
+                               <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
+                                 {seriesName} Series
+                               </h2>
+                               <Separator className="mb-4 mx-4" />
+                               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
+                                 {groupedSets[seriesName].map((set) => {
+                                   const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
+                                   const linkHref = `/sets/${set.id}`;
+                                   return (
+                                        <Link key={set.id} href={linkHref} className="block group">
+                                            <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
+                                                <div className="flex justify-between items-start w-full">
+                                                    <div className="relative h-6 w-6">
+                                                        {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
+                                                    </div>
+                                                    {user && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                            <span>{completion.collected}/{completion.total}</span>
+                                                            <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
                                                         </div>
-                                                        {user && (
-                                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                                <span>{completion.collected}/{completion.total}</span>
-                                                                <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-grow flex items-center justify-center w-full my-2">
-                                                      {set.images.logo ? (
-                                                          <div className="relative w-full h-full">
-                                                              <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
-                                                          </div>
-                                                      ) : (
-                                                          <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
-                                                              <span className="text-xs text-muted-foreground">No Logo</span>
-                                                          </div>
-                                                      )}
-                                                    </div>
-                                                    <p className="font-semibold text-sm mt-auto truncate w-full">{set.name}</p>
-                                                </Card>
-                                           </Link>
-                                       );
-                                     })}
-                                   </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-grow flex items-center justify-center w-full my-2">
+                                                  {set.images.logo ? (
+                                                      <div className="relative w-full h-full">
+                                                          <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
+                                                      </div>
+                                                  ) : (
+                                                      <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
+                                                          <span className="text-xs text-muted-foreground">No Logo</span>
+                                                      </div>
+                                                  )}
+                                                </div>
+                                                <p className="font-semibold text-sm mt-auto truncate w-full">{set.name}</p>
+                                            </Card>
+                                       </Link>
+                                   );
+                                 })}
                                </div>
-                           ))
-                        ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No sets found matching your search criteria.</p></div> )}
-                    </ScrollArea>
-                    )}
-                </TabsContent>
-                <TabsContent value="artists">
-                  {artistsError && (
-                    <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
-                        <ServerCrash className="h-16 w-16 mx-auto mb-4" />
-                        <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                        <p className="mt-2 max-w-md">{artistsError}</p>
-                         <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
-                    </div>
-                    )}
-                  {!loadingArtists && !artistsError && (
-                    <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
-                        {filteredArtists.length > 0 ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
-                            {filteredArtists.map((artist) => {
-                              const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
-                              return (
-                                <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
-                                  <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                                    <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
-                                    <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
-                                    {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
-                                        <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
-                                        <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
-                                          {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
-                                      </div>)}
-                                    <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
-                                  </Card>
-                                </Link>
-                              );
-                            })}
-                            </div>
-                        ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No artists found matching your search.</p></div> )}
-                    </ScrollArea>
-                  )}
-                </TabsContent>
-            </CardContent>
-            </Card>
+                           </div>
+                       ))
+                    ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No sets found matching your search criteria.</p></div> )}
+                </ScrollArea>
+                )}
+            </TabsContent>
+            <TabsContent value="artists">
+              {artistsError ? (
+                <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
+                    <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                    <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                    <p className="mt-2 max-w-md">{artistsError}</p>
+                     <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
+                </div>
+                ) : (
+                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
+                    {filteredArtists.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
+                        {filteredArtists.map((artist) => {
+                          const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
+                          return (
+                            <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
+                              <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
+                                <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
+                                <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
+                                {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
+                                    <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
+                                    <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
+                                      {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
+                                  </div>)}
+                                <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
+                              </Card>
+                            </Link>
+                          );
+                        })}
+                        </div>
+                    ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No artists found matching your search.</p></div> )}
+                </ScrollArea>
+              )}
+            </TabsContent>
         </Tabs>
       </main>
        <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
