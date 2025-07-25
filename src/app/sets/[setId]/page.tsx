@@ -80,6 +80,33 @@ const SetDetailsPage = () => {
   
   const { toast } = useToast();
 
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
+  useEffect(() => {
+    const scrollHandler = () => {
+      const currentScrollY = window.scrollY;
+      
+      setLastScrollY(prevLastScrollY => {
+        if (Math.abs(currentScrollY - prevLastScrollY) < 10) return prevLastScrollY;
+
+        if (currentScrollY > prevLastScrollY && currentScrollY > 100) {
+          setIsHeaderVisible(false); // scrolling down
+        } else {
+          setIsHeaderVisible(true); // scrolling up
+        }
+        
+        return currentScrollY;
+      });
+    };
+
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', scrollHandler);
+    };
+  }, []);
+
   const fetchSetDetailsAndCards = useCallback(async () => {
     if (!setId) return;
     setIsLoading(true);
@@ -189,14 +216,19 @@ const SetDetailsPage = () => {
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
-        <Link href="/browse-sets">
-          <Button variant="outline" className="mb-6">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sets
-          </Button>
-        </Link>
+        <div className="mb-6">
+            <Link href="/browse-sets">
+              <Button variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sets
+              </Button>
+            </Link>
+        </div>
         {setDetails && (
-          <Card className="sticky top-[77px] z-40 mb-6 shadow-xl">
-             <CardHeader>
+          <Card className={cn(
+            "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-[65px] md:top-[77px] z-40 transition-transform duration-300",
+            !isHeaderVisible && "-translate-y-[200%]"
+            )}>
+             <CardHeader className="p-0">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div className="flex flex-col md:flex-row md:items-center md:gap-4">
                         {setDetails.logoUrl && (
@@ -242,65 +274,63 @@ const SetDetailsPage = () => {
              </CardHeader>
           </Card>
         )}
-        <Card className="shadow-xl">
-          <CardContent className="pt-6">
-            {error && (
-              <div className="flex flex-col items-center justify-center py-10 text-destructive">
-                <ServerCrash className="h-16 w-16 mb-4" />
-                <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                <p className="text-center">Could not load cards for this set: {error}.<br />Please try again later or check the set ID.</p>
-              </div>
+        
+        {error && (
+            <div className="flex flex-col items-center justify-center py-10 text-destructive">
+            <ServerCrash className="h-16 w-16 mb-4" />
+            <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+            <p className="text-center">Could not load cards for this set: {error}.<br />Please try again later or check the set ID.</p>
+            </div>
+        )}
+        {!isLoading && !error && (
+            <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-26rem)]">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
+                {filteredCards.map((card) => {
+                    const isCollected = collection.some(
+                        (collected) =>
+                        collected.name === card.name &&
+                        collected.set === card.set.name &&
+                        collected.cardNumber === card.number &&
+                        collected.language === "English" 
+                    );
+                    return (
+                            <Card
+                            key={card.id}
+                            onClick={() => openDialogForCard(card)}
+                            className={cn(
+                                "p-2 cursor-pointer group flex flex-col relative bg-card",
+                                "transform transition-all duration-200 ease-out",
+                                "hover:scale-105 hover:-translate-y-1 hover:shadow-lg group-hover:z-10",
+                                    isCollected && "border-2 border-primary/50"
+                            )}
+                        >
+                            <div className={cn(
+                                "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden"
+                            )}>
+                            <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                                {isCollected && (
+                                <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-1">
+                                    <CheckCircle className="h-3 w-3" />
+                                </div>
+                            )}
+                            </div>
+                            <div className="mt-2 text-center">
+                                <p className="text-sm font-semibold truncate leading-tight">{card.name}</p>
+                                <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity}</p>
+                            </div>
+                        </Card>
+                    );
+                })}
+                </div>
+            {(!isLoading && !error && filteredCards.length === 0) && (
+                <div className="text-center py-10 text-muted-foreground">
+                    <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">{searchTerm ? "No cards found matching your search." : "No cards found in this set, or the database returned no data."}</p>
+                </div>
             )}
-            {!isLoading && !error && (
-              <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-26rem)]">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
-                    {filteredCards.map((card) => {
-                        const isCollected = collection.some(
-                            (collected) =>
-                            collected.name === card.name &&
-                            collected.set === card.set.name &&
-                            collected.cardNumber === card.number &&
-                            collected.language === "English" 
-                        );
-                        return (
-                             <Card
-                                key={card.id}
-                                onClick={() => openDialogForCard(card)}
-                                className={cn(
-                                    "p-2 cursor-pointer group flex flex-col relative bg-card",
-                                    "transform transition-all duration-200 ease-out",
-                                    "hover:scale-105 hover:-translate-y-1 hover:shadow-lg group-hover:z-10",
-                                     isCollected && "border-2 border-primary/50"
-                                )}
-                            >
-                              <div className={cn(
-                                  "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden"
-                              )}>
-                                <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
-                                 {isCollected && (
-                                    <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-1">
-                                        <CheckCircle className="h-3 w-3" />
-                                    </div>
-                                )}
-                              </div>
-                              <div className="mt-2 text-center">
-                                 <p className="text-sm font-semibold truncate leading-tight">{card.name}</p>
-                                 <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity}</p>
-                              </div>
-                            </Card>
-                        );
-                    })}
-                    </div>
-                {(!isLoading && !error && filteredCards.length === 0) && (
-                    <div className="text-center py-10 text-muted-foreground">
-                        <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg">{searchTerm ? "No cards found matching your search." : "No cards found in this set, or the database returned no data."}</p>
-                    </div>
-                )}
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
+            </ScrollArea>
+        )}
+        
       </main>
       {selectedApiCard && (
         <AddCardToCollectionDialog
