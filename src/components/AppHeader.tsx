@@ -39,11 +39,11 @@ export function AppHeader() {
   const closeSheet = () => setIsSheetOpen(false);
 
   return (
-    <header className="bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
+    <header className="bg-card text-foreground border-b shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <PokeballIcon className="h-8 w-8 md:h-10 md:w-10" />
-          <h1 className="text-2xl md:text-3xl font-headline font-bold">
+          <h1 className="text-2xl md:text-3xl font-headline font-bold text-primary">
             PokéTRKR
           </h1>
         </Link>
@@ -52,7 +52,7 @@ export function AppHeader() {
         <div className="flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative hover:bg-primary-foreground/10 text-primary-foreground">
+              <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
                 {hasNotifications && (
                   <span className="absolute top-2 right-2 flex h-3 w-3">
@@ -99,7 +99,7 @@ export function AppHeader() {
           <div>
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-primary-foreground/10 text-primary-foreground">
+                <Button variant="ghost" size="icon">
                   <Menu className="h-6 w-6" />
                   <span className="sr-only">Open menu</span>
                 </Button>
