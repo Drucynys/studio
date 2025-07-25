@@ -216,15 +216,8 @@ const SetDetailsPage = () => {
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
-        <div className="mb-6">
-            <Link href="/browse-sets">
-              <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sets
-              </Button>
-            </Link>
-        </div>
         {setDetails && (
-          <Card className={cn(
+          <div className={cn(
             "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-[65px] md:top-[77px] z-40 transition-transform duration-300",
             !isHeaderVisible && "-translate-y-[200%]"
             )}>
@@ -272,7 +265,7 @@ const SetDetailsPage = () => {
                     </div>
                 </div>
              </CardHeader>
-          </Card>
+          </div>
         )}
         
         {error && (
@@ -283,8 +276,8 @@ const SetDetailsPage = () => {
             </div>
         )}
         {!isLoading && !error && (
-            <ScrollArea className="h-[calc(100vh-28rem)] md:h-[calc(100vh-26rem)]">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
+            <div className="pb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 px-4">
                 {filteredCards.map((card) => {
                     const isCollected = collection.some(
                         (collected) =>
@@ -328,10 +321,18 @@ const SetDetailsPage = () => {
                     <p className="text-lg">{searchTerm ? "No cards found matching your search." : "No cards found in this set, or the database returned no data."}</p>
                 </div>
             )}
-            </ScrollArea>
+            </div>
         )}
         
       </main>
+      
+      <Link href="/browse-sets" className="fixed bottom-6 left-6 z-50">
+        <Button variant="secondary" size="icon" className="rounded-full h-14 w-14 shadow-lg border">
+            <ArrowLeft className="h-6 w-6" />
+            <span className="sr-only">Back to Sets</span>
+        </Button>
+      </Link>
+      
       {selectedApiCard && (
         <AddCardToCollectionDialog
           isOpen={isDialogOpen}
