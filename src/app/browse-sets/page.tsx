@@ -1,4 +1,3 @@
-
 // src/app/browse-sets/page.tsx
 "use client";
 
@@ -89,18 +88,33 @@ const BrowsePageContent: NextPage = () => {
   
   const isLoading = loadingSets || loadingArtists || authLoading;
 
-  const handleScroll = useCallback(() => {
-      const currentScrollY = scrollAreaRef.current?.querySelector('div[data-radix-scroll-area-viewport]')?.scrollTop ?? 0;
-      
-      if (Math.abs(currentScrollY - lastScrollY) < 10) return;
+  const handleScroll = useCallback((event: Event) => {
+    const target = event.target as HTMLDivElement;
+    const currentScrollY = target.scrollTop;
+    
+    // Only hide header if we've scrolled more than 10px and are scrolling down
+    if (Math.abs(currentScrollY - lastScrollY) < 10) return;
 
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-          setIsHeaderVisible(false); // scrolling down
-      } else {
-          setIsHeaderVisible(true); // scrolling up
-      }
-      setLastScrollY(currentScrollY);
+    if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      setIsHeaderVisible(false); // scrolling down
+    } else {
+      setIsHeaderVisible(true); // scrolling up
+    }
+    setLastScrollY(currentScrollY);
   }, [lastScrollY]);
+
+  // Attach scroll event listener to the scroll area
+  useEffect(() => {
+    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement;
+    
+    if (scrollElement) {
+      scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+      
+      return () => {
+        scrollElement.removeEventListener('scroll', handleScroll);
+      };
+    }
+  }, [handleScroll]);
 
   const fetchSets = useCallback(async () => {
     setLoadingSets(true);
@@ -418,7 +432,7 @@ const BrowsePageContent: NextPage = () => {
                      <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
                 </div>
                 ) : (
-                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]" ref={scrollAreaRef} onScroll={handleScroll}>
+                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]" ref={scrollAreaRef}>
                     {sortedSeriesKeys.length > 0 ? (
                        sortedSeriesKeys.map(seriesName => (
                            <div key={seriesName} className="mb-8">
@@ -476,7 +490,7 @@ const BrowsePageContent: NextPage = () => {
                      <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
                 </div>
                 ) : (
-                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]" onScroll={handleScroll}>
+                <ScrollArea className="h-[calc(100vh-22rem)] md:h-[calc(100vh-27rem)]">
                     {filteredArtists.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
                         {filteredArtists.map((artist) => {
