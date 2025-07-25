@@ -243,7 +243,7 @@ export function FullScreenCardView({
               src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
               alt={currentCard.name || "Pokémon Card"}
               layout="fill"
-              objectFit="cover"
+              objectFit="contain"
               priority
               className="card-image"
             />
