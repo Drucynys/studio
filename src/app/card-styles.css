@@ -64,10 +64,9 @@
 		radial-gradient(
 			circle farthest-corner at var(--posx) var(--posy),
 			rgba(255,255,255,0.8) 0%,
-			rgba(255,255,255,0.3) 40%,
-			rgba(0,0,0,0.5) 120%
+			rgba(255,255,255,0.3) 40%
 		);
-	mix-blend-mode: color-dodge;
+	mix-blend-mode: overlay;
 	opacity: var(--o);
 	pointer-events: none;
 	z-index: 3;
