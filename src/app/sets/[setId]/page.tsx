@@ -195,29 +195,52 @@ const SetDetailsPage = () => {
           </Button>
         </Link>
         {setDetails && (
-          <header className="mb-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex flex-col md:flex-row md:items-center md:gap-4">
-                    {setDetails.logoUrl && (
-                        <Image src={setDetails.logoUrl} alt={`${setDetails.name} logo`} width={120} height={50} style={{objectFit:"contain"}} className="mb-2 md:mb-0 self-center md:self-auto" data-ai-hint="pokemon set logo"/>
-                    )}
-                    <div>
-                        <h1 className="font-headline text-3xl md:text-4xl text-foreground text-center md:text-left">{setDetails.name}</h1>
-                        <p className="text-muted-foreground text-md md:text-lg text-center md:text-left">{setDetails.series} Series</p>
+          <Card className="sticky top-[77px] z-40 mb-6 shadow-xl">
+             <CardHeader>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center md:gap-4">
+                        {setDetails.logoUrl && (
+                            <Image src={setDetails.logoUrl} alt={`${setDetails.name} logo`} width={120} height={50} style={{objectFit:"contain"}} className="mb-2 md:mb-0 self-center md:self-auto" data-ai-hint="pokemon set logo"/>
+                        )}
+                        <div>
+                            <CardTitle className="font-headline text-3xl md:text-4xl text-foreground text-center md:text-left">{setDetails.name}</CardTitle>
+                            <CardDescription className="text-md md:text-lg text-center md:text-left">{setDetails.series} Series</CardDescription>
+                        </div>
+                    </div>
+                    <div className="relative w-full md:w-1/3 lg:w-1/4 mt-4 md:mt-0">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input
+                            type="text"
+                            placeholder="Search cards in set..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10 w-full"
+                        />
                     </div>
                 </div>
-                <div className="relative w-full md:w-1/3 lg:w-1/4 mt-4 md:mt-0">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                        type="text"
-                        placeholder="Search cards in set..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 w-full"
-                    />
+                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-4 gap-x-8 pt-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CalendarDays className="h-4 w-4 text-primary"/>
+                        Released: {format(new Date(setDetails.releaseDate), "MMMM d, yyyy")}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Hash className="h-4 w-4 text-primary"/>
+                        {setDetails.totalCards} cards
+                    </div>
+                     <div className="flex-1 min-w-[150px]">
+                        <div className="flex justify-between items-baseline mb-1">
+                            <h3 className="text-sm font-medium text-muted-foreground">
+                                Set Completion
+                            </h3>
+                            <p className="text-sm font-semibold text-primary">
+                                {setCompletion.collected} / {setCompletion.total}
+                            </p>
+                        </div>
+                        <Progress value={setCompletion.percentage} className="h-2" />
+                    </div>
                 </div>
-            </div>
-          </header>
+             </CardHeader>
+          </Card>
         )}
         <Card className="shadow-xl">
           <CardContent className="pt-6">
@@ -240,20 +263,29 @@ const SetDetailsPage = () => {
                             collected.language === "English" 
                         );
                         return (
-                            <Card
+                             <Card
                                 key={card.id}
                                 onClick={() => openDialogForCard(card)}
                                 className={cn(
                                     "p-2 cursor-pointer group flex flex-col relative bg-card",
                                     "transform transition-all duration-200 ease-out",
-                                    "hover:scale-105 hover:-translate-y-1 hover:shadow-lg group-hover:z-10"
+                                    "hover:scale-105 hover:-translate-y-1 hover:shadow-lg group-hover:z-10",
+                                     isCollected && "border-2 border-primary/50"
                                 )}
                             >
                               <div className={cn(
-                                  "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden group-hover:grayscale-0",
-                                  !isCollected && "grayscale"
+                                  "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden"
                               )}>
-                                  <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                                <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
+                                 {isCollected && (
+                                    <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-1">
+                                        <CheckCircle className="h-3 w-3" />
+                                    </div>
+                                )}
+                              </div>
+                              <div className="mt-2 text-center">
+                                 <p className="text-sm font-semibold truncate leading-tight">{card.name}</p>
+                                 <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity}</p>
                               </div>
                             </Card>
                         );
