@@ -1,17 +1,16 @@
-
 // src/app/browse-sets/page.tsx
 "use client";
 
 import type { NextPage } from "next";
-import { useEffect, useState, useCallback, Suspense, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/AppHeader";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw, Hash, Filter } from "lucide-react";
+import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw, Filter } from "lucide-react";
 import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,7 +40,6 @@ import {
   SheetFooter
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
-
 
 interface ApiSet {
   id: string;
@@ -92,23 +90,47 @@ const BrowsePageContent: NextPage = () => {
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
     
+    // Debug logging
+    console.log('Scroll event:', { currentScrollY, lastScrollY, isHeaderVisible });
+    
     if (Math.abs(currentScrollY - lastScrollY) < 10) return;
 
     if (currentScrollY > lastScrollY && currentScrollY > 100) {
+      console.log('Hiding header');
       setIsHeaderVisible(false); // scrolling down
     } else {
+      console.log('Showing header');
       setIsHeaderVisible(true); // scrolling up
     }
     setLastScrollY(currentScrollY);
-  }, [lastScrollY]);
+  }, [lastScrollY, isHeaderVisible]);
 
   useEffect(() => {
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    console.log('Setting up scroll listener');
+    
+    const scrollHandler = () => {
+      const currentScrollY = window.scrollY;
+      
+      setLastScrollY(prevLastScrollY => {
+        if (Math.abs(currentScrollY - prevLastScrollY) < 10) return prevLastScrollY;
+
+        if (currentScrollY > prevLastScrollY && currentScrollY > 100) {
+          setIsHeaderVisible(false); // scrolling down
+        } else {
+          setIsHeaderVisible(true); // scrolling up
+        }
+        
+        return currentScrollY;
+      });
+    };
+
+    window.addEventListener('scroll', scrollHandler, { passive: true });
     
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      console.log('Removing scroll listener');
+      window.removeEventListener('scroll', scrollHandler);
     };
-  }, [handleScroll]);
+  }, []); // Empty dependency array
 
   const fetchSets = useCallback(async () => {
     setLoadingSets(true);
@@ -176,7 +198,6 @@ const BrowsePageContent: NextPage = () => {
     }
   }, [toast]);
 
-
   // Fetch initial data based on the active tab
   useEffect(() => {
     if (activeTab === 'sets') {
@@ -185,7 +206,6 @@ const BrowsePageContent: NextPage = () => {
       if (allArtists.length === 0) fetchArtists();
     }
   }, [activeTab, fetchSets, fetchArtists, allSets, allArtists]);
-
 
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
@@ -220,9 +240,8 @@ const BrowsePageContent: NextPage = () => {
   
   const availableSeries = useMemo(() => {
     const seriesSet = new Set(allSets.map(set => set.series));
-    return Array.from(seriesSet).sort((a,b) => b.localeCompare(a)); // Sort alphabetically or by another logic if needed
+    return Array.from(seriesSet).sort((a,b) => b.localeCompare(a));
   }, [allSets]);
-
 
   const setCompletions = useMemo(() => {
     if (!user) return new Map();
@@ -270,7 +289,6 @@ const BrowsePageContent: NextPage = () => {
       });
   }, [groupedSets, sortOrder]);
 
-
   if (isLoading) {
      return (
       <div className="flex flex-col min-h-screen bg-background">
@@ -296,10 +314,10 @@ const BrowsePageContent: NextPage = () => {
 
   const FilterControls = ({ isSheet = false }: { isSheet?: boolean }) => (
     <>
-      <div className="space-y-2">
-        <Label>Sort Order</Label>
+      <div className={cn("space-y-2", !isSheet && "min-w-[140px]")}>
+        {isSheet && <Label>Sort Order</Label>}
         <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
-            <SelectTrigger>
+            <SelectTrigger className={cn(!isSheet && "h-10")}>
                 <SelectValue placeholder="Sort by year" />
             </SelectTrigger>
             <SelectContent>
@@ -308,11 +326,11 @@ const BrowsePageContent: NextPage = () => {
             </SelectContent>
         </Select>
       </div>
-      <div className="space-y-2">
-        <Label>Filter by Series</Label>
+      <div className={cn("space-y-2", !isSheet && "min-w-[160px]")}>
+        {isSheet && <Label>Filter by Series</Label>}
          <DropdownMenu>
             <DropdownMenuTrigger asChild>
-               <Button variant="outline" className="w-full justify-between">
+               <Button variant="outline" className={cn("w-full justify-between", !isSheet && "h-10")}>
                   <span>{selectedSeries.length === 0 ? "All Series" : `${selectedSeries.length} selected`}</span>
                   {selectedSeries.length > 0 && (
                     <Badge variant="secondary" className="ml-2">{selectedSeries.length}</Badge>
@@ -350,7 +368,7 @@ const BrowsePageContent: NextPage = () => {
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className={cn(
-              "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-0 z-40 transition-transform duration-300",
+              "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-[65px] md:top-[77px] z-40 transition-transform duration-300",
               !isHeaderVisible && "-translate-y-full"
               )}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -382,7 +400,7 @@ const BrowsePageContent: NextPage = () => {
                   {activeTab === 'sets' && (
                     <>
                       {/* Desktop Filters */}
-                      <div className="hidden md:flex flex-shrink-0 items-end gap-4">
+                      <div className="hidden md:flex flex-shrink-0 gap-4">
                          <FilterControls />
                       </div>
                        {/* Mobile Filter Button */}
@@ -418,43 +436,41 @@ const BrowsePageContent: NextPage = () => {
             </div>
 
             <TabsContent value="sets">
-              <Card>
-                <CardContent>
-                  {setsError ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
-                      <ServerCrash className="h-16 w-16 mx-auto mb-4" />
-                      <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                      <p className="mt-2 max-w-md">{setsError}</p>
-                      <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
-                  </div>
-                  ) : (
-                  <ScrollArea className="h-full">
-                      {sortedSeriesKeys.length > 0 ? (
-                      sortedSeriesKeys.map(seriesName => (
-                          <div key={seriesName} className="mb-8">
-                              <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
-                                  {seriesName} Series
-                              </h2>
-                              <Separator className="mb-4 mx-4" />
-                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
-                                  {groupedSets[seriesName].map((set) => {
-                                  const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
-                                  const linkHref = `/sets/${set.id}`;
-                                  return (
-                                          <Link key={set.id} href={linkHref} className="block group">
-                                              <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
-                                                  <div className="flex justify-between items-start w-full">
-                                                      <div className="relative h-6 w-6">
-                                                          {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
-                                                      </div>
-                                                      {user && (
-                                                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                              <span>{completion.collected}/{completion.total}</span>
-                                                              <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
-                                                          </div>
-                                                      )}
-                                                  </div>
-                                                  <div className="flex-grow flex items-center justify-center w-full my-2">
+                {setsError ? (
+                <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
+                    <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                    <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                    <p className="mt-2 max-w-md">{setsError}</p>
+                     <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
+                </div>
+                ) : (
+                <div className="pb-8">
+                    {sortedSeriesKeys.length > 0 ? (
+                       sortedSeriesKeys.map(seriesName => (
+                           <div key={seriesName} className="mb-8">
+                               <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
+                                 {seriesName} Series
+                               </h2>
+                               <Separator className="mb-4 mx-4" />
+                               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
+                                 {groupedSets[seriesName].map((set) => {
+                                   const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
+                                   const linkHref = `/sets/${set.id}`;
+                                   return (
+                                        <Link key={set.id} href={linkHref} className="block group">
+                                            <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
+                                                <div className="flex justify-between items-start w-full">
+                                                    <div className="relative h-6 w-6">
+                                                        {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
+                                                    </div>
+                                                    {user && (
+                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                            <span>{completion.collected}/{completion.total}</span>
+                                                            <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-grow flex items-center justify-center w-full my-2">
                                                   {set.images.logo ? (
                                                       <div className="relative w-full h-full">
                                                           <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
@@ -464,58 +480,63 @@ const BrowsePageContent: NextPage = () => {
                                                           <span className="text-xs text-muted-foreground">No Logo</span>
                                                       </div>
                                                   )}
-                                                  </div>
-                                                  <p className="font-semibold text-sm mt-auto truncate w-full">{set.name}</p>
-                                              </Card>
-                                      </Link>
-                                  );
-                                  })}
-                              </div>
-                          </div>
-                      ))
-                      ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No sets found matching your search criteria.</p></div> )}
-                  </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
+                                                </div>
+                                                <p className="font-semibold text-sm mt-auto truncate w-full">{set.name}</p>
+                                            </Card>
+                                       </Link>
+                                   );
+                                 })}
+                               </div>
+                           </div>
+                       ))
+                    ) : ( 
+                        <div className="text-center py-10 text-muted-foreground">
+                            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p className="text-lg">No sets found matching your search criteria.</p>
+                        </div> 
+                    )}
+                </div>
+                )}
             </TabsContent>
+            
             <TabsContent value="artists">
-              <Card>
-                <CardContent>
-                  {artistsError ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
-                      <ServerCrash className="h-16 w-16 mx-auto mb-4" />
-                      <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                      <p className="mt-2 max-w-md">{artistsError}</p>
-                      <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
-                  </div>
-                  ) : (
-                  <ScrollArea className="h-full">
-                      {filteredArtists.length > 0 ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
-                          {filteredArtists.map((artist) => {
+              {artistsError ? (
+                <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
+                    <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                    <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                    <p className="mt-2 max-w-md">{artistsError}</p>
+                     <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
+                </div>
+                ) : (
+                <div className="pb-8">
+                    {filteredArtists.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 px-4">
+                        {filteredArtists.map((artist) => {
                           const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
                           return (
-                              <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
+                            <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
                               <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                                  <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
-                                  <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
-                                  {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
-                                      <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
-                                      <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
+                                <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
+                                <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
+                                {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
+                                    <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
+                                    <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
                                       {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
                                   </div>)}
-                                  <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
+                                <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
                               </Card>
-                              </Link>
+                            </Link>
                           );
-                          })}
-                          </div>
-                      ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No artists found matching your search.</p></div> )}
-                  </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
+                        })}
+                        </div>
+                    ) : ( 
+                        <div className="text-center py-10 text-muted-foreground">
+                            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                            <p className="text-lg">No artists found matching your search.</p>
+                        </div> 
+                    )}
+                </div>
+              )}
             </TabsContent>
         </Tabs>
       </main>
@@ -541,5 +562,3 @@ const BrowsePage: NextPage = () => (
 );
 
 export default BrowsePage;
-
-    

@@ -43,49 +43,10 @@ export function AppHeader() {
       <div className="container mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <PokeballIcon className="h-8 w-8 md:h-10 md:w-10" />
-          <h1 className="hidden md:block text-2xl md:text-3xl font-headline font-bold">
+          <h1 className="text-2xl md:text-3xl font-headline font-bold">
             PokéTRKR
           </h1>
         </Link>
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1 md:gap-2">
-          <Link href="/search">
-            <Button variant="ghost" className="hover:bg-primary-foreground/10 text-primary-foreground px-2 md:px-3">
-              <Search className="mr-2 h-5 w-5" />
-              <span>Search</span>
-            </Button>
-          </Link>
-          <Link href="/my-collection">
-            <Button variant="ghost" className="hover:bg-primary-foreground/10 text-primary-foreground px-2 md:px-3">
-              <LayoutList className="mr-2 h-5 w-5" />
-              <span>My Collection</span>
-            </Button>
-          </Link>
-          <Link href="/browse-sets">
-            <Button variant="ghost" className="hover:bg-primary-foreground/10 text-primary-foreground px-2 md:px-3">
-              <PackageSearch className="mr-2 h-5 w-5" />
-              <span>Browse</span>
-            </Button>
-          </Link>
-           <Link href="/pokedex">
-            <Button variant="secondary" className="bg-primary-foreground/10 hover:bg-primary-foreground/20 text-primary-foreground px-2 md:px-3">
-              <PokedexIcon className="mr-2 h-5 w-5" />
-              <span>Pokédex</span>
-            </Button>
-          </Link>
-          <Link href="/exchange">
-            <Button variant="ghost" className="hover:bg-primary-foreground/10 text-primary-foreground px-2 md:px-3">
-              <Replace className="mr-2 h-5 w-5" />
-              <span>Exchange</span>
-            </Button>
-          </Link>
-          <Link href="/friends">
-            <Button variant="ghost" className="hover:bg-primary-foreground/10 text-primary-foreground px-2 md:px-3">
-              <Users className="mr-2 h-5 w-5" />
-              <span>Friends</span>
-            </Button>
-          </Link>
-        </nav>
         
         {/* Right side icons */}
         <div className="flex items-center gap-1">
@@ -135,7 +96,7 @@ export function AppHeader() {
           </DropdownMenu>
           <AuthButton />
            {/* Mobile Navigation */}
-          <div className="md:hidden">
+          <div>
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="hover:bg-primary-foreground/10 text-primary-foreground">
