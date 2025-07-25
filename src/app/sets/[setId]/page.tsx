@@ -1,3 +1,4 @@
+
 // src/app/sets/[setId]/page.tsx
 "use client";
 
@@ -19,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
+import { Badge } from "@/components/ui/badge";
+
 
 export interface ApiPokemonCard {
   id: string;
@@ -287,31 +290,35 @@ const SetDetailsPage = () => {
                         collected.language === "English" 
                     );
                     return (
-                            <Card
-                            key={card.id}
-                            onClick={() => openDialogForCard(card)}
-                            className={cn(
-                                "p-2 cursor-pointer group flex flex-col relative bg-card",
-                                "transform transition-all duration-200 ease-out",
-                                "hover:scale-105 hover:-translate-y-1 hover:shadow-lg group-hover:z-10",
-                                    isCollected && "border-2 border-primary/50"
-                            )}
+                        <div
+                          key={card.id}
+                          onClick={() => openDialogForCard(card)}
+                          className={cn(
+                            "relative aspect-[2.5/3.5] w-full cursor-pointer group",
+                            "transform transition-all duration-200 ease-out",
+                            "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:z-10",
+                            isCollected && "saturate-50"
+                          )}
                         >
-                            <div className={cn(
-                                "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden"
-                            )}>
-                            <Image src={card.images.small} alt={card.name} layout="fill" objectFit="contain" data-ai-hint="pokemon card front"/>
-                                {isCollected && (
-                                <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-1">
-                                    <CheckCircle className="h-3 w-3" />
-                                </div>
-                            )}
+                          <Image 
+                            src={card.images.small} 
+                            alt={card.name} 
+                            layout="fill" 
+                            objectFit="contain" 
+                            className="rounded-lg shadow-md"
+                            data-ai-hint="pokemon card front"
+                          />
+                          
+                          <Badge className="absolute top-2 right-2 z-10 bg-black/60 text-white border-transparent">
+                            #{card.number}
+                          </Badge>
+                          
+                          {isCollected && (
+                            <div className="absolute top-2 left-2 z-10 bg-primary text-primary-foreground rounded-full p-1 shadow-md">
+                                <CheckCircle className="h-4 w-4" />
                             </div>
-                            <div className="mt-2 text-center">
-                                <p className="text-sm font-semibold truncate leading-tight">{card.name}</p>
-                                <p className="text-xs text-muted-foreground">#{card.number} - {card.rarity}</p>
-                            </div>
-                        </Card>
+                          )}
+                        </div>
                     );
                 })}
                 </div>
