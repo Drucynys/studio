@@ -327,7 +327,7 @@ const SetDetailsPage = () => {
       </main>
       
       <Link href="/browse-sets" className="fixed bottom-6 left-6 z-50">
-        <Button variant="secondary" size="icon" className="rounded-full h-14 w-14 shadow-lg border">
+        <Button variant="secondary" size="icon" className="rounded-full h-14 w-14 shadow-lg border transition-colors hover:bg-primary hover:text-primary-foreground">
             <ArrowLeft className="h-6 w-6" />
             <span className="sr-only">Back to Sets</span>
         </Button>
