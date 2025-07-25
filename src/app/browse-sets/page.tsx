@@ -40,6 +40,7 @@ import {
   SheetFooter
 } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface ApiSet {
   id: string;
@@ -87,27 +88,7 @@ const BrowsePageContent: NextPage = () => {
   
   const isLoading = loadingSets || loadingArtists || authLoading;
 
-  const handleScroll = useCallback(() => {
-    const currentScrollY = window.scrollY;
-    
-    // Debug logging
-    console.log('Scroll event:', { currentScrollY, lastScrollY, isHeaderVisible });
-    
-    if (Math.abs(currentScrollY - lastScrollY) < 10) return;
-
-    if (currentScrollY > lastScrollY && currentScrollY > 100) {
-      console.log('Hiding header');
-      setIsHeaderVisible(false); // scrolling down
-    } else {
-      console.log('Showing header');
-      setIsHeaderVisible(true); // scrolling up
-    }
-    setLastScrollY(currentScrollY);
-  }, [lastScrollY, isHeaderVisible]);
-
   useEffect(() => {
-    console.log('Setting up scroll listener');
-    
     const scrollHandler = () => {
       const currentScrollY = window.scrollY;
       
@@ -127,10 +108,9 @@ const BrowsePageContent: NextPage = () => {
     window.addEventListener('scroll', scrollHandler, { passive: true });
     
     return () => {
-      console.log('Removing scroll listener');
       window.removeEventListener('scroll', scrollHandler);
     };
-  }, []); // Empty dependency array
+  }, []);
 
   const fetchSets = useCallback(async () => {
     setLoadingSets(true);
@@ -510,20 +490,30 @@ const BrowsePageContent: NextPage = () => {
                 ) : (
                 <div className="pb-8">
                     {filteredArtists.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 px-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
                         {filteredArtists.map((artist) => {
                           const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
+                          const artistInitial = artist.name.charAt(0).toUpperCase();
                           return (
                             <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
-                              <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                                <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
-                                <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
-                                {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
-                                    <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
-                                    <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
-                                      {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
-                                  </div>)}
-                                <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
+                              <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
+                                  <div className="flex justify-between items-start w-full">
+                                    <div className="relative h-6 w-6 bg-muted rounded-full flex items-center justify-center" data-ai-hint="artist initial">
+                                        <span className="font-bold text-muted-foreground">{artistInitial}</span>
+                                    </div>
+                                    {user && (
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                          <span>{completion.collected}/{completion.total}</span>
+                                          <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-grow flex items-center justify-center w-full my-2">
+                                    <Avatar className="w-24 h-24" data-ai-hint="artist avatar large">
+                                        <AvatarFallback className="text-4xl">{artistInitial}</AvatarFallback>
+                                    </Avatar>
+                                  </div>
+                                  <p className="font-semibold text-sm mt-auto truncate w-full capitalize">{artist.name}</p>
                               </Card>
                             </Link>
                           );
@@ -562,3 +552,5 @@ const BrowsePage: NextPage = () => (
 );
 
 export default BrowsePage;
+
+    
