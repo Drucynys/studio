@@ -246,6 +246,7 @@ export function FullScreenCardView({
               objectFit="contain"
               priority
               className="card-image"
+              sizes="(max-width: 768px) 90vw, 33vw"
             />
             <div className="shine" />
           </div>
@@ -336,3 +337,4 @@ export function FullScreenCardView({
     </Dialog>
   );
 }
+
