@@ -104,7 +104,7 @@ export function AppHeader() {
                   <span className="sr-only">Open menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[240px]">
+              <SheetContent side="right" className="w-[240px]">
                 <SheetHeader>
                   <SheetTitle>
                     <Link href="/" className="flex items-center gap-3" onClick={closeSheet}>
