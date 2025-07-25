@@ -1,3 +1,4 @@
+
 // src/app/browse-sets/page.tsx
 "use client";
 
@@ -7,6 +8,7 @@ import Link from "next/link";
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/AppHeader";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw, Hash, Filter } from "lucide-react";
@@ -295,7 +297,7 @@ const BrowsePageContent: NextPage = () => {
   const FilterControls = ({ isSheet = false }: { isSheet?: boolean }) => (
     <>
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Sort Order</Label>
+        <Label>Sort Order</Label>
         <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
             <SelectTrigger>
                 <SelectValue placeholder="Sort by year" />
@@ -307,7 +309,7 @@ const BrowsePageContent: NextPage = () => {
         </Select>
       </div>
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Filter by Series</Label>
+        <Label>Filter by Series</Label>
          <DropdownMenu>
             <DropdownMenuTrigger asChild>
                <Button variant="outline" className="w-full justify-between">
@@ -416,96 +418,104 @@ const BrowsePageContent: NextPage = () => {
             </div>
 
             <TabsContent value="sets">
-                {setsError ? (
-                <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
-                    <ServerCrash className="h-16 w-16 mx-auto mb-4" />
-                    <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                    <p className="mt-2 max-w-md">{setsError}</p>
-                     <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
-                </div>
-                ) : (
-                <ScrollArea className="h-full">
-                    {sortedSeriesKeys.length > 0 ? (
-                       sortedSeriesKeys.map(seriesName => (
-                           <div key={seriesName} className="mb-8">
-                               <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
-                                 {seriesName} Series
-                               </h2>
-                               <Separator className="mb-4 mx-4" />
-                               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
-                                 {groupedSets[seriesName].map((set) => {
-                                   const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
-                                   const linkHref = `/sets/${set.id}`;
-                                   return (
-                                        <Link key={set.id} href={linkHref} className="block group">
-                                            <div className={cn("bg-card hover:shadow-primary/20 border rounded-lg hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
-                                                <div className="flex justify-between items-start w-full">
-                                                    <div className="relative h-6 w-6">
-                                                        {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
-                                                    </div>
-                                                    {user && (
-                                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                            <span>{completion.collected}/{completion.total}</span>
-                                                            <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
+                <Card>
+                    <CardContent>
+                        {setsError ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
+                            <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                            <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                            <p className="mt-2 max-w-md">{setsError}</p>
+                            <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
+                        </div>
+                        ) : (
+                        <ScrollArea className="h-full">
+                            {sortedSeriesKeys.length > 0 ? (
+                            sortedSeriesKeys.map(seriesName => (
+                                <div key={seriesName} className="mb-8">
+                                    <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
+                                        {seriesName} Series
+                                    </h2>
+                                    <Separator className="mb-4 mx-4" />
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
+                                        {groupedSets[seriesName].map((set) => {
+                                        const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
+                                        const linkHref = `/sets/${set.id}`;
+                                        return (
+                                                <Link key={set.id} href={linkHref} className="block group">
+                                                    <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
+                                                        <div className="flex justify-between items-start w-full">
+                                                            <div className="relative h-6 w-6">
+                                                                {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
+                                                            </div>
+                                                            {user && (
+                                                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                                    <span>{completion.collected}/{completion.total}</span>
+                                                                    <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex-grow flex items-center justify-center w-full my-2">
-                                                  {set.images.logo ? (
-                                                      <div className="relative w-full h-full">
-                                                          <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
-                                                      </div>
-                                                  ) : (
-                                                      <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
-                                                          <span className="text-xs text-muted-foreground">No Logo</span>
-                                                      </div>
-                                                  )}
-                                                </div>
-                                                <p className="font-semibold text-sm mt-auto truncate w-full">{set.name}</p>
-                                            </div>
-                                       </Link>
-                                   );
-                                 })}
-                               </div>
-                           </div>
-                       ))
-                    ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No sets found matching your search criteria.</p></div> )}
-                </ScrollArea>
-                )}
+                                                        <div className="flex-grow flex items-center justify-center w-full my-2">
+                                                        {set.images.logo ? (
+                                                            <div className="relative w-full h-full">
+                                                                <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
+                                                                <span className="text-xs text-muted-foreground">No Logo</span>
+                                                            </div>
+                                                        )}
+                                                        </div>
+                                                        <p className="font-semibold text-sm mt-auto truncate w-full">{set.name}</p>
+                                                    </Card>
+                                            </Link>
+                                        );
+                                        })}
+                                    </div>
+                                </div>
+                            ))
+                            ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No sets found matching your search criteria.</p></div> )}
+                        </ScrollArea>
+                        )}
+                    </CardContent>
+                </Card>
             </TabsContent>
             <TabsContent value="artists">
-              {artistsError ? (
-                <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
-                    <ServerCrash className="h-16 w-16 mx-auto mb-4" />
-                    <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                    <p className="mt-2 max-w-md">{artistsError}</p>
-                     <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
-                </div>
-                ) : (
-                <ScrollArea className="h-full">
-                    {filteredArtists.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
-                        {filteredArtists.map((artist) => {
-                          const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
-                          return (
-                            <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
-                              <div className="bg-card border rounded-lg hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
-                                <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
-                                <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
-                                {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
-                                    <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
-                                    <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
-                                      {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
-                                  </div>)}
-                                <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
-                              </div>
-                            </Link>
-                          );
-                        })}
+                <Card>
+                    <CardContent>
+                        {artistsError ? (
+                        <div className="flex flex-col items-center justify-center py-10 text-destructive text-center">
+                            <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                            <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                            <p className="mt-2 max-w-md">{artistsError}</p>
+                            <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
                         </div>
-                    ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No artists found matching your search.</p></div> )}
-                </ScrollArea>
-              )}
+                        ) : (
+                        <ScrollArea className="h-full">
+                            {filteredArtists.length > 0 ? (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-6 pt-4 pb-24 px-4">
+                                {filteredArtists.map((artist) => {
+                                const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
+                                return (
+                                    <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
+                                    <Card className="bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center p-4 text-center h-full">
+                                        <div className="flex items-center justify-center w-16 h-16 mb-4 bg-muted rounded-full" data-ai-hint="artist avatar"><User className="w-8 h-8 text-muted-foreground" /></div>
+                                        <p className="font-semibold text-card-foreground group-hover:text-primary capitalize">{artist.name}</p>
+                                        {user && artist.cardCount !== undefined && (<div className="w-full mt-2 mb-3 px-2">
+                                            <Progress value={completion.percentage} className="h-2 [&>div]:bg-primary" />
+                                            <p className="text-xs text-muted-foreground mt-1">{completion.collected} / {completion.total} unique cards
+                                            {completion.percentage >= 100 && completion.total > 0 && <CheckCircle className="inline-block ml-1 h-3 w-3 text-green-500" />}</p>
+                                        </div>)}
+                                        <Button variant="outline" size="sm" className="mt-auto w-full group-hover:bg-primary group-hover:text-primary-foreground">View Cards</Button>
+                                    </Card>
+                                    </Link>
+                                );
+                                })}
+                                </div>
+                            ) : ( <div className="text-center py-10 text-muted-foreground"><Search className="h-12 w-12 mx-auto mb-4 opacity-50" /><p className="text-lg">No artists found matching your search.</p></div> )}
+                        </ScrollArea>
+                        )}
+                    </CardContent>
+                </Card>
             </TabsContent>
         </Tabs>
       </main>
@@ -531,3 +541,5 @@ const BrowsePage: NextPage = () => (
 );
 
 export default BrowsePage;
+
+    
