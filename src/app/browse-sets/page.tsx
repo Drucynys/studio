@@ -1,3 +1,4 @@
+
 // src/app/browse-sets/page.tsx
 "use client";
 
@@ -296,7 +297,7 @@ const BrowsePageContent: NextPage = () => {
   const FilterControls = ({ isSheet = false }: { isSheet?: boolean }) => (
     <>
       <div className="space-y-2">
-        <FormLabel>Sort Order</FormLabel>
+        <Label>Sort Order</Label>
         <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
             <SelectTrigger>
                 <SelectValue placeholder="Sort by year" />
@@ -308,7 +309,7 @@ const BrowsePageContent: NextPage = () => {
         </Select>
       </div>
       <div className="space-y-2">
-        <FormLabel>Filter by Series</FormLabel>
+        <Label>Filter by Series</Label>
          <DropdownMenu>
             <DropdownMenuTrigger asChild>
                <Button variant="outline" className="w-full justify-between">
@@ -349,7 +350,7 @@ const BrowsePageContent: NextPage = () => {
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className={cn(
-              "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-[65px] md:top-[77px] z-40 transition-transform duration-300",
+              "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-0 z-40 transition-transform duration-300",
               !isHeaderVisible && "-translate-y-full"
               )}>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -540,3 +541,5 @@ const BrowsePage: NextPage = () => (
 );
 
 export default BrowsePage;
+
+    
