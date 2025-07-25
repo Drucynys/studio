@@ -96,43 +96,46 @@ export function AddCardToCollectionDialog({
     const newPrices: DisplayPriceInfo[] = [];
     const pricedVariants: string[] = [];
 
-    if (pokemonTcgApiCard?.tcgplayer?.prices) {
-      imageUrlToSet = pokemonTcgApiCard.images.large || initialCardImageUrl || "https://placehold.co/200x280.png";
-      const prices = pokemonTcgApiCard.tcgplayer.prices;
-      const sortedPriceKeys = Object.keys(prices).sort((a,b) => {
-        const order = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
-        const indexA = order.indexOf(a);
-        const indexB = order.indexOf(b);
-        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-        if (indexA !== -1) return -1;
-        if (indexB !== -1) return 1;
-        return a.localeCompare(b); 
-      });
+    if (pokemonTcgApiCard) {
+      imageUrlToSet = pokemonTcgApiCard.images.large || pokemonTcgApiCard.images.small || initialCardImageUrl || "https://placehold.co/200x280.png";
+      
+      if (pokemonTcgApiCard.tcgplayer?.prices) {
+        const prices = pokemonTcgApiCard.tcgplayer.prices;
+        const sortedPriceKeys = Object.keys(prices).sort((a,b) => {
+          const order = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
+          const indexA = order.indexOf(a);
+          const indexB = order.indexOf(b);
+          if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+          if (indexA !== -1) return -1;
+          if (indexB !== -1) return 1;
+          return a.localeCompare(b); 
+        });
 
-      for (const key of sortedPriceKeys) {
-        const priceEntry = prices[key as keyof typeof prices];
-        if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
-          newPrices.push({ 
-            variantKey: `tcgplayer-${key}`, 
-            variantName: `TCGplayer - ${formatVariantKey(key)}`, 
-            price: priceEntry.market, 
-            currencySymbol: '$' 
-          });
-          pricedVariants.push(key);
+        for (const key of sortedPriceKeys) {
+          const priceEntry = prices[key as keyof typeof prices];
+          if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
+            newPrices.push({ 
+              variantKey: `tcgplayer-${key}`, 
+              variantName: `TCGplayer - ${formatVariantKey(key)}`, 
+              price: priceEntry.market, 
+              currencySymbol: '$' 
+            });
+            pricedVariants.push(key);
+          }
         }
-      }
-      setCurrentAvailableVariants(pricedVariants);
-      if (pricedVariants.length > 0) {
-        let defaultVariant = 
-            pricedVariants.find(v => v === 'normal') || 
-            pricedVariants.find(v => v === 'holofoil') || 
-            pricedVariants.find(v => v === 'reverseHolofoil') ||
-            pricedVariants.find(v => v === '1stEditionNormal') ||
-            pricedVariants.find(v => v === 'unlimitedNormal') ||
-            pricedVariants[0];
-        setSelectedVariant(defaultVariant || "");
-      } else {
-        setSelectedVariant("");
+        setCurrentAvailableVariants(pricedVariants);
+        if (pricedVariants.length > 0) {
+          let defaultVariant = 
+              pricedVariants.find(v => v === 'normal') || 
+              pricedVariants.find(v => v === 'holofoil') || 
+              pricedVariants.find(v => v === 'reverseHolofoil') ||
+              pricedVariants.find(v => v === '1stEditionNormal') ||
+              pricedVariants.find(v => v === 'unlimitedNormal') ||
+              pricedVariants[0];
+          setSelectedVariant(defaultVariant || "");
+        } else {
+          setSelectedVariant("");
+        }
       }
     } else if (initialCardImageUrl) {
       imageUrlToSet = initialCardImageUrl;

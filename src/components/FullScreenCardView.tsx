@@ -1,4 +1,3 @@
-
 // src/components/FullScreenCardView.tsx
 "use client";
 
@@ -108,13 +107,8 @@ export function FullScreenCardView({
     const rY = (mx - 0.5) * -20;
     const rX = (my - 0.5) * 20;
 
-    const posX = (mx * 100).toFixed(2);
-    const posY = (my * 100).toFixed(2);
-
     cardNode.style.setProperty('--rx', `${rX}deg`);
     cardNode.style.setProperty('--ry', `${rY}deg`);
-    cardNode.style.setProperty('--posx', `${posX}%`);
-    cardNode.style.setProperty('--posy', `${posY}%`);
   };
 
   const handleMouseLeave = () => {
@@ -123,8 +117,6 @@ export function FullScreenCardView({
     if (!cardNode) return;
     cardNode.style.setProperty('--rx', '0deg');
     cardNode.style.setProperty('--ry', '0deg');
-    cardNode.style.setProperty('--posx', `50%`);
-    cardNode.style.setProperty('--posy', `50%`);
   };
   
   const handleDeviceMotion = useCallback((event: DeviceOrientationEvent) => {
@@ -208,9 +200,7 @@ export function FullScreenCardView({
   
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent 
-        className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-none rounded-none sm:rounded-none"
-      >
+      <DialogContent className="w-screen h-screen max-w-none max-h-none p-0 flex flex-col bg-transparent backdrop-blur-md border-none rounded-none sm:rounded-none">
         <DialogHeader className="sr-only">
           <DialogTitle>Full Screen Card View: {currentCard.name || `Card #${currentCard.cardNumber}`}</DialogTitle>
         </DialogHeader>
@@ -243,10 +233,9 @@ export function FullScreenCardView({
               src={currentCard.imageUrl || "https://placehold.co/500x700.png"}
               alt={currentCard.name || "Pokémon Card"}
               layout="fill"
-              objectFit="contain"
+              objectFit="cover"
               priority
               className="card-image"
-              sizes="(max-width: 768px) 90vw, 33vw"
             />
             <div className="shine" />
           </div>
@@ -337,4 +326,3 @@ export function FullScreenCardView({
     </Dialog>
   );
 }
-

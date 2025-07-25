@@ -1,4 +1,3 @@
-
 // src/app/sets/[setId]/page.tsx
 "use client";
 
@@ -348,7 +347,7 @@ const SetDetailsPage = () => {
             setSelectedApiCard(null);
           }}
           cardName={selectedApiCard.name}
-          initialCardImageUrl={selectedApiCard.images.small}
+          initialCardImageUrl={selectedApiCard.images.large}
           pokemonTcgApiCard={selectedApiCard}
         />
       )}
