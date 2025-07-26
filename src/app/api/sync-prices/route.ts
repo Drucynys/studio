@@ -94,7 +94,7 @@ export async function POST(request: Request) {
             const batch = db.batch();
             const chunk = allCardsForSet.slice(i, i + BATCH_SIZE);
             chunk.forEach(card => {
-                if (card && card.id) {
+                if (card && card.id && card.tcgplayer?.prices) { // Added check for prices
                     const docRef = cardsCollection.doc(card.id);
                     const priceData = {
                         tcgplayer: card.tcgplayer || null,
@@ -111,13 +111,15 @@ export async function POST(request: Request) {
                         prices: priceData,
                     };
                     batch.set(historyDocRef, historyData);
+                } else {
+                    logs.push(`- Skipping card ${card.id} due to missing price data.`);
                 }
             });
             batchPromises.push(batch.commit());
         }
         
         await Promise.all(batchPromises);
-        logs.push(`✅ Successfully updated prices and saved history for ${allCardsForSet.length} cards in set '${setId}'.`);
+        logs.push(`✅ Successfully updated prices and saved history for applicable cards in set '${setId}'.`);
 
         return NextResponse.json({ status: 'success', count: allCardsForSet.length, logs });
 

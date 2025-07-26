@@ -98,7 +98,6 @@ export async function POST(request: Request) {
                     // Create a copy of the card and remove pricing data before saving
                     const cardToSave = { ...card };
                     delete cardToSave.tcgplayer;
-                    delete cardToSave.cardmarket;
                     batch.set(docRef, cardToSave);
                 }
             });

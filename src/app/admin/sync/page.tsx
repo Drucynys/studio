@@ -741,7 +741,7 @@ export default function SyncAdminPage() {
                 Update Card Prices
               </CardTitle>
               <CardDescription>
-                Efficiently update TCGPlayer and Cardmarket prices for all cards in your database without re-syncing all data.
+                Efficiently update TCGPlayer prices for all cards in your database without re-syncing all data.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
