@@ -1,4 +1,3 @@
-
 // src/app/browse-artists/[artistName]/page.tsx
 "use client";
 
@@ -13,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import { Loader2, ServerCrash, ArrowLeft, Images, Paintbrush } from "lucide-react";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
-import { dbAdmin } from "@/lib/firebase-admin";
+import { cn } from "@/lib/utils";
 
 const ArtistDetailPage = () => {
   const params = useParams();
@@ -25,8 +24,35 @@ const ArtistDetailPage = () => {
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
   const artistName = decodeURIComponent(artistNameParam);
   
+  useEffect(() => {
+    const scrollHandler = () => {
+      const currentScrollY = window.scrollY;
+      
+      setLastScrollY(prevLastScrollY => {
+        if (Math.abs(currentScrollY - prevLastScrollY) < 10) return prevLastScrollY;
+
+        if (currentScrollY > prevLastScrollY && currentScrollY > 100) {
+          setIsHeaderVisible(false); // scrolling down
+        } else {
+          setIsHeaderVisible(true); // scrolling up
+        }
+        
+        return currentScrollY;
+      });
+    };
+
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', scrollHandler);
+    };
+  }, []);
+
   const fetchCardsByArtist = useCallback(async () => {
     if (!artistName) return;
     setIsLoading(true);
@@ -59,11 +85,16 @@ const ArtistDetailPage = () => {
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
-        <Link href="/browse-sets?tab=artists">
-          <Button variant="outline" className="mb-6">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Browse
-          </Button>
-        </Link>
+        <div className={cn(
+            "mb-6 transition-transform duration-300 sticky top-[65px] md:top-[77px] z-40",
+            !isHeaderVisible && "-translate-y-[200%]"
+        )}>
+            <Link href="/browse-sets?tab=artists">
+              <Button variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Browse
+              </Button>
+            </Link>
+        </div>
         <Card className="shadow-xl">
           <CardHeader>
             <div className="flex items-center gap-4">
