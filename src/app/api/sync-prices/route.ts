@@ -47,9 +47,7 @@ export async function POST(request: Request) {
             logs.push("❌ FATAL: Pokémon TCG API key is missing from environment variables.");
             throw new Error("Pokémon TCG API key is missing.");
         }
-        // DEBUG: Log the API key to ensure it's loaded correctly
-        const maskedKey = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
-        logs.push(`✅ Pokémon TCG API key found. Using key: ${maskedKey}`);
+        logs.push(`✅ Pokémon TCG API key found.`);
 
         let allCardsForSet: any[] = [];
         let page = 1;
@@ -150,5 +148,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ status: 'error', message: errorMessage, logs }, { status: 500 });
     }
 }
-
-    
