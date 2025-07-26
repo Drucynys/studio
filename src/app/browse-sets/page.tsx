@@ -552,5 +552,3 @@ const BrowsePage: NextPage = () => (
 );
 
 export default BrowsePage;
-
-    
