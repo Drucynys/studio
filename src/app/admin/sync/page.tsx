@@ -28,6 +28,9 @@ interface ApiSet {
   total: number;
 }
 
+// Helper function to add a delay
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export default function SyncAdminPage() {
   const [setsSyncStatus, setSetsSyncStatus] = useState<SyncStatus>('idle');
   const [cardsSyncStatus, setCardsSyncStatus] = useState<SyncStatus>('idle');
@@ -180,6 +183,8 @@ export default function SyncAdminPage() {
             setMasterSyncProgress(progressPercentage);
             setMasterSyncCurrentStep(`Syncing cards for set: ${currentSet.name}`);
             setMasterSyncLogs(prev => [...prev, `\n[${i + 1}/${setsToSync.length}] Syncing set: ${currentSet.name} (${currentSet.id})`]);
+            
+            await sleep(500); // Add a delay to avoid rate limiting
 
             const syncResponse = await fetch('/api/sync-cards', {
                 method: 'POST',
@@ -320,6 +325,8 @@ export default function SyncAdminPage() {
         setCurrentSetIndex(i);
         const currentSet = sets[i];
         setCardsLogs(prev => [...prev, `\n[${i + 1}/${sets.length}] Syncing set: ${currentSet.name} (${currentSet.id})`]);
+        
+        await sleep(500); // Add a delay to avoid rate limiting
 
         const syncResponse = await fetch('/api/sync-cards', {
           method: 'POST',
@@ -376,6 +383,8 @@ export default function SyncAdminPage() {
         setCurrentSetIndex(i);
         const currentSet = sets[i];
         setPricesLogs(prev => [...prev, `\n[${i + 1}/${sets.length}] Updating prices for set: ${currentSet.name} (${currentSet.id})`]);
+        
+        await sleep(500); // Add a delay to avoid rate limiting
 
         const syncResponse = await fetch('/api/sync-prices', {
           method: 'POST',
@@ -955,3 +964,5 @@ export default function SyncAdminPage() {
     </div>
   );
 }
+
+    

@@ -19,7 +19,6 @@ function initializeFirebaseAdmin() {
 
     const serviceAccount = JSON.parse(serviceAccountJson);
     if (serviceAccount.private_key) {
-        // Fix: Modify the original serviceAccount object directly.
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
     
@@ -122,9 +121,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ status: 'success', count: allCardsForSet.length, logs });
 
     } catch (error: any) {
-        console.error('Error during price update sync:', error);
-        const errorMessage = error.message || 'An unknown error occurred on the server.';
+        let errorMessage = 'An unknown error occurred on the server.';
+        if (axios.isAxiosError(error) && error.response) {
+            errorMessage = `API Error: ${error.response.status} ${error.response.statusText}. Response: ${JSON.stringify(error.response.data)}`;
+        } else if (error instanceof Error) {
+            errorMessage = error.message;
+        }
+
+        console.error('Error during price update sync:', errorMessage);
         logs.push(`❌ FATAL ERROR: ${errorMessage}`);
         return NextResponse.json({ status: 'error', message: errorMessage, logs }, { status: 500 });
     }
 }
+
+    
