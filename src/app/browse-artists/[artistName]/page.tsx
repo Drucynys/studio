@@ -181,10 +181,10 @@ const ArtistDetailPage = () => {
                           setIsDialogOpen(true);
                         }}
                         className={cn(
-                          "relative aspect-[2.5/3.5] w-full cursor-pointer group",
+                          "relative aspect-[2.5/3.5] w-full cursor-pointer group rounded-lg",
                           "transform transition-all duration-200 ease-out",
                           "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:z-10",
-                          isCollected && "saturate-50"
+                          isCollected && "border-2 border-green-500"
                         )}
                       >
                         <Image 
@@ -192,18 +192,12 @@ const ArtistDetailPage = () => {
                           alt={card.name} 
                           layout="fill" 
                           objectFit="contain" 
-                          className="rounded-lg shadow-md"
+                          className="rounded-md shadow-md"
                           data-ai-hint="pokemon card front"
                         />
                         <Badge className="absolute top-2 right-2 z-10 bg-black/60 text-white border-transparent">
                           #{card.number}
                         </Badge>
-                        
-                        {isCollected && (
-                          <div className="absolute top-2 left-2 z-10 bg-primary text-primary-foreground rounded-full p-1 shadow-md">
-                              <CheckCircle className="h-4 w-4" />
-                          </div>
-                        )}
                       </div>
                   );
               })}
