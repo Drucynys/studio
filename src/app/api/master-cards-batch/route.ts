@@ -18,10 +18,8 @@ function initializeFirebaseAdmin() {
 
     const serviceAccount = JSON.parse(serviceAccountJson);
     if (serviceAccount.private_key) {
-        const serviceAccount = JSON.parse(serviceAccountJson);
-if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-}
+        // Fix: Modify the original serviceAccount object directly.
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
 
     admin.initializeApp({

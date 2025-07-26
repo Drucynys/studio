@@ -19,10 +19,8 @@ function initializeFirebaseAdmin() {
 
     const serviceAccount = JSON.parse(serviceAccountJson);
     if (serviceAccount.private_key) {
-        const serviceAccount = JSON.parse(serviceAccountJson);
-if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-}
+        // Fix: Modify the original serviceAccount object directly.
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
     
     admin.initializeApp({
@@ -98,6 +96,7 @@ export async function POST(request: Request) {
                     // Create a copy of the card and remove pricing data before saving
                     const cardToSave = { ...card };
                     delete cardToSave.tcgplayer;
+                    delete cardToSave.cardmarket; // Also remove cardmarket data
                     batch.set(docRef, cardToSave);
                 }
             });

@@ -20,10 +20,8 @@ function initializeFirebaseAdmin() {
 
     const serviceAccount = JSON.parse(serviceAccountJson);
     if (serviceAccount.private_key) {
-        const serviceAccount = JSON.parse(serviceAccountJson);
-if (serviceAccount.private_key) {
-    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-}
+        // Fix: Modify the original serviceAccount object directly.
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
 
     admin.initializeApp({
@@ -60,5 +58,3 @@ export async function GET(request: Request, { params }: { params: Promise<{ poke
         return NextResponse.json({ message: error.message || 'An unknown server error occurred.' }, { status: 500 });
     }
 }
-
-    
