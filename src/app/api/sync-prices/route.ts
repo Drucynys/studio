@@ -19,6 +19,7 @@ function initializeFirebaseAdmin() {
 
     const serviceAccount = JSON.parse(serviceAccountJson);
     if (serviceAccount.private_key) {
+        // Fix: Modify the original serviceAccount object directly.
         serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
     
@@ -42,8 +43,13 @@ export async function POST(request: Request) {
         logs.push("✅ Firebase Admin SDK initialized.");
 
         const apiKey = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-        if (!apiKey) throw new Error("Pokémon TCG API key is missing.");
-        logs.push("✅ Pokémon TCG API key found.");
+        if (!apiKey) {
+            logs.push("❌ FATAL: Pokémon TCG API key is missing from environment variables.");
+            throw new Error("Pokémon TCG API key is missing.");
+        }
+        // DEBUG: Log the API key to ensure it's loaded correctly
+        const maskedKey = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
+        logs.push(`✅ Pokémon TCG API key found. Using key: ${maskedKey}`);
 
         let allCardsForSet: any[] = [];
         let page = 1;
