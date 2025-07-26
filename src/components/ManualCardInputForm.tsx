@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -446,7 +447,8 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       };
     }
     
-    addCardToCollection(cardToSave); 
+    // Use the onAddCard prop to pass the card up to the parent component
+    onAddCard({ ...cardToSave, id: '', userId: '', timestamp: null });
 
     form.reset({
       selectedSetId: values.selectedSetId, 
