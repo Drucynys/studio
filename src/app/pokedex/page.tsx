@@ -283,7 +283,7 @@ export default function PokedexPage() {
                                 return (
                                 <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
                                 <Card className={cn(
-                                    "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center relative aspect-square",
+                                    "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center relative aspect-square overflow-hidden",
                                     isOwned && "border-2 border-green-500 hover:border-green-600"
                                 )}>
                                     <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/10 text-xs font-mono text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
@@ -299,6 +299,7 @@ export default function PokedexPage() {
                                         objectFit="contain"
                                         unoptimized // Sprites are small and don't need optimization
                                         data-ai-hint="pokemon sprite"
+                                        className="rounded-lg"
                                     />
                                     </div>
                                     
