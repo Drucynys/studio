@@ -296,7 +296,7 @@ const SetDetailsPage = () => {
                             "relative aspect-[2.5/3.5] w-full cursor-pointer group rounded-lg overflow-hidden",
                             "transform transition-all duration-200 ease-out",
                             "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:z-10",
-                            isCollected && "bg-green-500 p-0.5"
+                             isCollected && "ring-2 ring-green-500"
                           )}
                         >
                           <Image 
@@ -304,7 +304,7 @@ const SetDetailsPage = () => {
                             alt={card.name} 
                             layout="fill" 
                             objectFit="contain" 
-                            className="bg-card shadow-md rounded-md"
+                            className="bg-card shadow-md rounded-lg"
                             data-ai-hint="pokemon card front"
                           />
                           
