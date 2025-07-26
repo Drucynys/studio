@@ -283,15 +283,10 @@ export default function PokedexPage() {
                                 return (
                                 <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
                                 <Card className={cn(
-                                    "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center relative aspect-square overflow-hidden",
-                                    isOwned && "ring-2 ring-green-500"
+                                    "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center relative aspect-square",
+                                    isOwned ? "bg-green-500 p-0.5" : ""
                                 )}>
-                                    <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/10 text-xs font-mono text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
-                                        #{String(pokemon.id).padStart(3, '0')}
-                                    </div>
-                                    <div className={cn(
-                                        "relative w-24 h-24 transition-all"
-                                    )}>
+                                    <div className={cn("relative w-24 h-24 transition-all", isOwned ? "w-full h-full" : "")}>
                                     <Image
                                         src={pokemon.sprite}
                                         alt={pokemon.name}
@@ -299,10 +294,14 @@ export default function PokedexPage() {
                                         objectFit="contain"
                                         unoptimized // Sprites are small and don't need optimization
                                         data-ai-hint="pokemon sprite"
-                                        className="rounded-lg"
+                                        className={cn("rounded-lg", isOwned ? "rounded-md" : "")}
                                     />
                                     </div>
-                                    
+                                    {!isOwned && (
+                                      <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/10 text-xs font-mono text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
+                                          #{String(pokemon.id).padStart(3, '0')}
+                                      </div>
+                                    )}
                                 </Card>
                                 </Link>
                             )})}
