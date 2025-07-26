@@ -283,8 +283,8 @@ export default function PokedexPage() {
                                 return (
                                 <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
                                 <Card className={cn(
-                                    "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center relative aspect-square",
-                                    isOwned ? "ring-2 ring-green-500" : "saturate-[.80]"
+                                    "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center relative aspect-square group",
+                                    isOwned ? "ring-2 ring-green-500" : "saturate-50 group-hover:saturate-100"
                                 )}>
                                     <div className={cn("relative w-24 h-24 transition-all")}>
                                     <Image

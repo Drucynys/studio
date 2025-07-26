@@ -184,7 +184,7 @@ const ArtistDetailPage = () => {
                           "relative aspect-[2.5/3.5] w-full cursor-pointer group rounded-lg overflow-hidden",
                           "transform transition-all duration-200 ease-out",
                           "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:z-10",
-                          isCollected ? "ring-2 ring-green-500" : "saturate-[.80]"
+                          isCollected ? "ring-2 ring-green-500" : "saturate-50 group-hover:saturate-100"
                         )}
                       >
                         <Image 
