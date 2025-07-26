@@ -181,7 +181,7 @@ const ArtistDetailPage = () => {
                           setIsDialogOpen(true);
                         }}
                         className={cn(
-                          "relative aspect-[2.5/3.5] w-full cursor-pointer group rounded-lg overflow-hidden",
+                          "relative aspect-[2.5/3.5] w-full cursor-pointer group rounded-lg",
                           "transform transition-all duration-200 ease-out",
                           "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:z-10",
                           isCollected && "ring-2 ring-green-500"
@@ -194,7 +194,7 @@ const ArtistDetailPage = () => {
                           objectFit="contain" 
                           className={cn(
                             "bg-card shadow-md rounded-lg",
-                            !isCollected && "saturate-50 group-hover:saturate-100 transition-all"
+                            !isCollected && "saturate-[.9] group-hover:saturate-100 transition-all"
                           )}
                           data-ai-hint="pokemon card front"
                         />
