@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 
 const ArtistDetailPage = () => {
   const params = useParams();
+  const router = useRouter();
   const artistNameParam = params.artistName as string;
   
   const [cardsByArtist, setCardsByArtist] = useState<ApiPokemonCard[]>([]);
@@ -24,35 +25,8 @@ const ArtistDetailPage = () => {
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-
   const artistName = decodeURIComponent(artistNameParam);
   
-  useEffect(() => {
-    const scrollHandler = () => {
-      const currentScrollY = window.scrollY;
-      
-      setLastScrollY(prevLastScrollY => {
-        if (Math.abs(currentScrollY - prevLastScrollY) < 10) return prevLastScrollY;
-
-        if (currentScrollY > prevLastScrollY && currentScrollY > 100) {
-          setIsHeaderVisible(false); // scrolling down
-        } else {
-          setIsHeaderVisible(true); // scrolling up
-        }
-        
-        return currentScrollY;
-      });
-    };
-
-    window.addEventListener('scroll', scrollHandler, { passive: true });
-    
-    return () => {
-      window.removeEventListener('scroll', scrollHandler);
-    };
-  }, []);
-
   const fetchCardsByArtist = useCallback(async () => {
     if (!artistName) return;
     setIsLoading(true);
@@ -146,12 +120,12 @@ const ArtistDetailPage = () => {
           </CardContent>
         </Card>
       </main>
-      <Link href="/browse-sets?tab=artists" className="fixed bottom-6 left-6 z-50">
-        <Button variant="secondary" size="icon" className="rounded-full h-14 w-14 shadow-lg border transition-colors hover:bg-primary hover:text-primary-foreground">
+      <div className="fixed bottom-6 left-6 z-50">
+        <Button onClick={() => router.back()} variant="secondary" size="icon" className="rounded-full h-14 w-14 shadow-lg border transition-colors hover:bg-primary hover:text-primary-foreground">
             <ArrowLeft className="h-6 w-6" />
-            <span className="sr-only">Back to Browse</span>
+            <span className="sr-only">Back</span>
         </Button>
-      </Link>
+      </div>
       {selectedApiCard && (
         <AddCardToCollectionDialog
           isOpen={isDialogOpen}

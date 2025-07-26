@@ -19,6 +19,9 @@ env:
       - RUNTIME
   - variable: NEXT_PUBLIC_POKEMONTCG_API_KEY
     secret: firebase-client-api-key
+    availability:
+      - BUILD
+      - RUNTIME
 
   - variable: GOOGLE_APPLICATION_CREDENTIALS_JSON
     secret: google-creds-final
