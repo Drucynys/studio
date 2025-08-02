@@ -292,12 +292,7 @@ const SetDetailsPage = () => {
                         <div
                           key={card.id}
                           onClick={() => openDialogForCard(card)}
-                          className={cn(
-                            "relative aspect-[2.5/3.5] w-full cursor-pointer group rounded-lg",
-                            "transform transition-all duration-200 ease-out",
-                            "hover:scale-105 hover:-translate-y-1 hover:shadow-lg hover:z-10",
-                             isCollected ? "ring-2 ring-green-500" : ""
-                          )}
+                          className="group relative aspect-[2.5/3.5] w-full cursor-pointer rounded-lg"
                         >
                           <Image 
                             src={card.images.small} 
@@ -305,13 +300,21 @@ const SetDetailsPage = () => {
                             layout="fill" 
                             objectFit="contain" 
                             className={cn(
-                              "bg-card shadow-md rounded-lg",
-                              !isCollected && "saturate-[.1] group-hover:saturate-100 transition-all"
+                              "bg-card shadow-md rounded-lg transition-all",
+                              isCollected ? "saturate-100" : "saturate-[.1] group-hover:saturate-100"
                             )}
                             data-ai-hint="pokemon card front"
                           />
                           
-                          <Badge className="absolute top-2 right-2 z-10 bg-black/60 text-white border-transparent">
+                          <div className={cn(
+                              "absolute inset-0 rounded-lg ring-2 pointer-events-none",
+                              isCollected ? "ring-green-500" : "ring-transparent"
+                          )}/>
+
+                          <Badge className={cn(
+                            "absolute bottom-1 right-1 z-10 text-white border-transparent transition-opacity group-hover:opacity-0",
+                             isCollected ? "bg-green-600" : "bg-black/60"
+                           )}>
                             #{card.number}
                           </Badge>
                         </div>
