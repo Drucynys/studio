@@ -287,8 +287,8 @@ export default function PokedexPage() {
                                     isOwned ? "ring-2 ring-green-500" : ""
                                 )}>
                                     <div className={cn(
-                                        "relative w-24 h-24 transition-all",
-                                        !isOwned && "saturate-50 group-hover:saturate-100"
+                                        "relative w-24 h-24 transition-all group-hover:saturate-100",
+                                        !isOwned && "saturate-[.1]"
                                     )}>
                                     <Image
                                         src={pokemon.sprite}
