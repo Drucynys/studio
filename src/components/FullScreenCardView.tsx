@@ -207,6 +207,7 @@ export function FullScreenCardView({
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
     if (dragStart) {
       const dragEnd = { x: e.clientX, y: e.clientY };
       const deltaX = dragEnd.x - dragStart.x;
@@ -226,7 +227,6 @@ export function FullScreenCardView({
       setDragStart(null);
       setDragOffset({ x: 0, y: 0 });
     }
-    e.currentTarget.releasePointerCapture(e.pointerId);
   };
   
 
