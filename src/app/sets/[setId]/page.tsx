@@ -292,24 +292,21 @@ const SetDetailsPage = () => {
                         <div
                           key={card.id}
                           onClick={() => openDialogForCard(card)}
-                          className="group relative aspect-[2.5/3.5] w-full cursor-pointer"
+                          className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
                         >
-                          <Image 
-                            src={card.images.small} 
-                            alt={card.name} 
-                            layout="fill" 
-                            objectFit="contain" 
-                            className={cn(
-                              "bg-card shadow-md rounded-lg transition-transform duration-200 group-hover:scale-105",
-                              isCollected ? "saturate-100" : "saturate-[.1] group-hover:saturate-100"
-                            )}
-                            data-ai-hint="pokemon card front"
-                          />
-                          
-                          <div className={cn(
-                              "absolute inset-0 rounded-lg ring-2 pointer-events-none",
-                              isCollected ? "ring-green-500" : "ring-transparent"
-                          )}/>
+                          <div className={cn("absolute inset-0 rounded-lg overflow-hidden", isCollected && "ring-2 ring-green-500")}>
+                            <Image 
+                              src={card.images.small} 
+                              alt={card.name} 
+                              layout="fill" 
+                              objectFit="contain" 
+                              className={cn(
+                                "bg-card shadow-md rounded-lg",
+                                isCollected ? "saturate-100" : "saturate-[.1] group-hover:saturate-100"
+                              )}
+                              data-ai-hint="pokemon card front"
+                            />
+                          </div>
 
                           <Badge className={cn(
                             "absolute bottom-1 right-1 z-10 text-white border-transparent transition-opacity group-hover:opacity-0",

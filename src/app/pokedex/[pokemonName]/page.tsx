@@ -123,16 +123,18 @@ const PokemonDetailPage = () => {
                         setSelectedApiCard(card);
                         setIsDialogOpen(true);
                       }}
-                      className="group relative aspect-[2.5/3.5] w-full cursor-pointer"
+                      className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
                     >
-                      <Image
-                        src={card.images.small}
-                        alt={card.name}
-                        layout="fill"
-                        objectFit="contain"
-                        className={cn("bg-card shadow-md rounded-lg transition-transform duration-200 group-hover:scale-105")}
-                        data-ai-hint="pokemon card front"
-                      />
+                       <div className="absolute inset-0 rounded-lg overflow-hidden">
+                        <Image
+                          src={card.images.small}
+                          alt={card.name}
+                          layout="fill"
+                          objectFit="contain"
+                          className={cn("bg-card shadow-md rounded-lg")}
+                          data-ai-hint="pokemon card front"
+                        />
+                       </div>
                     </div>
                   ))}
                 </div>
