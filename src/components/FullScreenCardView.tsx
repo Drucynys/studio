@@ -68,6 +68,9 @@ export function FullScreenCardView({
   const isMobile = useIsMobile();
   const [motionPermission, setMotionPermission] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
   const currentCard = currentIndex !== null ? cards[currentIndex] : null;
   const masterCard = currentCard ? masterCardData.get(currentCard.apiId) : null;
 
@@ -189,6 +192,43 @@ export function FullScreenCardView({
     };
   }, [isOpen, currentIndex, cards.length, onNavigate, onClose, handleDeviceMotion]);
 
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragStart({ x: e.clientX, y: e.clientY });
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStart) {
+      const offsetX = e.clientX - dragStart.x;
+      const offsetY = e.clientY - dragStart.y;
+      setDragOffset({ x: offsetX, y: offsetY });
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStart) {
+      const dragEnd = { x: e.clientX, y: e.clientY };
+      const deltaX = dragEnd.x - dragStart.x;
+      const deltaY = dragEnd.y - dragStart.y;
+      const swipeThreshold = 50; // Minimum distance for a swipe
+
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > swipeThreshold) { // Horizontal swipe
+        if (deltaX < 0 && currentIndex !== null && currentIndex < cards.length - 1) {
+          onNavigate(currentIndex + 1);
+        } else if (deltaX > 0 && currentIndex !== null && currentIndex > 0) {
+          onNavigate(currentIndex - 1);
+        }
+      } else if (Math.abs(deltaY) > swipeThreshold) { // Vertical swipe
+        onClose();
+      }
+      
+      setDragStart(null);
+      setDragOffset({ x: 0, y: 0 });
+    }
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+  
 
   const displayVariant = formatVariantKey(currentCard?.variant ?? '');
   const currentMarketValue = getMarketPrice(masterCard, currentCard?.variant);
@@ -209,6 +249,10 @@ export function FullScreenCardView({
             className="flex-grow flex items-center justify-center relative overflow-hidden pt-12 pb-28 h-full w-full card-container"
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
         >
           {currentIndex !== null && currentIndex > 0 && (
             <Button
@@ -225,7 +269,13 @@ export function FullScreenCardView({
           <div
             ref={cardRef}
             key={currentCard.id}
-            className="card aspect-[2.5/3.5] h-[72vh] max-h-[680px] w-auto"
+            className="card aspect-[2.5/3.5] h-[72vh] max-h-[680px] w-auto touch-none"
+            style={{
+              transform: dragStart 
+                ? `translate(${dragOffset.x}px, ${dragOffset.y}px)` 
+                : 'translate(0, 0)',
+              transition: dragStart ? 'none' : 'transform 0.3s ease-out',
+            }}
             data-ai-hint="pokemon card front large interactive"
           >
             <Image
@@ -235,9 +285,9 @@ export function FullScreenCardView({
               layout="fill"
               objectFit="cover"
               priority
-              className="card-image"
+              className="card-image pointer-events-none"
             />
-            <div className="shine" />
+            <div className="shine pointer-events-none" />
           </div>
 
           {currentIndex !== null && currentIndex < cards.length - 1 && (
