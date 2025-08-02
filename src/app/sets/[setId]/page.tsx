@@ -292,7 +292,7 @@ const SetDetailsPage = () => {
                         <div
                           key={card.id}
                           onClick={() => openDialogForCard(card)}
-                          className="group relative aspect-[2.5/3.5] w-full cursor-pointer rounded-lg"
+                          className="group relative aspect-[2.5/3.5] w-full cursor-pointer"
                         >
                           <Image 
                             src={card.images.small} 
@@ -300,7 +300,7 @@ const SetDetailsPage = () => {
                             layout="fill" 
                             objectFit="contain" 
                             className={cn(
-                              "bg-card shadow-md rounded-lg transition-all",
+                              "bg-card shadow-md rounded-lg transition-transform duration-200 group-hover:scale-105",
                               isCollected ? "saturate-100" : "saturate-[.1] group-hover:saturate-100"
                             )}
                             data-ai-hint="pokemon card front"

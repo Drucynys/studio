@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import { Loader2, ServerCrash, ArrowLeft, Target, Images } from "lucide-react";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
+import { cn } from "@/lib/utils";
 
 
 // Interface for a single Pokémon entry from our DB
@@ -116,24 +117,23 @@ const PokemonDetailPage = () => {
               <ScrollArea className="h-[calc(100vh-28rem)]">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 pb-24 px-4">
                   {cardsForPokemon.map(card => (
-                    <Card
+                    <div
                       key={card.id}
                       onClick={() => {
                         setSelectedApiCard(card);
                         setIsDialogOpen(true);
                       }}
-                      className="p-2 cursor-pointer group flex flex-col relative bg-card transform transition-all duration-200 ease-out hover:scale-105 hover:-translate-y-1 hover:shadow-lg"
+                      className="group relative aspect-[2.5/3.5] w-full cursor-pointer"
                     >
-                      <div className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden">
-                        <Image
-                          src={card.images.small}
-                          alt={card.name}
-                          layout="fill"
-                          objectFit="contain"
-                          data-ai-hint="pokemon card front"
-                        />
-                      </div>
-                    </Card>
+                      <Image
+                        src={card.images.small}
+                        alt={card.name}
+                        layout="fill"
+                        objectFit="contain"
+                        className={cn("bg-card shadow-md rounded-lg transition-transform duration-200 group-hover:scale-105")}
+                        data-ai-hint="pokemon card front"
+                      />
+                    </div>
                   ))}
                 </div>
                 {cardsForPokemon.length === 0 && (
