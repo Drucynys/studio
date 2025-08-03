@@ -310,8 +310,8 @@ export default function PokedexPage() {
                                     isOwned && "ring-2 ring-green-500 rounded-lg"
                                 )}>
                                     <Card className={cn(
-                                        "bg-card h-full w-full hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out flex flex-col items-center justify-center p-2 text-center",
-                                        !isOwned ? "saturate-[.1] group-hover:saturate-100" : ""
+                                        "bg-card h-full w-full transition-all duration-300 ease-in-out flex flex-col items-center justify-center p-2 text-center",
+                                        !isOwned ? "saturate-[.1] group-hover:saturate-100 hover:shadow-primary/20 hover:border-primary" : ""
                                     )}>
                                         <div className="relative w-20 h-20">
                                         <Image
