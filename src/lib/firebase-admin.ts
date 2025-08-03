@@ -22,7 +22,8 @@ function initializeFirebaseAdmin() {
     
     // The service account JSON from Secret Manager often comes with escaped newlines.
     // We need to replace them with actual newlines for the SDK to parse it correctly.
-    const serviceAccount = JSON.parse(serviceAccountJson.replace(/\\n/g, '\n'));
+    const serviceAccountString = serviceAccountJson.replace(/\\n/g, '\n');
+    const serviceAccount = JSON.parse(serviceAccountString);
     
     // Initialize the app with the credentials
     return admin.initializeApp({
