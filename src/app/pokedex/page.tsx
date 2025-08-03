@@ -324,7 +324,7 @@ export default function PokedexPage() {
                                         />
                                         </div>
                                     </Card>
-                                    <Badge className="absolute top-1 right-1 z-10 text-white border-transparent transition-opacity bg-black/60 group-hover:opacity-0">
+                                    <Badge variant="secondary" className="absolute top-1 right-1 z-10">
                                         #{String(pokemon.id).padStart(3, '0')}
                                     </Badge>
                                 </div>
