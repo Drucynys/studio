@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
+const CARDS_PER_PAGE = 50;
+
 const ArtistDetailPage = () => {
   const params = useParams();
   const router = useRouter();
@@ -26,6 +28,8 @@ const ArtistDetailPage = () => {
   const [cardsByArtist, setCardsByArtist] = useState<ApiPokemonCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -33,7 +37,67 @@ const ArtistDetailPage = () => {
 
   const artistName = decodeURIComponent(artistNameParam);
 
+  const fetchCardsByArtist = useCallback(async (loadMore = false) => {
+    if (!artistName) return;
+
+    if (loadMore) {
+        setIsLoadingMore(true);
+    } else {
+        setIsLoading(true);
+        setCardsByArtist([]);
+    }
+    setError(null);
+    
+    try {
+      const lastCard = loadMore && cardsByArtist.length > 0 ? cardsByArtist[cardsByArtist.length - 1] : null;
+      const params = new URLSearchParams({
+        limit: String(CARDS_PER_PAGE),
+      });
+
+      if (lastCard) {
+        params.append('startAfterDate', lastCard.set.releaseDate);
+        params.append('startAfterNumber', lastCard.number);
+      }
+      
+      const response = await fetch(`/api/cards/by-artist/${encodeURIComponent(artistName)}?${params.toString()}`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to fetch cards: ${response.statusText} (status: ${response.status})`);
+      }
+      
+      const newCards: ApiPokemonCard[] = await response.json();
+      
+      setCardsByArtist(prev => loadMore ? [...prev, ...newCards] : newCards);
+      setHasMore(newCards.length === CARDS_PER_PAGE);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred");
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [artistName, cardsByArtist]);
+
+
+  useEffect(() => {
+    fetchCardsByArtist(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [artistName]);
+
+  useEffect(() => {
+    const lowercasedFilter = searchTerm.toLowerCase();
+    const filteredData = cardsByArtist.filter(card =>
+      card.name.toLowerCase().includes(lowercasedFilter) ||
+      card.number.toLowerCase().includes(lowercasedFilter) ||
+      (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter)) ||
+      card.set.name.toLowerCase().includes(lowercasedFilter)
+    );
+    setFilteredCards(filteredData);
+  }, [searchTerm, cardsByArtist]);
+
   const artistCompletion = useMemo(() => {
+    // This is now an estimate based on loaded cards, which is a trade-off for performance.
     if (cardsByArtist.length === 0) return { collected: 0, total: 0, percentage: 0 };
     const collectedCardIdentifiers = new Set<string>();
     collection.forEach(card => {
@@ -46,56 +110,6 @@ const ArtistDetailPage = () => {
     const percentage = totalByThisArtist > 0 ? parseFloat(((uniqueCollectedCount / totalByThisArtist) * 100).toFixed(1)) : 0;
     return { collected: uniqueCollectedCount, total: totalByThisArtist, percentage };
   }, [cardsByArtist, collection, artistName]);
-
-  
-  const fetchCardsByArtist = useCallback(async () => {
-    if (!artistName) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/cards/by-artist/${encodeURIComponent(artistName)}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to fetch cards: ${response.statusText} (status: ${response.status})`);
-      }
-      
-      let data: ApiPokemonCard[] = await response.json();
-      data.sort((a, b) => {
-        const dateA = new Date(a.set.releaseDate).getTime();
-        const dateB = new Date(b.set.releaseDate).getTime();
-        if(dateA === dateB) {
-            const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
-            const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
-            return numA - numB;
-        }
-        return dateA - dateB;
-      });
-
-      setCardsByArtist(data);
-      setFilteredCards(data);
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [artistName]);
-
-
-  useEffect(() => {
-    fetchCardsByArtist();
-  }, [fetchCardsByArtist]);
-
-  useEffect(() => {
-    const lowercasedFilter = searchTerm.toLowerCase();
-    const filteredData = cardsByArtist.filter(card =>
-      card.name.toLowerCase().includes(lowercasedFilter) ||
-      card.number.toLowerCase().includes(lowercasedFilter) ||
-      (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter)) ||
-      card.set.name.toLowerCase().includes(lowercasedFilter)
-    );
-    setFilteredCards(filteredData);
-  }, [searchTerm, cardsByArtist]);
 
   if (isLoading) {
     return (
@@ -137,12 +151,12 @@ const ArtistDetailPage = () => {
                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-4 gap-x-8 pt-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Hash className="h-4 w-4 text-primary"/>
-                        {cardsByArtist.length} cards illustrated
+                        {cardsByArtist.length} cards loaded
                     </div>
                      <div className="flex-1 min-w-[150px]">
                         <div className="flex justify-between items-baseline mb-1">
                             <h3 className="text-sm font-medium text-muted-foreground">
-                                Artist Completion
+                                Artist Completion (Loaded)
                             </h3>
                             <p className="text-sm font-semibold text-primary">
                                 {artistCompletion.collected} / {artistCompletion.total}
@@ -209,6 +223,14 @@ const ArtistDetailPage = () => {
               <div className="text-center py-10 text-muted-foreground">
                 <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg">No cards found for this artist.</p>
+              </div>
+            )}
+            
+            {!searchTerm && hasMore && (
+              <div className="flex justify-center mt-8">
+                <Button onClick={() => fetchCardsByArtist(true)} disabled={isLoadingMore}>
+                  {isLoadingMore ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Loading...</> : 'Load More Cards'}
+                </Button>
               </div>
             )}
           </div>

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
-// Safe initialization function (same as your working set API)
+// Safe initialization function
 function initializeFirebaseAdmin() {
     if (admin.apps.length > 0) {
         return;
@@ -34,11 +34,15 @@ export async function GET(
 ) {
     const { artistName } = await params;
     
+    const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const startAfterDate = searchParams.get('startAfterDate');
+    const startAfterNumber = searchParams.get('startAfterNumber');
+
     if (!artistName) {
         return NextResponse.json({ message: 'Artist name is required' }, { status: 400 });
     }
 
-    // Decode the artist name from the URL (e.g., "Ken%20Sugimori" -> "Ken Sugimori")
     const decodedArtistName = decodeURIComponent(artistName);
 
     try {
@@ -46,10 +50,17 @@ export async function GET(
         const db = getFirestore();
         const cardsRef = db.collection('pokemon-tcg-cards');
         
-        // This query requires a single-field index on 'artist'. 
-        // Firestore can usually create this automatically, but sometimes it needs to be done manually.
-        // The previous limit of 100 has been removed to show all cards.
-        const querySnapshot = await cardsRef.where('artist', '==', decodedArtistName).get();
+        let query = cardsRef
+            .where('artist', '==', decodedArtistName)
+            .orderBy('set.releaseDate', 'asc')
+            .orderBy('number', 'asc')
+            .limit(limit);
+
+        if (startAfterDate && startAfterNumber) {
+            query = query.startAfter(startAfterDate, startAfterNumber);
+        }
+        
+        const querySnapshot = await query.get();
 
         if (querySnapshot.empty) {
             return NextResponse.json([]);
@@ -60,11 +71,10 @@ export async function GET(
     } catch (error: any) {
         console.error(`Error fetching cards for artist ${decodedArtistName}:`, error);
         
-        // Specific check for the "requires an index" error from Firestore
         if (error.message && error.message.includes('requires an index')) {
              return NextResponse.json(
                 { 
-                    message: `A database index is required to query by artist. Please create a single-field index in your Firestore settings for the 'pokemon-tcg-cards' collection on the 'artist' field.`,
+                    message: `A database index is required to query by artist. Please create a composite index in your Firestore settings for the 'pokemon-tcg-cards' collection on 'artist' (asc), 'set.releaseDate' (asc), and 'number' (asc).`,
                     details: error.message
                 },
                 { status: 500 }
