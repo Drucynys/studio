@@ -324,7 +324,7 @@ export default function PokedexPage() {
                                         />
                                         </div>
                                     </Card>
-                                    <Badge variant="secondary" className="absolute top-1 right-1 z-10">
+                                    <Badge variant="secondary" className="absolute top-1 right-1 z-10 px-1.5 py-0 text-[10px] h-auto font-normal">
                                         #{String(pokemon.id).padStart(3, '0')}
                                     </Badge>
                                 </div>
