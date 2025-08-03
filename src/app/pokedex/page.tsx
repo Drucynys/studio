@@ -1,4 +1,5 @@
 
+// src/app/pokedex/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -192,63 +193,61 @@ export default function PokedexPage() {
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8 flex flex-col gap-6">
-        <Card className="shadow-xl">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-              <div>
-                <CardTitle className="font-headline text-3xl text-foreground flex items-center gap-2">
-                  <PokedexIcon className="h-8 w-8 text-primary"/>
-                  Pokédex
-                </CardTitle>
-                <CardDescription className="pt-2">
-                  Browse all Pokémon to see their TCG card appearances. Data is sourced from your local database.
-                </CardDescription>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                <div className="relative flex-grow">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      type="text"
-                      placeholder="Search Pokémon..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 w-full"
-                    />
+        <div className="p-4 md:p-6 bg-card rounded-lg shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                  <h1 className="font-headline text-3xl text-foreground flex items-center gap-2">
+                     <PokedexIcon className="h-8 w-8 text-primary"/> Pokédex
+                  </h1>
+                  <p className="text-muted-foreground">
+                    Browse all Pokémon to see their TCG card appearances.
+                  </p>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full sm:w-auto justify-start">
-                      <span>Gen</span>
-                      {selectedGenerations.length > 0 && (
-                        <Badge variant="secondary" className="ml-2">{selectedGenerations.length} selected</Badge>
-                      )}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-56">
-                    <DropdownMenuLabel>Filter by Generation</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuCheckboxItem
-                        checked={selectedGenerations.length === 0}
-                        onCheckedChange={() => handleSelectAllGens()}
-                    >
-                        All Generations
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuSeparator />
-                    {generations.map(gen => (
-                      <DropdownMenuCheckboxItem
-                        key={gen}
-                        checked={selectedGenerations.includes(gen)}
-                        onCheckedChange={() => handleGenerationToggle(gen)}
-                      >
-                        Generation {gen} ({generationRegions[gen]})
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
             </div>
-            {user && (
+            
+            <div className="flex flex-col md:flex-row gap-4 mt-4">
+              <div className="relative flex-grow">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search Pokémon..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full md:w-auto justify-between">
+                    <span>Generations</span>
+                    {selectedGenerations.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">{selectedGenerations.length} selected</Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56">
+                  <DropdownMenuLabel>Filter by Generation</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                      checked={selectedGenerations.length === 0}
+                      onCheckedChange={() => handleSelectAllGens()}
+                  >
+                      All Generations
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
+                  {generations.map(gen => (
+                    <DropdownMenuCheckboxItem
+                      key={gen}
+                      checked={selectedGenerations.includes(gen)}
+                      onCheckedChange={() => handleGenerationToggle(gen)}
+                    >
+                      Generation {gen} ({generationRegions[gen]})
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+             {user && (
               <div className="space-y-2 pt-4">
                   <div className="flex justify-between items-baseline">
                       <h3 className="text-sm font-medium text-muted-foreground">
@@ -262,62 +261,56 @@ export default function PokedexPage() {
                   <Progress value={completionStats.percentage} className="h-2" />
               </div>
             )}
-          </CardHeader>
-        </Card>
+        </div>
         
-        <Card className="shadow-xl flex-1 overflow-hidden">
-          <CardContent className="pt-6 h-full">
-            <ScrollArea className="h-full">
-              {filteredPokemon.length > 0 ? (
+        <div className="flex-1">
+            {filteredPokemon.length > 0 ? (
                 sortedGenerationKeys.map(genKey => (
                     <div key={genKey}>
-                        <>
-                            <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
-                                <Hash className="h-6 w-6 text-primary/80" /> Generation {genKey} - {generationRegions[genKey]}
-                            </h2>
-                            <Separator className="mb-4 mx-4" />
-                        </>
+                        <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
+                            Generation {genKey} - {generationRegions[genKey]}
+                        </h2>
+                        <Separator className="mb-4 mx-4" />
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-4 pt-4 pb-12 px-4">
                             {groupedPokemon[genKey]?.map((pokemon) => {
                                 const isOwned = ownedPokemonNames.has(pokemon.name.toLowerCase());
                                 return (
                                 <Link key={pokemon.id} href={`/pokedex/${pokemon.name.toLowerCase()}`} className="block group">
-                                <Card className={cn(
-                                    "bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col items-center justify-center p-4 text-center relative aspect-square",
-                                    isOwned ? "ring-2 ring-green-500" : ""
+                                <div className={cn(
+                                    "relative aspect-square w-full cursor-pointer transition-transform duration-200 hover:scale-105",
+                                    isOwned && "ring-2 ring-green-500 rounded-lg"
                                 )}>
-                                    <div className={cn(
-                                        "relative w-24 h-24 transition-all group-hover:saturate-100",
-                                        !isOwned && "saturate-[.1]"
+                                    <Card className={cn(
+                                        "bg-card h-full w-full hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out flex flex-col items-center justify-center p-2 text-center",
+                                        !isOwned ? "saturate-[.1] group-hover:saturate-100" : ""
                                     )}>
-                                    <Image
-                                        src={pokemon.sprite}
-                                        alt={pokemon.name}
-                                        layout="fill"
-                                        objectFit="contain"
-                                        unoptimized // Sprites are small and don't need optimization
-                                        data-ai-hint="pokemon sprite"
-                                        className={cn("rounded-lg")}
-                                    />
-                                    </div>
-                                    <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-black/10 text-xs font-mono text-muted-foreground group-hover:bg-primary group-hover:text-primary-foreground">
-                                          #{String(pokemon.id).padStart(3, '0')}
-                                      </div>
-                                </Card>
+                                        <div className="relative w-20 h-20">
+                                        <Image
+                                            src={pokemon.sprite}
+                                            alt={pokemon.name}
+                                            layout="fill"
+                                            objectFit="contain"
+                                            unoptimized
+                                            data-ai-hint="pokemon sprite"
+                                        />
+                                        </div>
+                                    </Card>
+                                    <Badge className="absolute top-1 right-1 z-10 text-white border-transparent transition-opacity bg-black/60 group-hover:opacity-0">
+                                        #{String(pokemon.id).padStart(3, '0')}
+                                    </Badge>
+                                </div>
                                 </Link>
                             )})}
                         </div>
                     </div>
                 ))
-              ) : (
+            ) : (
                 <div className="text-center py-10 text-muted-foreground">
-                  <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg">No Pokémon found matching your search or filter.</p>
+                    <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">No Pokémon found matching your search or filter.</p>
                 </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+            )}
+        </div>
       </main>
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
         PokéTRKR &copy; {new Date().getFullYear()}
