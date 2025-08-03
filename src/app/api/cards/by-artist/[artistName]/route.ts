@@ -35,9 +35,7 @@ export async function GET(
     const { artistName } = await params;
     
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const startAfterDate = searchParams.get('startAfterDate');
-    const startAfterNumber = searchParams.get('startAfterNumber');
+    const limit = parseInt(searchParams.get('limit') || '1000', 10); // Reverted to a high limit
 
     if (!artistName) {
         return NextResponse.json({ message: 'Artist name is required' }, { status: 400 });
@@ -50,15 +48,11 @@ export async function GET(
         const db = getFirestore();
         const cardsRef = db.collection('pokemon-tcg-cards');
         
+        // Reverted Query: Simple filter by artist and a high limit.
+        // This query does not require the complex composite index.
         let query = cardsRef
             .where('artist', '==', decodedArtistName)
-            .orderBy('set.releaseDate', 'asc')
-            .orderBy('number', 'asc')
             .limit(limit);
-
-        if (startAfterDate && startAfterNumber) {
-            query = query.startAfter(startAfterDate, startAfterNumber);
-        }
         
         const querySnapshot = await query.get();
 
@@ -74,7 +68,7 @@ export async function GET(
         if (error.message && error.message.includes('requires an index')) {
              return NextResponse.json(
                 { 
-                    message: `A database index is required to query by artist. Please create a composite index in your Firestore settings for the 'pokemon-tcg-cards' collection on 'artist' (asc), 'set.releaseDate' (asc), and 'number' (asc).`,
+                    message: `A database index is required to query by artist. Please create an index in your Firestore settings for the 'pokemon-tcg-cards' collection on 'artist' (ascending).`,
                     details: error.message
                 },
                 { status: 500 }

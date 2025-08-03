@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
-const CARDS_PER_PAGE = 50;
+const CARDS_PER_PAGE = 1000; // Reverted to a high limit
 
 const ArtistDetailPage = () => {
   const params = useParams();
@@ -49,16 +49,10 @@ const ArtistDetailPage = () => {
     setError(null);
     
     try {
-      const lastCard = loadMore && cardsByArtist.length > 0 ? cardsByArtist[cardsByArtist.length - 1] : null;
       const params = new URLSearchParams({
         limit: String(CARDS_PER_PAGE),
       });
 
-      if (lastCard) {
-        params.append('startAfterDate', lastCard.set.releaseDate);
-        params.append('startAfterNumber', lastCard.number);
-      }
-      
       const response = await fetch(`/api/cards/by-artist/${encodeURIComponent(artistName)}?${params.toString()}`);
 
       if (!response.ok) {
@@ -77,7 +71,7 @@ const ArtistDetailPage = () => {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [artistName, cardsByArtist]);
+  }, [artistName]);
 
 
   useEffect(() => {
@@ -97,7 +91,6 @@ const ArtistDetailPage = () => {
   }, [searchTerm, cardsByArtist]);
 
   const artistCompletion = useMemo(() => {
-    // This is now an estimate based on loaded cards, which is a trade-off for performance.
     if (cardsByArtist.length === 0) return { collected: 0, total: 0, percentage: 0 };
     const collectedCardIdentifiers = new Set<string>();
     collection.forEach(card => {
@@ -226,7 +219,7 @@ const ArtistDetailPage = () => {
               </div>
             )}
             
-            {!searchTerm && hasMore && (
+            {hasMore && !searchTerm && (
               <div className="flex justify-center mt-8">
                 <Button onClick={() => fetchCardsByArtist(true)} disabled={isLoadingMore}>
                   {isLoadingMore ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Loading...</> : 'Load More Cards'}
