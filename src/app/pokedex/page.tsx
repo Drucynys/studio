@@ -1,4 +1,3 @@
-
 // src/app/pokedex/page.tsx
 "use client";
 
@@ -48,6 +47,33 @@ export default function PokedexPage() {
   const [selectedGenerations, setSelectedGenerations] = useState<number[]>([]);
   const totalGenerations = 9;
   const generations = useMemo(() => Array.from({ length: totalGenerations }, (_, i) => i + 1), [totalGenerations]);
+
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
+  useEffect(() => {
+    const scrollHandler = () => {
+      const currentScrollY = window.scrollY;
+      
+      setLastScrollY(prevLastScrollY => {
+        if (Math.abs(currentScrollY - prevLastScrollY) < 10) return prevLastScrollY;
+
+        if (currentScrollY > prevLastScrollY && currentScrollY > 100) {
+          setIsHeaderVisible(false); // scrolling down
+        } else {
+          setIsHeaderVisible(true); // scrolling up
+        }
+        
+        return currentScrollY;
+      });
+    };
+
+    window.addEventListener('scroll', scrollHandler, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', scrollHandler);
+    };
+  }, []);
 
   const generationRegions: { [key: number]: string } = {
     1: "Kanto",
@@ -193,7 +219,10 @@ export default function PokedexPage() {
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8 flex flex-col gap-6">
-        <div className="p-4 md:p-6 bg-card rounded-lg shadow-xl">
+        <div className={cn(
+          "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-[65px] md:top-[77px] z-40 transition-transform duration-300",
+          !isHeaderVisible && "-translate-y-full"
+        )}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
                   <h1 className="font-headline text-3xl text-foreground flex items-center gap-2">
