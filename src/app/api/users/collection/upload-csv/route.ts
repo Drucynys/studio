@@ -1,9 +1,18 @@
 
 // src/app/api/users/collection/upload-csv/route.ts
 import { NextResponse } from 'next/server';
-import { dbAdmin, authAdmin } from '@/lib/firebase-admin';
 import admin from 'firebase-admin';
 import type { PokemonCard } from '@/types';
+
+// Re-initialize Firebase Admin SDK and Auth if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+const authAdmin = admin.auth();
+const dbAdmin = admin.firestore();
 
 const getDefaultMarketPrice = (apiCard: any): { value: number, variant?: string } => {
     if (!apiCard || !apiCard.tcgplayer?.prices) return { value: 0 };

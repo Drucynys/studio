@@ -1,6 +1,16 @@
 
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Re-initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+
+const db = admin.firestore();
 
 const ARTISTS_COLLECTION = 'pokemon-tcg-artists';
 const CARDS_COLLECTION = 'pokemon-tcg-cards';
@@ -13,7 +23,7 @@ const BATCH_SIZE = 450; // Firestore batch writes are limited to 500 operations
  */
 export async function GET() {
     try {
-        const artistsCollection = dbAdmin.collection(ARTISTS_COLLECTION);
+        const artistsCollection = db.collection(ARTISTS_COLLECTION);
         
         // Use a Firestore query to order the data. This requires a composite index.
         // Index: collection='pokemon-tcg-artists', fields: 'cardCount' (desc), 'name' (asc)
@@ -60,7 +70,7 @@ export async function POST() {
 
         logs.push(`Scanning '${CARDS_COLLECTION}' collection for artists... This may take a moment.`);
         // Use .select('artist') to only fetch the artist field, which is much more efficient
-        const snapshot = await dbAdmin.collection(CARDS_COLLECTION).select('artist').get();
+        const snapshot = await db.collection(CARDS_COLLECTION).select('artist').get();
         logs.push(`✅ Found ${snapshot.size} total card documents to scan.`);
 
         if (snapshot.empty) {
@@ -82,11 +92,11 @@ export async function POST() {
         }));
         
         logs.push(`Writing ${artistList.length} artists to the '${ARTISTS_COLLECTION}' collection...`);
-        const artistsCollection = dbAdmin.collection(ARTISTS_COLLECTION);
+        const artistsCollection = db.collection(ARTISTS_COLLECTION);
         const batchPromises: Promise<any>[] = [];
 
         for (let i = 0; i < artistList.length; i += BATCH_SIZE) {
-            const batch = dbAdmin.batch();
+            const batch = db.batch();
             const chunk = artistList.slice(i, i + BATCH_SIZE);
             chunk.forEach(artist => {
                 // Sanitize the artist name to create a valid Firestore document ID.

@@ -1,6 +1,15 @@
 
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Re-initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+const db = admin.firestore();
 
 export async function GET(request: Request, { params }: { params: { pokemonName: string } }) {
     const { pokemonName } = params;
@@ -9,7 +18,7 @@ export async function GET(request: Request, { params }: { params: { pokemonName:
     }
 
     try {
-        const pokedexRef = dbAdmin.collection('pokedex');
+        const pokedexRef = db.collection('pokedex');
         
         // Query the collection for a document where the 'name' field matches the parameter
         const q = pokedexRef.where('name', '==', pokemonName.toLowerCase());

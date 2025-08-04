@@ -1,7 +1,17 @@
 
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
 import axios from 'axios';
+
+// Re-initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+
+const db = admin.firestore();
 
 async function runFullDataResync(baseUrl: string) {
     const logs: string[] = ["🚀 Starting automated full data resynchronization..."];
@@ -74,7 +84,7 @@ export async function GET(request: Request) {
 
     try {
         // 2. Fetch local set count
-        const setsCollection = dbAdmin.collection('pokemon-tcg-sets');
+        const setsCollection = db.collection('pokemon-tcg-sets');
         const localSetsCount = (await setsCollection.count().get()).data().count;
 
         // 3. Fetch remote set count from TCG API

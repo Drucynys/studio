@@ -1,10 +1,19 @@
 
 import { NextResponse } from 'next/server';
-import { dbAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Re-initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+const db = admin.firestore();
 
 export async function GET() {
     try {
-        const setsCollection = dbAdmin.collection('pokemon-tcg-sets');
+        const setsCollection = db.collection('pokemon-tcg-sets');
         const snapshot = await setsCollection.count().get();
         const count = snapshot.data().count;
 

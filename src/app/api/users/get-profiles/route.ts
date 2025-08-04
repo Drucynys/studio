@@ -1,6 +1,16 @@
 
 import { NextResponse } from 'next/server';
-import { dbAdmin, authAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Re-initialize Firebase Admin SDK and Auth if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+const authAdmin = admin.auth();
+const dbAdmin = admin.firestore();
 
 export async function POST(request: Request) {
     try {

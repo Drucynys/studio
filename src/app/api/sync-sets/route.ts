@@ -1,7 +1,16 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { dbAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Re-initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+const db = admin.firestore();
 
 export async function POST() {
   const logs: string[] = ["- Starting Sync Process Checklist -"];
@@ -38,8 +47,8 @@ export async function POST() {
     logs.push(`Found ${sets.length} sets. Preparing to write to database...`);
     
     // Step 4: Write to Firestore
-    const setsCollection = dbAdmin.collection('pokemon-tcg-sets');
-    const batch = dbAdmin.batch();
+    const setsCollection = db.collection('pokemon-tcg-sets');
+    const batch = db.batch();
     let setsWritten = 0;
 
     sets.forEach((set: any) => {

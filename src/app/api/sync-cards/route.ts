@@ -1,7 +1,16 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { dbAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Re-initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+const db = admin.firestore();
 
 const POKEMON_TCG_API_BASE = 'https://api.pokemontcg.io/v2/cards';
 const PAGE_SIZE = 250; // Max page size allowed by the API
@@ -59,11 +68,11 @@ export async function POST(request: Request) {
         logs.push(`✅ Finished fetching. Total cards found for set: ${allCardsForSet.length}.`);
 
         logs.push(`Writing ${allCardsForSet.length} cards to Firestore (excluding prices)...`);
-        const cardsCollection = dbAdmin.collection('pokemon-tcg-cards');
+        const cardsCollection = db.collection('pokemon-tcg-cards');
         const batchPromises: Promise<any>[] = [];
 
         for (let i = 0; i < allCardsForSet.length; i += BATCH_SIZE) {
-            const batch = dbAdmin.batch();
+            const batch = db.batch();
             const chunk = allCardsForSet.slice(i, i + BATCH_SIZE);
             chunk.forEach(card => {
                 if (card && card.id) {

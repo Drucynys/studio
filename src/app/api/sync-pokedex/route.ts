@@ -1,7 +1,16 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { dbAdmin } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+// Re-initialize Firebase Admin SDK if not already initialized
+if (!admin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+}
+const db = admin.firestore();
 
 const POKEDEX_COLLECTION = 'pokedex';
 const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2';
@@ -42,8 +51,8 @@ export async function POST() {
 
 
         logs.push(`Writing ${pokedexData.length} Pokémon to the '${POKEDEX_COLLECTION}' collection...`);
-        const pokedexCollection = dbAdmin.collection(POKEDEX_COLLECTION);
-        const batch = dbAdmin.batch();
+        const pokedexCollection = db.collection(POKEDEX_COLLECTION);
+        const batch = db.batch();
         let pokemonWritten = 0;
 
         pokedexData.forEach((pokemon: any) => {
