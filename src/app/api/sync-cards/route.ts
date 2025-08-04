@@ -16,6 +16,18 @@ const POKEMON_TCG_API_BASE = 'https://api.pokemontcg.io/v2/cards';
 const PAGE_SIZE = 250; // Max page size allowed by the API
 const BATCH_SIZE = 450; // Firestore batch writes are limited to 500 operations
 
+const convertCardNumberToInt = (cardNumber: string): number => {
+    if (!cardNumber) return 999;
+    // Extracts the leading number from strings like "swsh12-186" or "TG05/TG30"
+    const match = cardNumber.match(/^\D*(\d+)/);
+    if (match && match[1]) {
+        return parseInt(match[1], 10);
+    }
+    // Fallback for purely numeric strings or other cases
+    const numericPart = parseInt(cardNumber, 10);
+    return isNaN(numericPart) ? 999 : numericPart;
+};
+
 export async function POST(request: Request) {
     const logs: string[] = [];
     try {
@@ -81,6 +93,10 @@ export async function POST(request: Request) {
                     const cardToSave = { ...card };
                     delete cardToSave.tcgplayer;
                     delete cardToSave.cardmarket;
+                    
+                    // Add the new field for numeric sorting
+                    cardToSave.numberAsInt = convertCardNumberToInt(card.number);
+
                     batch.set(docRef, cardToSave);
                 }
             });

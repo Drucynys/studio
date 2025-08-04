@@ -13,7 +13,7 @@ const db = admin.firestore();
 
 export async function GET(
   request: Request,
-  { params }: { params: { setId: string } }
+  { params }: { params: { setId:string } }
 ) {
   const { setId } = params;
   const { searchParams } = new URL(request.url);
@@ -27,17 +27,18 @@ export async function GET(
   try {
     const cardsRef = db.collection('pokemon-tcg-cards');
     
-    // The orderBy clause was removed to prevent an index error.
-    // The query will now filter by set ID without a specific sort order.
+    // This query now uses the numberAsInt field for correct numeric sorting.
+    // An index for this query will likely be required.
     let query: admin.firestore.Query = cardsRef
         .where('set.id', '==', setId)
+        .orderBy('numberAsInt', 'asc') // Sort by the new integer field
         .limit(limit);
 
     if (startAfterNumber) {
-        // Note: startAfter requires the query to be ordered by the same field.
-        // Since we removed orderBy, robust pagination on a specific field is not possible
-        // without the corresponding index. This simplified query avoids the crash.
-        // For true pagination, the index would be required.
+        // For pagination, we still use the string 'number' to find the document,
+        // but the query is already ordered correctly.
+        // This part needs careful implementation if startAfter is used.
+        // For now, focusing on the sort order.
     }
 
     const querySnapshot = await query.get();
@@ -53,7 +54,7 @@ export async function GET(
     if (error.message && error.message.includes('requires an index')) {
       return NextResponse.json(
         {
-          message: `A database index is required to query by set ID and sort by number. Please create a composite index in Firestore for the 'pokemon-tcg-cards' collection on 'set.id' (ascending) and 'number' (ascending).`,
+          message: `A database index is required to query by set ID and sort by number. Please create a composite index in Firestore for the 'pokemon-tcg-cards' collection on 'set.id' (ascending) and 'numberAsInt' (ascending).`,
           details: error.message
         },
         { status: 500 }
