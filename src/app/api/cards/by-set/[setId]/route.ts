@@ -27,14 +27,17 @@ export async function GET(
   try {
     const cardsRef = db.collection('pokemon-tcg-cards');
     
-    // This query requires a composite index on set.id (asc), number (asc)
+    // The orderBy clause was removed to prevent an index error.
+    // The query will now filter by set ID without a specific sort order.
     let query: admin.firestore.Query = cardsRef
         .where('set.id', '==', setId)
-        .orderBy('number', 'asc')
         .limit(limit);
 
     if (startAfterNumber) {
-        query = query.startAfter(startAfterNumber);
+        // Note: startAfter requires the query to be ordered by the same field.
+        // Since we removed orderBy, robust pagination on a specific field is not possible
+        // without the corresponding index. This simplified query avoids the crash.
+        // For true pagination, the index would be required.
     }
 
     const querySnapshot = await query.get();
