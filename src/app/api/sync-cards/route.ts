@@ -50,26 +50,37 @@ export async function POST(request: Request) {
         logs.push(`Fetching all cards for set '${setId}' from API...`);
 
         while (hasMore) {
-            const response = await axios.get(POKEMON_TCG_API_BASE, {
-                headers: { 'X-Api-Key': apiKey },
-                params: { q: `set.id:${setId}`, page: page, pageSize: PAGE_SIZE, orderBy: 'number' },
-            });
-            
-            const { data, totalCount } = response.data;
-            if (apiTotalCount === 0) apiTotalCount = totalCount;
+            try {
+                const response = await axios.get(POKEMON_TCG_API_BASE, {
+                    headers: { 'X-Api-Key': apiKey },
+                    params: { q: `set.id:${setId}`, page: page, pageSize: PAGE_SIZE, orderBy: 'number' },
+                });
+                
+                const { data, totalCount } = response.data;
+                if (apiTotalCount === 0) apiTotalCount = totalCount;
 
-            if (!data || data.length === 0) {
-                hasMore = false;
-                continue;
-            }
-            
-            allCardsForSet = allCardsForSet.concat(data);
-            logs.push(`Fetched page ${page}. ${allCardsForSet.length} of ${apiTotalCount} cards for this set.`);
-            
-            if (allCardsForSet.length >= apiTotalCount) {
-                hasMore = false;
-            } else {
-                page++;
+                if (!data || data.length === 0) {
+                    hasMore = false;
+                    continue;
+                }
+                
+                allCardsForSet = allCardsForSet.concat(data);
+                logs.push(`Fetched page ${page}. ${allCardsForSet.length} of ${apiTotalCount} cards for this set.`);
+                
+                if (allCardsForSet.length >= apiTotalCount) {
+                    hasMore = false;
+                } else {
+                    page++;
+                }
+            } catch (apiError: any) {
+                 let errorMessage = 'An unknown error occurred while fetching from API.';
+                 if (axios.isAxiosError(apiError) && apiError.response) {
+                     errorMessage = `API Error: ${apiError.response.status} ${apiError.response.statusText}. The set ID '${setId}' may be invalid or the API may be temporarily down.`;
+                 } else if (apiError instanceof Error) {
+                     errorMessage = apiError.message;
+                 }
+                 logs.push(`❌ Could not fetch cards for set ${setId}. ${errorMessage}. Skipping this set.`);
+                 hasMore = false; // Stop trying to fetch more pages for this failed set
             }
         }
         

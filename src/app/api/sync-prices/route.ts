@@ -70,7 +70,7 @@ export async function POST(request: Request) {
                  } else if (apiError instanceof Error) {
                      errorMessage = apiError.message;
                  }
-                 logs.push(`❌ Could not fetch cards for set ${setId}. ${errorMessage}`);
+                 logs.push(`❌ Could not fetch cards for set ${setId}. ${errorMessage}. Skipping this set.`);
                  hasMore = false; // Stop trying to fetch more pages for this failed set
             }
         }
