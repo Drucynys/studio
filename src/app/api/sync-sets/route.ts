@@ -45,19 +45,9 @@ export async function POST() {
     sets.forEach((set: any) => {
       if (set && set.id) {
         const docRef = setsCollection.doc(set.id);
-        const sanitizedSet = {
-          id: set.id,
-          name: set.name || 'Unknown Set',
-          series: set.series || 'Unknown Series',
-          printedTotal: set.printedTotal || 0,
-          total: set.total || 0,
-          releaseDate: set.releaseDate || 'N/A',
-          images: {
-            symbol: set.images?.symbol || '',
-            logo: set.images?.logo || '',
-          },
-        };
-        batch.set(docRef, sanitizedSet);
+        // Save the entire, unmodified set object from the API.
+        // This is more robust and ensures all data is preserved.
+        batch.set(docRef, set);
         setsWritten++;
       } else {
         logs.push(`Skipping a set due to missing ID: ${JSON.stringify(set)}`);
