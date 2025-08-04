@@ -1,32 +1,7 @@
 import { NextResponse } from 'next/server';
+import { dbAdmin } from '@/lib/firebase-admin';
 import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
 
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) {
-        return;
-    }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson) {
-        throw new Error("CRITICAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.");
-    }
-    if (!projectId) {
-        throw new Error("CRITICAL: The FIREBASE_PROJECT_ID environment variable is not set.");
-    }
-
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        // Fix: Modify the original serviceAccount object directly.
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
 
 export async function POST(request: Request) {
     try {
@@ -35,9 +10,7 @@ export async function POST(request: Request) {
             return NextResponse.json([]);
         }
 
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-        const cardsRef = db.collection('pokemon-tcg-cards');
+        const cardsRef = dbAdmin.collection('pokemon-tcg-cards');
         const uniqueIds = [...new Set(ids)];
 
         // Firestore 'in' query supports up to 30 elements in the array

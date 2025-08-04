@@ -7,7 +7,7 @@ import Image from "next/image";
 import { useParams, useRouter } from 'next/navigation';
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import { Loader2, ServerCrash, ArrowLeft, Target, Images, Search, Hash } from "lucide-react";
@@ -17,14 +17,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 
-
-// Interface for a single Pokémon entry from our DB
 export interface Pokemon {
   id: number;
   name: string;
   sprite: string;
   generation: number;
 }
+
+const CARDS_PER_PAGE = 50;
 
 const PokemonDetailPage = () => {
   const params = useParams();
@@ -36,17 +36,84 @@ const PokemonDetailPage = () => {
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
   const [pokemonData, setPokemonData] = useState<Pokemon | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  const pokemonCompletion = useMemo(() => {
+  const fetchPageData = useCallback(async (pageNum = 1, loadMore = false) => {
+    if (!pokemonName) return;
+    if (loadMore) {
+        setIsLoadingMore(true);
+    } else {
+        setIsLoading(true);
+        setCardsForPokemon([]);
+    }
+    setError(null);
+    
+    try {
+        const fetchPromises = [];
+        if (!loadMore) {
+            fetchPromises.push(fetch(`/api/pokedex/${pokemonName}`));
+        }
+        fetchPromises.push(fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${pokemonName}"&orderBy=set.releaseDate,number&page=${pageNum}&pageSize=${CARDS_PER_PAGE}`, {
+            headers: { 'X-Api-Key': process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY || '' }
+        }));
+
+        const responses = await Promise.all(fetchPromises);
+        
+        if (!loadMore) {
+            const pokemonDetailsResponse = responses[0];
+            if (!pokemonDetailsResponse.ok) throw new Error(`Failed to fetch Pokémon details from database.`);
+            const pokemonDetailsData = await pokemonDetailsResponse.json();
+            setPokemonData(pokemonDetailsData);
+        }
+
+        const cardsResponse = loadMore ? responses[0] : responses[1];
+        if (!cardsResponse.ok) throw new Error(`Failed to fetch cards: ${cardsResponse.statusText}`);
+        const cardsData = await cardsResponse.json();
+        const newCards: ApiPokemonCard[] = cardsData.data || [];
+
+        setCardsForPokemon(prev => loadMore ? [...prev, ...newCards] : newCards);
+        setHasMore(newCards.length === CARDS_PER_PAGE);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An unknown error occurred");
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [pokemonName]);
+  
+  useEffect(() => {
+    fetchPageData(1, false);
+  }, [fetchPageData]);
+  
+  const handleLoadMore = () => {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchPageData(nextPage, true);
+  };
+
+
+  useEffect(() => {
+    const lowercasedFilter = searchTerm.toLowerCase();
+    const filteredData = cardsForPokemon.filter(card =>
+      card.name.toLowerCase().includes(lowercasedFilter) ||
+      card.number.toLowerCase().includes(lowercasedFilter) ||
+      (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter)) ||
+      card.set.name.toLowerCase().includes(lowercasedFilter)
+    );
+    setFilteredCards(filteredData);
+  }, [searchTerm, cardsForPokemon]);
+  
+    const pokemonCompletion = useMemo(() => {
     if (cardsForPokemon.length === 0) return { collected: 0, total: 0, percentage: 0 };
     const collectedCardIdentifiers = new Set<string>();
     collection.forEach(card => {
-        // We can't just check by name, as different pokemon can have the same name (e.g. Unown)
-        // A better check would be against the specific cards for THIS pokemon.
         const apiCardForCollected = cardsForPokemon.find(apiCard => apiCard.id === card.apiId);
         if (apiCardForCollected && card.language === "English") { 
             collectedCardIdentifiers.add(`${card.name}-${card.cardNumber}`);
@@ -59,68 +126,6 @@ const PokemonDetailPage = () => {
     return { collected: uniqueCollectedCount, total: totalForThisPokemon, percentage };
   }, [cardsForPokemon, collection]);
 
-
-  const fetchPageData = useCallback(async () => {
-    if (!pokemonName) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [pokemonDetailsResponse, cardsResponse] = await Promise.all([
-        fetch(`/api/pokedex/${pokemonName}`),
-        fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${pokemonName}"&orderBy=set.releaseDate`, {
-            headers: { 'X-Api-Key': process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY || '' }
-        })
-      ]);
-
-      if (!pokemonDetailsResponse.ok) {
-        throw new Error(`Failed to fetch Pokémon details from database.`);
-      }
-      const pokemonDetailsData = await pokemonDetailsResponse.json();
-      setPokemonData(pokemonDetailsData);
-
-      if (!cardsResponse.ok) {
-        throw new Error(`Failed to fetch cards: ${cardsResponse.statusText} (status: ${cardsResponse.status})`);
-      }
-      const cardsData = await cardsResponse.json();
-      const allCards: ApiPokemonCard[] = cardsData.data;
-
-      // Sort cards by release date then number
-       allCards.sort((a, b) => {
-        const dateA = new Date(a.set.releaseDate).getTime();
-        const dateB = new Date(b.set.releaseDate).getTime();
-        if(dateA === dateB) {
-            const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
-            const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
-            return numA - numB;
-        }
-        return dateA - dateB;
-      });
-
-      setCardsForPokemon(allCards);
-      setFilteredCards(allCards);
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [pokemonName]);
-
-
-  useEffect(() => {
-    fetchPageData();
-  }, [fetchPageData]);
-
-  useEffect(() => {
-    const lowercasedFilter = searchTerm.toLowerCase();
-    const filteredData = cardsForPokemon.filter(card =>
-      card.name.toLowerCase().includes(lowercasedFilter) ||
-      card.number.toLowerCase().includes(lowercasedFilter) ||
-      (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter)) ||
-      card.set.name.toLowerCase().includes(lowercasedFilter)
-    );
-    setFilteredCards(filteredData);
-  }, [searchTerm, cardsForPokemon]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -160,7 +165,7 @@ const PokemonDetailPage = () => {
                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-4 gap-x-8 pt-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Hash className="h-4 w-4 text-primary"/>
-                        {cardsForPokemon.length} cards found
+                        {cardsForPokemon.length} cards loaded
                     </div>
                      <div className="flex-1 min-w-[150px]">
                         <div className="flex justify-between items-baseline mb-1">
@@ -234,6 +239,13 @@ const PokemonDetailPage = () => {
               <div className="text-center py-10 text-muted-foreground">
                 <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg">No cards found for this Pokémon.</p>
+              </div>
+            )}
+             {hasMore && !searchTerm && (
+              <div className="flex justify-center mt-8">
+                <Button onClick={handleLoadMore} disabled={isLoadingMore}>
+                  {isLoadingMore ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Loading...</> : 'Load More Cards'}
+                </Button>
               </div>
             )}
           </div>

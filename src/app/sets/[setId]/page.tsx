@@ -2,17 +2,14 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import Link from "next/link";
 import Image from "next/image";
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
 import { useAuth } from "@/hooks/useAuth";
-import type { PokemonCard as CollectionPokemonCard } from "@/types";
-import { Loader2, ServerCrash, ArrowLeft, Images, Search, Info, CheckCircle, DollarSign, TrendingUp, CalendarDays, Hash, Palette, Paintbrush } from "lucide-react";
+import { Loader2, ServerCrash, ArrowLeft, Images, Search, CalendarDays, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Input } from "@/components/ui/input";
@@ -20,7 +17,6 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
-
 
 export interface ApiPokemonCard {
   id: string;
@@ -65,8 +61,11 @@ interface SetDetails {
   series: string;
 }
 
+const CARDS_PER_PAGE = 50;
+
 const SetDetailsPage = () => {
   const params = useParams();
+  const router = useRouter();
   const setId = params.setId as string;
   const { collection } = useAuth();
   
@@ -75,6 +74,10 @@ const SetDetailsPage = () => {
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastLoadedNumber, setLastLoadedNumber] = useState<string | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -82,96 +85,71 @@ const SetDetailsPage = () => {
   
   const { toast } = useToast();
 
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const fetchSetDetails = useCallback(async () => {
+      try {
+        const setResponse = await fetch(`/api/sets/${setId}`);
+        if (!setResponse.ok) {
+            const errorData = await setResponse.json().catch(() => ({}));
+            throw new Error(errorData.message || `Set with ID "${setId}" not found in database.`);
+        }
+        const setInfo = await setResponse.json();
+        setSetDetails({
+            id: setInfo.id,
+            name: setInfo.name,
+            logoUrl: setInfo.images?.logo,
+            releaseDate: setInfo.releaseDate,
+            totalCards: setInfo.printedTotal || setInfo.total || 0,
+            series: setInfo.series,
+        });
+      } catch (err: any) {
+        setError(err.message);
+      }
+  }, [setId]);
 
-  useEffect(() => {
-    const scrollHandler = () => {
-      const currentScrollY = window.scrollY;
-      
-      setLastScrollY(prevLastScrollY => {
-        if (Math.abs(currentScrollY - prevLastScrollY) < 10) return prevLastScrollY;
+  const fetchCards = useCallback(async (loadMore = false) => {
+    if (!setId) return;
 
-        if (currentScrollY > prevLastScrollY && currentScrollY > 100) {
-          setIsHeaderVisible(false); // scrolling down
-        } else {
-          setIsHeaderVisible(true); // scrolling up
+    if (loadMore) {
+        setIsLoadingMore(true);
+    } else {
+        setIsLoading(true);
+        setCardsInSet([]);
+    }
+    setError(null);
+
+    try {
+        const params = new URLSearchParams({ limit: String(CARDS_PER_PAGE) });
+        if (loadMore && lastLoadedNumber) {
+            params.set('startAfterNumber', lastLoadedNumber);
+        }
+
+        const cardsResponse = await fetch(`/api/cards/by-set/${setId}?${params.toString()}`);
+        if (!cardsResponse.ok) {
+            const errorData = await cardsResponse.json().catch(() => ({}));
+            throw new Error(errorData.message || `Failed to fetch cards for set ${setId}`);
         }
         
-        return currentScrollY;
-      });
-    };
+        let newCards: ApiPokemonCard[] = await cardsResponse.json();
 
-    window.addEventListener('scroll', scrollHandler, { passive: true });
-    
-    return () => {
-      window.removeEventListener('scroll', scrollHandler);
-    };
-  }, []);
+        setCardsInSet(prev => loadMore ? [...prev, ...newCards] : newCards);
+        setHasMore(newCards.length === CARDS_PER_PAGE);
 
-  const fetchSetDetailsAndCards = useCallback(async () => {
-    if (!setId) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const setResponse = await fetch(`/api/sets/${setId}`);
-      if (!setResponse.ok) {
-        const errorData = await setResponse.json().catch(() => ({ message: 'Failed to parse error response' }));
-        throw new Error(errorData.message || `Set with ID "${setId}" not found in database. It may not be synced yet.`);
-      }
-      const setInfo = await setResponse.json();
-      setSetDetails({
-        id: setInfo.id,
-        name: setInfo.name,
-        logoUrl: setInfo.images?.logo,
-        releaseDate: setInfo.releaseDate,
-        totalCards: setInfo.printedTotal || setInfo.total || 0,
-        series: setInfo.series,
-      });
+        if (newCards.length > 0) {
+            setLastLoadedNumber(newCards[newCards.length - 1].number);
+        }
 
-      const cardsResponse = await fetch(`/api/cards/by-set/${setId}`);
-      if (!cardsResponse.ok) {
-           const errorData = await cardsResponse.json().catch(() => ({ message: 'Failed to parse error response' }));
-           throw new Error(errorData.message || `Failed to fetch cards for set ${setId}`);
-      }
-      let allCards: ApiPokemonCard[] = await cardsResponse.json();
-
-      if (allCards.length === 0) {
-           const countResponse = await fetch('/api/cards-count');
-           const countData = await countResponse.json();
-           if (countData.count === 0) {
-               toast({
-                   variant: "destructive",
-                   title: "No Cards in Database",
-                   description: "Please sync cards from the Admin page to view set details.",
-                   action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
-               });
-           }
-      }
-
-      allCards.sort((a, b) => {
-        const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
-        const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
-        const suffixA = a.number.replace(/\d/g, '');
-        const suffixB = b.number.replace(/\d/g, '');
-        if (numA === numB) return suffixA.localeCompare(suffixB);
-        return numA - numB;
-      });
-
-      setCardsInSet(allCards);
-      setFilteredCards(allCards);
-
-    } catch (err) {
-      console.error(`Error fetching data for set ${setId} from database:`, err);
-      setError(err instanceof Error ? err.message : "An unknown error occurred");
+    } catch (err: any) {
+        setError(err.message);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
+        setIsLoadingMore(false);
     }
-  }, [setId, toast]);
+  }, [setId, lastLoadedNumber]);
 
   useEffect(() => {
-    fetchSetDetailsAndCards();
-  }, [fetchSetDetailsAndCards]);
+    fetchSetDetails();
+    fetchCards(false);
+  }, [fetchSetDetails, fetchCards]);
 
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
@@ -219,10 +197,7 @@ const SetDetailsPage = () => {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         {setDetails && (
-          <div className={cn(
-            "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky top-[65px] md:top-[77px] z-40 transition-transform duration-300",
-            !isHeaderVisible && "-translate-y-[200%]"
-            )}>
+          <div className="p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6">
              <CardHeader className="p-0">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div className="flex flex-col md:flex-row md:items-center md:gap-4">
@@ -324,17 +299,22 @@ const SetDetailsPage = () => {
                     <p className="text-lg">{searchTerm ? "No cards found matching your search." : "No cards found in this set, or the database returned no data."}</p>
                 </div>
             )}
+             {hasMore && !searchTerm && (
+              <div className="flex justify-center mt-8">
+                <Button onClick={() => fetchCards(true)} disabled={isLoadingMore}>
+                  {isLoadingMore ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Loading...</> : 'Load More Cards'}
+                </Button>
+              </div>
+            )}
             </div>
         )}
         
       </main>
       
-      <Link href="/browse-sets" className="fixed bottom-6 left-6 z-50">
-        <Button variant="secondary" size="icon" className="rounded-full h-14 w-14 shadow-lg border transition-colors hover:bg-primary hover:text-primary-foreground">
-            <ArrowLeft className="h-6 w-6" />
-            <span className="sr-only">Back to Sets</span>
-        </Button>
-      </Link>
+      <Button variant="secondary" size="icon" className="fixed bottom-6 left-6 rounded-full h-14 w-14 shadow-lg border transition-colors hover:bg-primary hover:text-primary-foreground z-50" onClick={() => router.back()}>
+        <ArrowLeft className="h-6 w-6" />
+        <span className="sr-only">Back to Sets</span>
+      </Button>
       
       {selectedApiCard && (
         <AddCardToCollectionDialog

@@ -1,25 +1,7 @@
 // src/app/api/users/collection/export-csv/route.ts
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { authAdmin, dbAdmin } from '@/lib/firebase-admin';
 import type { PokemonCard } from '@/types';
-
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) { return; }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    if (!serviceAccountJson) {
-        throw new Error("Firebase credentials are not set in environment variables.");
-    }
-    const serviceAccount = JSON.parse(serviceAccountJson);
-     if (serviceAccount.private_key) {
-        // Fix: Modify the original serviceAccount object directly.
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-    });
-}
 
 function convertToCsv(data: PokemonCard[]): string {
     if (data.length === 0) {
@@ -66,19 +48,16 @@ function convertToCsv(data: PokemonCard[]): string {
 
 export async function GET(request: Request) {
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-
         const authorization = request.headers.get("Authorization");
         if (!authorization?.startsWith("Bearer ")) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
         const idToken = authorization.split("Bearer ")[1];
-        const decodedToken = await getAuth().verifyIdToken(idToken);
+        const decodedToken = await authAdmin.verifyIdToken(idToken);
         const userId = decodedToken.uid;
 
         // *** FIX: Corrected the path to the user's sub-collection ***
-        const collectionRef = db.collection('users').doc(userId).collection('cards');
+        const collectionRef = dbAdmin.collection('users').doc(userId).collection('cards');
         const snapshot = await collectionRef.orderBy('timestamp', 'desc').get();
 
         if (snapshot.empty) {

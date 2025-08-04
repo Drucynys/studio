@@ -1,42 +1,15 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { dbAdmin } from '@/lib/firebase-admin';
 
 const POKEDEX_COLLECTION = 'pokedex';
 const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2';
 const TOTAL_GENERATIONS = 9; // As of now, there are 9 generations
 
-// Safe initialization function
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) {
-        return;
-    }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson || !projectId) {
-        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
-    }
-
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        // Fix: Modify the original serviceAccount object directly.
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
-
 export async function POST() {
     const logs: string[] = ["- Starting Full Pokédex Data Sync -"];
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
         logs.push("✅ Firebase Admin SDK initialized.");
 
         const allPokemonMap = new Map();
@@ -69,8 +42,8 @@ export async function POST() {
 
 
         logs.push(`Writing ${pokedexData.length} Pokémon to the '${POKEDEX_COLLECTION}' collection...`);
-        const pokedexCollection = db.collection(POKEDEX_COLLECTION);
-        const batch = db.batch();
+        const pokedexCollection = dbAdmin.collection(POKEDEX_COLLECTION);
+        const batch = dbAdmin.batch();
         let pokemonWritten = 0;
 
         pokedexData.forEach((pokemon: any) => {

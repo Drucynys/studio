@@ -1,41 +1,17 @@
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-
-// Safe initialization function
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) {
-        return;
-    }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    
-    if (!serviceAccountJson) {
-        throw new Error("CRITICAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set. The sync tool cannot authenticate with the database.");
-    }
-    if (!projectId) {
-        throw new Error("CRITICAL: The FIREBASE_PROJECT_ID environment variable is not set.");
-    }
-    
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
+import { dbAdmin } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ artistName: string }> }
+    { params }: { params: { artistName: string } }
 ) {
-    const { artistName } = await params;
+    const { artistName } = params;
     
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '1000', 10); // Reverted to a high limit
+    const limit = parseInt(searchParams.get('limit') || '50', 10);
+    const startAfterReleaseDate = searchParams.get('startAfterReleaseDate');
+    const startAfterNumber = searchParams.get('startAfterNumber');
 
     if (!artistName) {
         return NextResponse.json({ message: 'Artist name is required' }, { status: 400 });
@@ -44,15 +20,20 @@ export async function GET(
     const decodedArtistName = decodeURIComponent(artistName);
 
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-        const cardsRef = db.collection('pokemon-tcg-cards');
+        const cardsRef = dbAdmin.collection('pokemon-tcg-cards');
         
-        // Reverted Query: Simple filter by artist and a high limit.
-        // This query does not require the complex composite index.
+        // This query requires a composite index on artist (asc), set.releaseDate (desc), number (asc)
         let query = cardsRef
             .where('artist', '==', decodedArtistName)
+            .orderBy('set.releaseDate', 'desc')
+            .orderBy('number', 'asc')
             .limit(limit);
+        
+        if (startAfterReleaseDate && startAfterNumber) {
+            // Firestore timestamps need to be handled correctly for pagination
+            const releaseDateTimestamp = Timestamp.fromDate(new Date(startAfterReleaseDate));
+            query = query.startAfter(releaseDateTimestamp, startAfterNumber);
+        }
         
         const querySnapshot = await query.get();
 
@@ -68,7 +49,7 @@ export async function GET(
         if (error.message && error.message.includes('requires an index')) {
              return NextResponse.json(
                 { 
-                    message: `A database index is required to query by artist. Please create an index in your Firestore settings for the 'pokemon-tcg-cards' collection on 'artist' (ascending).`,
+                    message: `A database index is required to query by artist and sort by release date. Please create a composite index in your Firestore settings for the 'pokemon-tcg-cards' collection on 'artist' (ascending), 'set.releaseDate' (descending), and 'number' (ascending).`,
                     details: error.message
                 },
                 { status: 500 }

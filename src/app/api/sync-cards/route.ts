@@ -1,32 +1,11 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { dbAdmin } from '@/lib/firebase-admin';
 
 const POKEMON_TCG_API_BASE = 'https://api.pokemontcg.io/v2/cards';
 const PAGE_SIZE = 250; // Max page size allowed by the API
 const BATCH_SIZE = 450; // Firestore batch writes are limited to 500 operations
-
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) { return; }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson || !projectId) {
-        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
-    }
-
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
 
 export async function POST(request: Request) {
     const logs: string[] = [];
@@ -36,9 +15,6 @@ export async function POST(request: Request) {
             throw new Error("A 'setId' must be provided in the request body.");
         }
         logs.push(`- Starting sync for set ID: ${setId} -`);
-
-        initializeFirebaseAdmin();
-        const db = getFirestore();
         logs.push("✅ Firebase Admin SDK initialized.");
 
         const apiKey = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
@@ -83,11 +59,11 @@ export async function POST(request: Request) {
         logs.push(`✅ Finished fetching. Total cards found for set: ${allCardsForSet.length}.`);
 
         logs.push(`Writing ${allCardsForSet.length} cards to Firestore (excluding prices)...`);
-        const cardsCollection = db.collection('pokemon-tcg-cards');
+        const cardsCollection = dbAdmin.collection('pokemon-tcg-cards');
         const batchPromises: Promise<any>[] = [];
 
         for (let i = 0; i < allCardsForSet.length; i += BATCH_SIZE) {
-            const batch = db.batch();
+            const batch = dbAdmin.batch();
             const chunk = allCardsForSet.slice(i, i + BATCH_SIZE);
             chunk.forEach(card => {
                 if (card && card.id) {

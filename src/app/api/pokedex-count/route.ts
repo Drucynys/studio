@@ -1,40 +1,10 @@
 
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
-
-// Safe initialization function
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) {
-        return;
-    }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson) {
-        throw new Error("CRITICAL: The GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.");
-    }
-    if (!projectId) {
-        throw new Error("CRITICAL: The FIREBASE_PROJECT_ID environment variable is not set.");
-    }
-
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        // Fix: Modify the original serviceAccount object directly.
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
+import { dbAdmin } from '@/lib/firebase-admin';
 
 export async function GET() {
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-        const collectionRef = db.collection('pokedex');
+        const collectionRef = dbAdmin.collection('pokedex');
         
         // Firestore's count() aggregation is very efficient for this
         const snapshot = await collectionRef.count().get();

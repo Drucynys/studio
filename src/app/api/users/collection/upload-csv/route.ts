@@ -1,26 +1,9 @@
 
 // src/app/api/users/collection/upload-csv/route.ts
 import { NextResponse } from 'next/server';
+import { dbAdmin, authAdmin } from '@/lib/firebase-admin';
 import admin from 'firebase-admin';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
 import type { PokemonCard } from '@/types';
-
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) { return; }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    if (!serviceAccountJson) {
-        throw new Error("Firebase credentials are not set in environment variables.");
-    }
-    const serviceAccount = JSON.parse(serviceAccountJson);
-     if (serviceAccount.private_key) {
-        // Fix: Modify the original serviceAccount object directly.
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-    });
-}
 
 const getDefaultMarketPrice = (apiCard: any): { value: number, variant?: string } => {
     if (!apiCard || !apiCard.tcgplayer?.prices) return { value: 0 };
@@ -43,8 +26,6 @@ const getDefaultMarketPrice = (apiCard: any): { value: number, variant?: string 
 export async function POST(request: Request) {
     console.log('[API] /api/users/collection/upload-csv endpoint hit.');
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
         console.log('[API] Firebase Admin initialized.');
 
         const authorization = request.headers.get("Authorization");
@@ -52,7 +33,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
         const idToken = authorization.split("Bearer ")[1];
-        const decodedToken = await getAuth().verifyIdToken(idToken);
+        const decodedToken = await authAdmin.verifyIdToken(idToken);
         const userId = decodedToken.uid;
         console.log(`[API] Authenticated user: ${userId}`);
 
@@ -61,9 +42,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'No card data provided.' }, { status: 400 });
         }
 
-        const masterCardsRef = db.collection('pokemon-tcg-cards');
-        const userCardsRef = db.collection('users').doc(userId).collection('cards');
-        const batch = db.batch();
+        const masterCardsRef = dbAdmin.collection('pokemon-tcg-cards');
+        const userCardsRef = dbAdmin.collection('users').doc(userId).collection('cards');
+        const batch = dbAdmin.batch();
         const notFound: any[] = [];
         let addedCount = 0;
 

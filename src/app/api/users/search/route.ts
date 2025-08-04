@@ -1,36 +1,10 @@
 
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { dbAdmin } from '@/lib/firebase-admin';
 import type { PokemonCard } from '@/types';
-
-// Assuming initializeFirebaseAdmin is available and works
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) { return; }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson || !projectId) {
-        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
-    }
-    
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        // Fix: Modify the original serviceAccount object directly.
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
 
 export async function GET(request: Request) {
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-
         const { searchParams } = new URL(request.url);
         const query = searchParams.get('q');
 
@@ -39,7 +13,7 @@ export async function GET(request: Request) {
         }
 
         const lowercasedQuery = query.toLowerCase();
-        const usersRef = db.collection('users');
+        const usersRef = dbAdmin.collection('users');
         
         // This is a simple "starts with" search on the case-insensitive field.
         const usersSnapshot = await usersRef
@@ -59,7 +33,7 @@ export async function GET(request: Request) {
 
                 // Check privacy settings before showing collection
                 if (userData.followSetting === 'everyone') {
-                    const cardsSnapshot = await db.collection('users').doc(userData.uid).collection('cards')
+                    const cardsSnapshot = await dbAdmin.collection('users').doc(userData.uid).collection('cards')
                         .orderBy('timestamp', 'desc')
                         .limit(5)
                         .get();

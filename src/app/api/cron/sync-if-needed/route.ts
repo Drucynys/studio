@@ -1,30 +1,7 @@
 
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { dbAdmin } from '@/lib/firebase-admin';
 import axios from 'axios';
-
-// Duplicating this init function as it's not exported from other routes
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) { return; }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson || !projectId) {
-        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
-    }
-    
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        // Fix: Modify the original serviceAccount object directly.
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
 
 async function runFullDataResync(baseUrl: string) {
     const logs: string[] = ["🚀 Starting automated full data resynchronization..."];
@@ -96,11 +73,8 @@ export async function GET(request: Request) {
     }
 
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-        
         // 2. Fetch local set count
-        const setsCollection = db.collection('pokemon-tcg-sets');
+        const setsCollection = dbAdmin.collection('pokemon-tcg-sets');
         const localSetsCount = (await setsCollection.count().get()).data().count;
 
         // 3. Fetch remote set count from TCG API

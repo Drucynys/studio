@@ -1,34 +1,11 @@
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
-
-function initializeFirebaseAdmin() {
-    if (admin.apps.length > 0) {
-        return;
-    }
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-
-    if (!serviceAccountJson || !projectId) {
-        throw new Error("Firebase credentials or Project ID are not set in environment variables.");
-    }
-    
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-    
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: projectId,
-    });
-}
+import { dbAdmin } from '@/lib/firebase-admin';
 
 export async function GET(
     request: Request,
-    context: { params: Promise<{ cardApiId: string }> }
+    context: { params: { cardApiId: string } }
 ) {
-    const { cardApiId } = await context.params;
+    const { cardApiId } = context.params;
     const { searchParams } = new URL(request.url);
     const range = searchParams.get('range') || '30d'; // Default to 30 days
 
@@ -37,9 +14,7 @@ export async function GET(
     }
 
     try {
-        initializeFirebaseAdmin();
-        const db = getFirestore();
-        const historyRef = db.collection('priceHistory');
+        const historyRef = dbAdmin.collection('priceHistory');
 
         let days;
         switch (range) {
