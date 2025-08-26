@@ -99,30 +99,47 @@ export default function MyCollectionPage() {
         ...new Set(myExchangeItems.map(e => e.apiId).filter(Boolean)),
       ];
       
-      if (allApiIds.length === 0) {
+      const uniqueApiIds = [...new Set(allApiIds)];
+
+      if (uniqueApiIds.length === 0) {
         setMasterCardData(new Map());
         return;
       }
+      
       setLoadingMasterData(true);
       try {
-        const response = await fetch('/api/master-cards-batch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: allApiIds }),
-        });
+        const CHUNK_SIZE = 100;
+        const allFetchedCards: ApiPokemonCard[] = [];
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch latest card data.');
+        for (let i = 0; i < uniqueApiIds.length; i += CHUNK_SIZE) {
+            const chunk = uniqueApiIds.slice(i, i + CHUNK_SIZE);
+            const response = await fetch('/api/master-cards-batch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: chunk }),
+            });
+
+            if (!response.ok) {
+                console.error(`Failed to fetch chunk starting at index ${i}. Status: ${response.status}`);
+                // Continue to next chunk instead of throwing an error for the whole process
+                continue;
+            }
+
+            const chunkData: ApiPokemonCard[] = await response.json();
+            allFetchedCards.push(...chunkData);
         }
 
-        const masterData: ApiPokemonCard[] = await response.json();
         const dataMap = new Map<string, ApiPokemonCard>();
-        masterData.forEach(card => dataMap.set(card.id, card));
+        allFetchedCards.forEach(card => dataMap.set(card.id, card));
         setMasterCardData(dataMap);
 
       } catch (error) {
-        console.error("Error fetching master card data:", error);
-        // Not showing a toast here to avoid bothering user for a non-critical background fetch
+        console.error("Error fetching master card data in chunks:", error);
+        toast({
+          variant: "destructive",
+          title: "Update Error",
+          description: "Could not retrieve the latest market prices for some cards.",
+        });
       } finally {
         setLoadingMasterData(false);
       }
@@ -131,7 +148,7 @@ export default function MyCollectionPage() {
     if (!loadingCollection && !loadingWishlist && !loadingMyExchangeItems) {
       fetchMasterData();
     }
-  }, [collection, wishlist, myExchangeItems, loadingCollection, loadingWishlist, loadingMyExchangeItems]);
+  }, [collection, wishlist, myExchangeItems, loadingCollection, loadingWishlist, loadingMyExchangeItems, toast]);
 
 
   const collectionStats = useMemo(() => {
