@@ -28,6 +28,9 @@ const convertCardNumberToInt = (cardNumber: string): number => {
     return isNaN(numericPart) ? 999 : numericPart;
 };
 
+// Helper function to add a delay
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function POST(request: Request) {
     const logs: string[] = [];
     try {
@@ -51,6 +54,9 @@ export async function POST(request: Request) {
 
         while (hasMore) {
             try {
+                if (page > 1) {
+                    await sleep(500); // Add delay between fetching pages of the same set
+                }
                 const response = await axios.get(POKEMON_TCG_API_BASE, {
                     headers: { 'X-Api-Key': apiKey },
                     params: { q: `set.id:${setId}`, page: page, pageSize: PAGE_SIZE, orderBy: 'number' },

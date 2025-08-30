@@ -16,6 +16,9 @@ const POKEMON_TCG_API_BASE = 'https://api.pokemontcg.io/v2/cards';
 const PAGE_SIZE = 250; // Max page size allowed by the API
 const BATCH_SIZE = 450; // Firestore batch writes are limited to 500 operations
 
+// Helper function to add a delay
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function POST(request: Request) {
     const logs: string[] = [];
     try {
@@ -42,6 +45,9 @@ export async function POST(request: Request) {
 
         while (hasMore) {
             try {
+                 if (page > 1) {
+                    await sleep(500); // Add delay between fetching pages of the same set
+                }
                 const response = await axios.get(POKEMON_TCG_API_BASE, {
                     headers: { 'X-Api-Key': apiKey },
                     params: { q: `set.id:${setId}`, page: page, pageSize: PAGE_SIZE },
