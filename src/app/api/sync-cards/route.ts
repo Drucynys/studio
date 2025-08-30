@@ -1,34 +1,31 @@
 
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-import admin from 'firebase-admin';
+import { getFirebaseAdmin } from '@/lib/firebase-admin'; // Use the singleton instance
 
-// Re-initialize Firebase Admin SDK if not already initialized
-if (!admin.apps.length) {
-    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-}
-const db = admin.firestore();
+const db = getFirebaseAdmin().firestore();
 
 const POKEMON_TCG_API_BASE = 'https://api.pokemontcg.io/v2/cards';
 const PAGE_SIZE = 250; // Max page size allowed by the API
-const BATCH_SIZE = 450; // Firestore batch writes are limited to 500 operations
+const BATCH_SIZE = 400; // Reduced for a safer margin below the 500 limit
 
 const convertCardNumberToInt = (cardNumber: string): number => {
     if (!cardNumber) return 999;
-    // Extracts the leading number from strings like "swsh12-186" or "TG05/TG30"
     const match = cardNumber.match(/^\D*(\d+)/);
     if (match && match[1]) {
         return parseInt(match[1], 10);
     }
-    // Fallback for purely numeric strings or other cases
     const numericPart = parseInt(cardNumber, 10);
     return isNaN(numericPart) ? 999 : numericPart;
 };
 
-// Helper function to add a delay
+const isValidDocId = (id: string): boolean => {
+    if (!id || id.includes('/') || id === '.' || id === '..') {
+        return false;
+    }
+    return true;
+};
+
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(request: Request) {
@@ -39,7 +36,7 @@ export async function POST(request: Request) {
             throw new Error("A 'setId' must be provided in the request body.");
         }
         logs.push(`- Starting sync for set ID: ${setId} -`);
-        logs.push("✅ Firebase Admin SDK initialized.");
+        logs.push("✅ Firebase Admin SDK initialized via singleton.");
 
         const apiKey = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
         if (!apiKey) throw new Error("Pokémon TCG API key is missing.");
@@ -54,13 +51,10 @@ export async function POST(request: Request) {
 
         while (hasMore) {
             try {
-                // Add a delay between fetching pages of the same set, especially if it's not the first page.
-                if (page > 1) {
-                    await sleep(500); 
-                }
+                if (page > 1) await sleep(500);
                 const response = await axios.get(POKEMON_TCG_API_BASE, {
                     headers: { 'X-Api-Key': apiKey },
-                    params: { q: `set.id:${setId}`, page: page, pageSize: PAGE_SIZE, orderBy: 'number' },
+                    params: { q: `set.id:${setId}`, page, pageSize: PAGE_SIZE, orderBy: 'number' },
                 });
                 
                 const { data, totalCount } = response.data;
@@ -87,7 +81,6 @@ export async function POST(request: Request) {
                      errorMessage = apiError.message;
                  }
                  logs.push(`❌ Could not fetch cards for set ${setId}. ${errorMessage}. Skipping this set.`);
-                 // Return a success response with an error message to prevent the whole sync from crashing.
                  return NextResponse.json({ status: 'error', count: 0, logs, message: errorMessage });
             }
         }
@@ -100,38 +93,47 @@ export async function POST(request: Request) {
 
         logs.push(`Writing ${allCardsForSet.length} cards to Firestore (excluding prices)...`);
         const cardsCollection = db.collection('pokemon-tcg-cards');
-        const batchPromises: Promise<any>[] = [];
+        let successfulWrites = 0;
 
         for (let i = 0; i < allCardsForSet.length; i += BATCH_SIZE) {
-            const batch = db.batch();
             const chunk = allCardsForSet.slice(i, i + BATCH_SIZE);
+            const batch = db.batch();
+            let processedInChunk = 0;
+            
             chunk.forEach(card => {
-                if (card && card.id) {
+                if (card && card.id && isValidDocId(card.id)) {
                     const docRef = cardsCollection.doc(card.id);
-                    // Create a copy of the card and remove pricing data before saving
                     const cardToSave = { ...card };
                     delete cardToSave.tcgplayer;
                     delete cardToSave.cardmarket;
-                    
-                    // Add the new field for numeric sorting
                     cardToSave.numberAsInt = convertCardNumberToInt(card.number);
-
                     batch.set(docRef, cardToSave);
+                    processedInChunk++;
+                } else {
+                    logs.push(`- Skipped card with invalid ID: ${card.id || 'N/A'}`);
                 }
             });
-            batchPromises.push(batch.commit());
+
+            if (processedInChunk > 0) {
+                try {
+                    await batch.commit();
+                    successfulWrites += processedInChunk;
+                    logs.push(`- Batch ${Math.floor(i / BATCH_SIZE) + 1} succeeded. Wrote ${processedInChunk} cards.`);
+                    await sleep(100); // Add a small delay between batches
+                } catch (batchError: any) {
+                    logs.push(`❌ Batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${batchError.message}`);
+                }
+            }
         }
         
-        await Promise.all(batchPromises);
-        logs.push(`✅ Successfully synced ${allCardsForSet.length} cards for set '${setId}' to Firestore.`);
+        logs.push(`✅ Successfully synced ${successfulWrites} of ${allCardsForSet.length} cards for set '${setId}' to Firestore.`);
 
-        return NextResponse.json({ status: 'success', count: allCardsForSet.length, logs });
+        return NextResponse.json({ status: 'success', count: successfulWrites, logs });
 
     } catch (error: any) {
         console.error('Error during single set card sync:', error);
         const errorMessage = error.message || 'An unknown error occurred on the server.';
         logs.push(`❌ FATAL ERROR: ${errorMessage}`);
-        // Ensure even in fatal scenarios, we return a JSON response the front-end can handle
-        return NextResponse.json({ status: 'error', message: errorMessage, logs, count: 0 });
+        return NextResponse.json({ status: 'error', message: errorMessage, logs, count: 0 }, { status: 500 });
     }
 }
