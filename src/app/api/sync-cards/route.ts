@@ -54,8 +54,9 @@ export async function POST(request: Request) {
 
         while (hasMore) {
             try {
+                // Add a delay between fetching pages of the same set, especially if it's not the first page.
                 if (page > 1) {
-                    await sleep(500); // Add delay between fetching pages of the same set
+                    await sleep(500); 
                 }
                 const response = await axios.get(POKEMON_TCG_API_BASE, {
                     headers: { 'X-Api-Key': apiKey },
@@ -86,12 +87,13 @@ export async function POST(request: Request) {
                      errorMessage = apiError.message;
                  }
                  logs.push(`❌ Could not fetch cards for set ${setId}. ${errorMessage}. Skipping this set.`);
-                 hasMore = false; // Stop trying to fetch more pages for this failed set
+                 // Return a success response with an error message to prevent the whole sync from crashing.
+                 return NextResponse.json({ status: 'error', count: 0, logs, message: errorMessage });
             }
         }
         
         if (allCardsForSet.length === 0) {
-             logs.push(`⚠️ No cards found from API for set ${setId}. This might be normal.`);
+             logs.push(`⚠️ No cards found from API for set ${setId}. This might be normal for some sets.`);
              return NextResponse.json({ status: 'success', count: 0, logs });
         }
         logs.push(`✅ Finished fetching. Total cards found for set: ${allCardsForSet.length}.`);
@@ -129,6 +131,7 @@ export async function POST(request: Request) {
         console.error('Error during single set card sync:', error);
         const errorMessage = error.message || 'An unknown error occurred on the server.';
         logs.push(`❌ FATAL ERROR: ${errorMessage}`);
-        return NextResponse.json({ status: 'error', message: errorMessage, logs }, { status: 500 });
+        // Ensure even in fatal scenarios, we return a JSON response the front-end can handle
+        return NextResponse.json({ status: 'error', message: errorMessage, logs, count: 0 });
     }
 }

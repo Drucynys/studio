@@ -194,8 +194,10 @@ export default function SyncAdminPage() {
             const syncResult = await syncResponse.json();
             setMasterSyncLogs(prev => [...prev, ...(syncResult.logs || [])]);
 
+            // Resilient check: continue even if one set fails.
             if (!syncResponse.ok || syncResult.status !== 'success') {
-                throw new Error(syncResult.message || `Failed to sync cards for set ${currentSet.id}`);
+                setMasterSyncLogs(prev => [...prev, `❌ Error syncing set ${currentSet.id}. Message: ${syncResult.message || 'Unknown error'}. Continuing to next set.`]);
+                continue; // Continue to the next set
             }
             cumulativeCardCount += syncResult.count || 0;
         }
@@ -319,6 +321,8 @@ export default function SyncAdminPage() {
       setCardsLogs(prev => [...prev, `Found ${sets.length} sets. Starting incremental sync...`]);
 
       let cumulativeCardCount = 0;
+      let hasEncounteredError = false;
+
       for (let i = 0; i < sets.length; i++) {
         if (isSyncStopped.current) break;
 
@@ -337,8 +341,11 @@ export default function SyncAdminPage() {
         const syncResult = await syncResponse.json();
         setCardsLogs(prev => [...prev, ...(syncResult.logs || [])]);
 
+        // Resilient check: continue even if one set fails.
         if (!syncResponse.ok || syncResult.status !== 'success') {
-          throw new Error(syncResult.message || `Failed to sync set ${currentSet.id}`);
+            setCardsLogs(prev => [...prev, `❌ Error syncing set ${currentSet.id}. Message: ${syncResult.message || 'Unknown error'}. Continuing...`]);
+            hasEncounteredError = true;
+            continue; // Continue to the next set
         }
         
         cumulativeCardCount += syncResult.count || 0;
@@ -346,15 +353,15 @@ export default function SyncAdminPage() {
       }
       
       if (!isSyncStopped.current) {
-        setCardsSyncStatus('success');
-        setCardsLogs(prev => [...prev, `\n✅✅✅ Full sync complete! Total cards synced: ${cumulativeCardCount}.`]);
+        setCardsSyncStatus(hasEncounteredError ? 'error' : 'success');
+        setCardsLogs(prev => [...prev, `\n✅✅✅ Full sync finished! Total cards synced: ${cumulativeCardCount}. Some sets may have been skipped due to errors.`]);
         await checkDbStatus();
       }
 
     } catch (err: any) {
         setCardsSyncStatus('error');
         setCardsError(err.message || "An unknown client-side error occurred during card sync.");
-        setCardsLogs(prev => [...prev, `❌ Error: ${err.message}`]);
+        setCardsLogs(prev => [...prev, `❌ FATAL ERROR: ${err.message}`]);
     }
   };
   
@@ -695,7 +702,7 @@ export default function SyncAdminPage() {
                         <Square className="mr-2 h-4 w-4"/> Stop Sync
                     </Button>
                  )}
-                 {cardsSyncStatus === 'stopped' && (
+                 {(cardsSyncStatus === 'stopped' || cardsSyncStatus === 'error' || cardsSyncStatus === 'success') && (
                     <Button onClick={() => resetCardSync('cards')} variant="outline" size="lg">
                         <ListRestart className="mr-2 h-4 w-4"/> Reset
                     </Button>
@@ -720,11 +727,11 @@ export default function SyncAdminPage() {
                       <AlertTitle>Card Sync Successful!</AlertTitle>
                     </Alert>
                   )}
-                  {cardsSyncStatus === 'error' && cardsError && (
+                  {cardsSyncStatus === 'error' && (
                     <Alert variant="destructive">
                       <ServerCrash className="h-4 w-4" />
-                      <AlertTitle>Card Sync Failed</AlertTitle>
-                      <AlertDescription>{cardsError}</AlertDescription>
+                      <AlertTitle>Card Sync Finished with Errors</AlertTitle>
+                      <AlertDescription>Some sets failed to sync. Check the logs for details.</AlertDescription>
                     </Alert>
                   )}
                   {cardsSyncStatus === 'stopped' && (
@@ -964,3 +971,4 @@ export default function SyncAdminPage() {
     </div>
   );
 }
+
