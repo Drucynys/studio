@@ -964,5 +964,3 @@ export default function SyncAdminPage() {
     </div>
   );
 }
-
-    
