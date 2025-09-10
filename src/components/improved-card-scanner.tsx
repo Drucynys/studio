@@ -1,13 +1,14 @@
 // File: src/components/ImprovedCardScanner.tsx
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Camera, RotateCcw, Zap, Eye } from "lucide-react";
 import { findCardByImageEnhanced, validateCardData } from "@/ai/flows/find-card-by-image-flow";
-import { preprocessImageForOCR, detectImageRotation, cropToCardArea } from "@/lib/image-preprocessing";
+import { detectImageRotation, cropToCardArea } from "@/lib/image-preprocessing";
+import { useImageProcessor } from "@/hooks/useImageProcessor";
 import { useToast } from "@/hooks/use-toast";
 import Image from "next/image";
 
@@ -31,8 +32,18 @@ export function ImprovedCardScanner({ onScanResult }: ImprovedCardScannerProps) 
   const [processingStep, setProcessingStep] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { processImageWithProgress, isAvailable: workerAvailable } = useImageProcessor();
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const fileToDataUrl = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -41,59 +52,71 @@ export function ImprovedCardScanner({ onScanResult }: ImprovedCardScannerProps) 
     setProcessingStep("Uploading image...");
 
     try {
-      // Step 1: Basic preprocessing
-      setProcessingStep("Preprocessing image...");
-      let processedImage = await preprocessImageForOCR(file, {
-        targetWidth: 1200,
-        enhanceContrast: true,
-        sharpen: true,
-      });
-      
-      setImagePreview(processedImage);
+      // Convert file to data URL
+      setProcessingStep("Loading image...");
+      const imageDataUrl = await fileToDataUrl(file);
 
-      // Step 2: Check for rotation
-      setProcessingStep("Checking image orientation...");
-      const suggestedRotation = await detectImageRotation(processedImage);
-      if (suggestedRotation > 0) {
-        setProcessingStep("Rotating image...");
-        // You could implement rotation here if needed
+      // Step 1: Process image using Web Worker (non-blocking)
+      if (workerAvailable) {
+        const processedImage = await processImageWithProgress(
+          imageDataUrl,
+          {
+            targetWidth: 1200,
+            enhanceContrast: true,
+            sharpen: true,
+          },
+          setProcessingStep
+        );
+        setImagePreview(processedImage);
+
+        // Step 2: Check for rotation (quick check)
+        setProcessingStep("Checking image orientation...");
+        const suggestedRotation = await detectImageRotation(processedImage);
+        if (suggestedRotation > 0) {
+          setProcessingStep("Image rotation detected...");
+          // Rotation could be implemented in the worker for better performance
+        }
+
+        // Step 3: Crop to card area (also could be moved to worker)
+        setProcessingStep("Focusing on card area...");
+        const croppedImage = await cropToCardArea(processedImage);
+
+        // Step 4: AI Analysis
+        setProcessingStep("Analyzing card with AI...");
+        const result = await findCardByImageEnhanced({ imageDataUri: croppedImage });
+        
+        // Step 5: Validate and clean result
+        setProcessingStep("Validating results...");
+        const cleanedResult = validateCardData(result);
+        
+        setScanResult(cleanedResult);
+        onScanResult(cleanedResult);
+
+        // Show success message with confidence
+        const confidence = Math.round((cleanedResult.confidence || 0) * 100);
+        toast({
+          title: "Scan Complete!",
+          description: `Card analyzed with ${confidence}% confidence. ${cleanedResult.name ? `Found: ${cleanedResult.name}` : 'Please verify the results.'}`,
+          className: confidence > 70 ? "bg-green-100 text-green-900" : "bg-yellow-100 text-yellow-900",
+        });
+      } else {
+        // Fallback to synchronous processing if worker is not available
+        throw new Error("Image processing not available. Please try refreshing the page.");
       }
-
-      // Step 3: Crop to card area
-      setProcessingStep("Focusing on card area...");
-      processedImage = await cropToCardArea(processedImage);
-
-      // Step 4: AI Analysis
-      setProcessingStep("Analyzing card with AI...");
-      const result = await findCardByImageEnhanced({ imageDataUri: processedImage });
-      
-      // Step 5: Validate and clean result
-      setProcessingStep("Validating results...");
-      const cleanedResult = validateCardData(result);
-      
-      setScanResult(cleanedResult);
-      onScanResult(cleanedResult);
-
-      // Show success message with confidence
-      const confidence = Math.round((cleanedResult.confidence || 0) * 100);
-      toast({
-        title: "Scan Complete!",
-        description: `Card analyzed with ${confidence}% confidence. ${cleanedResult.name ? `Found: ${cleanedResult.name}` : 'Please verify the results.'}`,
-        className: confidence > 70 ? "bg-green-100 text-green-900" : "bg-yellow-100 text-yellow-900",
-      });
 
     } catch (error) {
       console.error("Error scanning card:", error);
+      const errorMessage = error instanceof Error ? error.message : "Could not analyze the card image.";
       toast({
         variant: "destructive",
         title: "Scan Failed",
-        description: "Could not analyze the card image. Please try again with a clearer photo.",
+        description: `${errorMessage} Please try again with a clearer photo.`,
       });
     } finally {
       setIsScanning(false);
       setProcessingStep("");
     }
-  };
+  }, [fileToDataUrl, processImageWithProgress, workerAvailable, onScanResult, toast]);
 
   const getConfidenceColor = (confidence: number = 0) => {
     if (confidence > 0.8) return "bg-green-100 text-green-800";

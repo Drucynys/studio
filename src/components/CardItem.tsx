@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Sparkles, ExternalLink, Palette, Edit3, Trash2, Layers, Eye, Languages, Paintbrush, Star, ArrowDown, ArrowRight, ArrowUp, DollarSign, Replace } from "lucide-react";
-import React from "react";
+import React, { memo, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 
@@ -49,16 +49,33 @@ const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | 
 };
 
 
-export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView, onToggleFavorite, onAddToExchange }: CardItemProps) {
+export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, onView, onToggleFavorite, onAddToExchange }: CardItemProps) => {
   if (!card) return null;
 
-  const tcgPlayerSearchUrl = `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant || '') : ''}&view=grid`;
-  const displayVariant = formatDisplayVariant(card.variant as string | undefined);
+  // Memoize expensive calculations
+  const tcgPlayerSearchUrl = useMemo(() => 
+    `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant || '') : ''}&view=grid`,
+    [card.name, card.variant]
+  );
 
-  const valueAdded = card.value || 0;
-  const cardQuantity = card.quantity || 1;
-  const currentValue = getMarketPrice(masterCard, card.variant);
-  const valueDifference = currentValue > 0 ? currentValue - valueAdded : 0;
+  const displayVariant = useMemo(() => 
+    formatDisplayVariant(card.variant as string | undefined),
+    [card.variant]
+  );
+
+  const marketPriceData = useMemo(() => {
+    const valueAdded = card.value || 0;
+    const cardQuantity = card.quantity || 1;
+    const currentValue = getMarketPrice(masterCard, card.variant);
+    const valueDifference = currentValue > 0 ? currentValue - valueAdded : 0;
+    
+    return {
+      valueAdded,
+      cardQuantity,
+      currentValue,
+      valueDifference
+    };
+  }, [card.value, card.quantity, masterCard, card.variant]);
 
   return (
     <Card className={cn(
@@ -107,7 +124,7 @@ export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView
         </div>
          <div className="flex items-center gap-2 text-xs">
           <Layers className="h-3.5 w-3.5 text-purple-500" />
-          <strong>Quantity:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-purple-500/50 text-purple-600">{cardQuantity}</Badge>
+          <strong>Quantity:</strong> <Badge variant="outline" className="text-xs px-1.5 py-0.5 border-purple-500/50 text-purple-600">{marketPriceData.cardQuantity}</Badge>
         </div>
         {card.artist && (
           <div className="flex items-center gap-2 text-xs">
@@ -121,20 +138,20 @@ export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView
          <div className="w-full space-y-1">
             <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1"><DollarSign size={14}/>Added</span>
-                <span>${valueAdded.toFixed(2)}</span>
+                <span>${marketPriceData.valueAdded.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between text-sm font-semibold">
                 <span className="text-primary flex items-center gap-1"><DollarSign size={14}/>Current</span>
                 <div className="flex items-center gap-1">
-                    <span>${currentValue > 0 ? currentValue.toFixed(2) : valueAdded.toFixed(2)}</span>
-                    {currentValue > 0 && valueDifference !== 0 && (
+                    <span>${marketPriceData.currentValue > 0 ? marketPriceData.currentValue.toFixed(2) : marketPriceData.valueAdded.toFixed(2)}</span>
+                    {marketPriceData.currentValue > 0 && marketPriceData.valueDifference !== 0 && (
                         <span className={cn(
                             "flex items-center text-xs",
-                            valueDifference > 0 && "text-green-600",
-                            valueDifference < 0 && "text-red-600"
+                            marketPriceData.valueDifference > 0 && "text-green-600",
+                            marketPriceData.valueDifference < 0 && "text-red-600"
                         )}>
-                           {valueDifference > 0 ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}
-                           ${Math.abs(valueDifference).toFixed(2)}
+                           {marketPriceData.valueDifference > 0 ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}
+                           ${Math.abs(marketPriceData.valueDifference).toFixed(2)}
                         </span>
                     )}
                 </div>
@@ -169,4 +186,13 @@ export function CardItem({ card, cardIndex, masterCard, onEdit, onRemove, onView
       </CardFooter>
     </Card>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for better memoization
+  return (
+    prevProps.card.id === nextProps.card.id &&
+    prevProps.card.isFavorite === nextProps.card.isFavorite &&
+    prevProps.card.value === nextProps.card.value &&
+    prevProps.card.quantity === nextProps.card.quantity &&
+    prevProps.masterCard?.tcgplayer?.prices === nextProps.masterCard?.tcgplayer?.prices
+  );
+});

@@ -1,7 +1,7 @@
 // src/context/AuthContext.tsx
 "use client";
 
-import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { 
   getAuth, 
   onAuthStateChanged, 
@@ -96,6 +96,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [following, setFollowing] = useState<string[]>([]);
   const [loadingFollowing, setLoadingFollowing] = useState(true);
+
+  // Refs to track subscriptions for proper cleanup
+  const subscriptionsRef = useRef<(() => void)[]>([]);
+  const isMountedRef = useRef(true);
 
 
   const openAuthModal = () => setIsAuthModalOpen(true);
@@ -353,18 +357,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Cleanup function to properly unsubscribe from all listeners
+  const cleanupSubscriptions = useCallback(() => {
+    subscriptionsRef.current.forEach(unsubscribe => {
+      try {
+        unsubscribe();
+      } catch (error) {
+        console.warn('Error during subscription cleanup:', error);
+      }
+    });
+    subscriptionsRef.current = [];
+  }, []);
+
+  // Component unmount cleanup
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      cleanupSubscriptions();
+    };
+  }, [cleanupSubscriptions]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
       setLoading(false);
+      if (isMountedRef.current) {
+        setUser(currentUser);
+      }
     });
-    return () => unsubscribe();
+    
+    subscriptionsRef.current.push(unsubscribe);
+    return () => {
+      const index = subscriptionsRef.current.indexOf(unsubscribe);
+      if (index > -1) {
+        subscriptionsRef.current.splice(index, 1);
+      }
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
+    // Cleanup previous subscriptions when user changes
+    cleanupSubscriptions();
+    
     if (user) {
       const userDocRef = doc(db, 'users', user.uid);
       const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
+        if (!isMountedRef.current) return;
+        
         if (docSnap.exists()) {
           const data = docSnap.data();
           setRole(data.role || 'user');
@@ -375,16 +414,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }, (error) => {
         console.error("Error fetching user data: ", error);
-        setRole(null);
-        setPrivacySetting(null);
+        if (isMountedRef.current) {
+          setRole(null);
+          setPrivacySetting(null);
+        }
       });
       
-      return () => unsubscribeUser();
+      subscriptionsRef.current.push(unsubscribeUser);
     } else {
       setRole(null);
       setPrivacySetting(null);
     }
-  }, [user]);
+  }, [user, cleanupSubscriptions]);
 
   useEffect(() => {
     if (user) {

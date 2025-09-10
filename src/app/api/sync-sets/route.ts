@@ -33,37 +33,88 @@ export async function POST() {
     // Check 3: Firebase Admin initialized (handled by centralized module)
     logs.push("✅ Firebase Admin SDK initialized via centralized module.");
     
-    // Step 3: Fetch data from Pokémon TCG API
+    // Step 3: Fetch data from Pokémon TCG API with timeout and error handling
     logs.push("Fetching latest sets from Pokémon TCG API...");
-    const response = await axios.get('https://api.pokemontcg.io/v2/sets', {
-      headers: { 'X-Api-Key': apiKey }
-    });
     
-    const sets = response.data.data;
-    if (!sets || sets.length === 0) {
-      logs.push("No sets found from API. Exiting sync.");
+    let response;
+    try {
+      response = await axios.get('https://api.pokemontcg.io/v2/sets', {
+        headers: { 'X-Api-Key': apiKey },
+        timeout: 30000, // 30 second timeout
+        maxRedirects: 3,
+        validateStatus: (status) => status >= 200 && status < 300
+      });
+    } catch (apiError: any) {
+      let errorMessage = 'Failed to fetch sets from Pokemon TCG API';
+      if (axios.isAxiosError(apiError)) {
+        if (apiError.code === 'ECONNABORTED') {
+          errorMessage = 'Request timeout - Pokemon TCG API took too long to respond';
+        } else if (apiError.response) {
+          errorMessage = `Pokemon TCG API Error: ${apiError.response.status} ${apiError.response.statusText}`;
+        } else {
+          errorMessage = `Network error: ${apiError.message}`;
+        }
+      }
+      logs.push(`❌ ${errorMessage}`);
+      throw new Error(errorMessage);
+    }
+    
+    const sets = response.data?.data;
+    if (!sets || !Array.isArray(sets) || sets.length === 0) {
+      logs.push("⚠️ No sets found from API. This might indicate an API issue.");
       return NextResponse.json({ status: 'noop', count: 0, message: 'No sets found from API.', logs });
     }
-    logs.push(`Found ${sets.length} sets. Preparing to write to database...`);
     
-    // Step 4: Write to Firestore
+    // Validate set data structure
+    const validSets = sets.filter(set => set && set.id && typeof set.id === 'string');
+    if (validSets.length !== sets.length) {
+      logs.push(`⚠️ Filtered out ${sets.length - validSets.length} invalid sets`);
+    }
+    
+    logs.push(`✅ Found ${validSets.length} valid sets. Preparing to write to database...`);
+    
+    // Step 4: Write to Firestore with proper error handling
     const setsCollection = db.collection('pokemon-tcg-sets');
-    const batch = db.batch();
     let setsWritten = 0;
+    const FIRESTORE_BATCH_LIMIT = 500; // Firestore batch write limit
 
-    sets.forEach((set: any) => {
-      if (set && set.id) {
-        const docRef = setsCollection.doc(set.id);
-        // Save the entire, unmodified set object from the API.
-        // This is more robust and ensures all data is preserved.
-        batch.set(docRef, set);
-        setsWritten++;
-      } else {
-        logs.push(`Skipping a set due to missing ID: ${JSON.stringify(set)}`);
+    // Process sets in batches to avoid Firestore limits
+    for (let i = 0; i < validSets.length; i += FIRESTORE_BATCH_LIMIT) {
+      const batch = db.batch();
+      const chunk = validSets.slice(i, i + FIRESTORE_BATCH_LIMIT);
+      let batchCount = 0;
+
+      chunk.forEach((set: any) => {
+        try {
+          const docRef = setsCollection.doc(set.id);
+          // Save the entire, unmodified set object from the API.
+          // This is more robust and ensures all data is preserved.
+          batch.set(docRef, {
+            ...set,
+            lastSynced: admin.firestore.FieldValue.serverTimestamp()
+          });
+          batchCount++;
+        } catch (setError) {
+          logs.push(`⚠️ Error preparing set ${set.id}: ${setError}`);
+        }
+      });
+
+      if (batchCount > 0) {
+        try {
+          await batch.commit();
+          setsWritten += batchCount;
+          logs.push(`✅ Batch ${Math.floor(i / FIRESTORE_BATCH_LIMIT) + 1}: Wrote ${batchCount} sets`);
+          
+          // Small delay between batches to avoid rate limiting
+          if (i + FIRESTORE_BATCH_LIMIT < validSets.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (batchError: any) {
+          logs.push(`❌ Batch ${Math.floor(i / FIRESTORE_BATCH_LIMIT) + 1} failed: ${batchError.message}`);
+          // Continue with next batch instead of failing completely
+        }
       }
-    });
-
-    await batch.commit();
+    }
     
     const successMessage = `Successfully synced ${setsWritten} sets to Firestore.`;
     logs.push("✅ " + successMessage);

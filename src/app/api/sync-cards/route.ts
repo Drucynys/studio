@@ -28,6 +28,12 @@ const isValidDocId = (id: string): boolean => {
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Constants for safety limits
+const MAX_PAGES = 50; // Safety limit to prevent infinite loops
+const MAX_RETRIES = 3;
+const REQUEST_TIMEOUT = 15000; // 15 second timeout
+const INITIAL_RETRY_DELAY = 1000; // 1 second
+
 export async function POST(request: Request) {
     const logs: string[] = [];
     try {
@@ -46,43 +52,97 @@ export async function POST(request: Request) {
         let page = 1;
         let hasMore = true;
         let apiTotalCount = 0;
+        let retryCount = 0;
+        let consecutiveEmptyPages = 0;
 
         logs.push(`Fetching all cards for set '${setId}' from API...`);
 
-        while (hasMore) {
+        while (hasMore && page <= MAX_PAGES) {
             try {
-                if (page > 1) await sleep(500);
+                // Rate limiting with exponential backoff on retries
+                const delay = page > 1 ? (retryCount > 0 ? INITIAL_RETRY_DELAY * Math.pow(2, retryCount) : 500) : 0;
+                if (delay > 0) await sleep(delay);
+
                 const response = await axios.get(POKEMON_TCG_API_BASE, {
+                    timeout: REQUEST_TIMEOUT,
                     headers: { 'X-Api-Key': apiKey },
                     params: { q: `set.id:${setId}`, page, pageSize: PAGE_SIZE, orderBy: 'number' },
                 });
                 
                 const { data, totalCount } = response.data;
-                if (apiTotalCount === 0) apiTotalCount = totalCount;
+                
+                // Set total count on first successful request
+                if (apiTotalCount === 0 && totalCount) {
+                    apiTotalCount = totalCount;
+                }
 
+                // Multiple exit conditions to prevent infinite loops
                 if (!data || data.length === 0) {
-                    hasMore = false;
+                    consecutiveEmptyPages++;
+                    logs.push(`Page ${page} returned no data. Empty pages: ${consecutiveEmptyPages}`);
+                    
+                    // Exit if we get 3 consecutive empty pages or reach expected total
+                    if (consecutiveEmptyPages >= 3 || allCardsForSet.length >= apiTotalCount) {
+                        hasMore = false;
+                        break;
+                    }
+                    page++;
                     continue;
                 }
                 
-                allCardsForSet = allCardsForSet.concat(data);
-                logs.push(`Fetched page ${page}. ${allCardsForSet.length} of ${apiTotalCount} cards for this set.`);
+                // Reset counters on successful data retrieval
+                retryCount = 0;
+                consecutiveEmptyPages = 0;
                 
-                if (allCardsForSet.length >= apiTotalCount) {
+                allCardsForSet = allCardsForSet.concat(data);
+                logs.push(`✅ Fetched page ${page}. ${allCardsForSet.length} of ${apiTotalCount || 'unknown'} cards for this set.`);
+                
+                // Exit conditions: reached total count or got less than expected page size
+                if (apiTotalCount > 0 && allCardsForSet.length >= apiTotalCount) {
                     hasMore = false;
+                    logs.push(`✅ Reached expected total count: ${apiTotalCount}`);
+                } else if (data.length < PAGE_SIZE) {
+                    hasMore = false;
+                    logs.push(`✅ Last page detected (got ${data.length} cards, expected ${PAGE_SIZE})`);
                 } else {
                     page++;
                 }
+
             } catch (apiError: any) {
-                 let errorMessage = 'An unknown error occurred while fetching from API.';
-                 if (axios.isAxiosError(apiError) && apiError.response) {
-                     errorMessage = `API Error: ${apiError.response.status} ${apiError.response.statusText}. The set ID '${setId}' may be invalid or the API may be temporarily down.`;
-                 } else if (apiError instanceof Error) {
-                     errorMessage = apiError.message;
-                 }
-                 logs.push(`❌ Could not fetch cards for set ${setId}. ${errorMessage}. Skipping this set.`);
-                 return NextResponse.json({ status: 'error', count: 0, logs, message: errorMessage });
+                retryCount++;
+                let errorMessage = 'An unknown error occurred while fetching from API.';
+                
+                if (axios.isAxiosError(apiError)) {
+                    if (apiError.code === 'ECONNABORTED') {
+                        errorMessage = `Request timeout after ${REQUEST_TIMEOUT}ms`;
+                    } else if (apiError.response) {
+                        errorMessage = `API Error: ${apiError.response.status} ${apiError.response.statusText}`;
+                    } else {
+                        errorMessage = `Network error: ${apiError.message}`;
+                    }
+                } else if (apiError instanceof Error) {
+                    errorMessage = apiError.message;
+                }
+
+                logs.push(`⚠️ Error fetching page ${page}, attempt ${retryCount}/${MAX_RETRIES}: ${errorMessage}`);
+
+                if (retryCount >= MAX_RETRIES) {
+                    logs.push(`❌ Failed after ${MAX_RETRIES} retries. Stopping sync for set ${setId}.`);
+                    return NextResponse.json({ 
+                        status: 'error', 
+                        count: allCardsForSet.length, 
+                        logs, 
+                        message: `Failed after ${MAX_RETRIES} retries: ${errorMessage}` 
+                    });
+                }
+                
+                // Continue with exponential backoff (handled in next iteration)
             }
+        }
+
+        // Safety check - if we hit max pages limit
+        if (page > MAX_PAGES) {
+            logs.push(`⚠️ Hit maximum page limit (${MAX_PAGES}). This may indicate an infinite loop was prevented.`);
         }
         
         if (allCardsForSet.length === 0) {

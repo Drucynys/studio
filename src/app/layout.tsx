@@ -2,9 +2,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './card-styles.css'; // Import the new card styles
-import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
-import { AuthModal } from '@/components/AuthModal';
+import { ClientComponents } from '@/components/ClientComponents';
 
 export const metadata: Metadata = {
   title: 'PokéTRKR',
@@ -26,8 +25,7 @@ export default function RootLayout({
       <body className="font-body antialiased" suppressHydrationWarning={true}>
         <AuthProvider>
           {children}
-          <Toaster />
-          <AuthModal />
+          <ClientComponents />
         </AuthProvider>
       </body>
     </html>

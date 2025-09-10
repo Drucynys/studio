@@ -1,7 +1,7 @@
 // src/app/my-collection/page.tsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { AppHeader } from "@/components/AppHeader";
 import { CardList } from "@/components/CardList";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useDebounce } from "@/hooks/useDebounce";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { FullScreenCardView } from "@/components/FullScreenCardView";
 import { AlertCircle, PackageOpen, Search, Filter, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library, Heart, Check, X, Redo, Replace } from "lucide-react";
@@ -70,9 +71,6 @@ export default function MyCollectionPage() {
     openAuthModal
   } = useAuth();
   
-  const [filteredCards, setFilteredCards] = useState<PokemonCard[]>([]);
-  const [filteredWishlist, setFilteredWishlist] = useState<WishlistItem[]>([]);
-  const [filteredExchangeItems, setFilteredExchangeItems] = useState<ExchangeItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("dateAddedDesc");
   const [cardToEdit, setCardToEdit] = useState<PokemonCard | null>(null);
@@ -91,64 +89,93 @@ export default function MyCollectionPage() {
 
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchMasterData = async () => {
-      const allApiIds = [
-        ...new Set(collection.map(c => c.apiId).filter(Boolean)),
-        ...new Set(wishlist.map(w => w.apiId).filter(Boolean)),
-        ...new Set(myExchangeItems.map(e => e.apiId).filter(Boolean)),
-      ];
-      
-      const uniqueApiIds = [...new Set(allApiIds)];
+  // Debounced search term to avoid excessive re-renders
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-      if (uniqueApiIds.length === 0) {
-        setMasterCardData(new Map());
+  // Optimized master data fetching with caching
+  const fetchMasterData = useCallback(async () => {
+    const allApiIds = [
+      ...new Set(collection.map(c => c.apiId).filter(Boolean)),
+      ...new Set(wishlist.map(w => w.apiId).filter(Boolean)),
+      ...new Set(myExchangeItems.map(e => e.apiId).filter(Boolean)),
+    ];
+    
+    const uniqueApiIds = [...new Set(allApiIds)];
+
+    if (uniqueApiIds.length === 0) {
+      setMasterCardData(new Map());
+      return;
+    }
+
+    // Check cache first
+    const cacheKey = 'masterCardCache';
+    const cacheTimeKey = 'masterCardCacheTime';
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      const cacheTime = sessionStorage.getItem(cacheTimeKey);
+      
+      if (cached && cacheTime && Date.now() - parseInt(cacheTime) < CACHE_DURATION) {
+        console.log('Using cached master card data');
+        const cachedData = JSON.parse(cached);
+        const dataMap = new Map<string, ApiPokemonCard>(cachedData);
+        setMasterCardData(dataMap);
         return;
       }
-      
-      setLoadingMasterData(true);
-      try {
-        const CHUNK_SIZE = 100;
-        const allFetchedCards: ApiPokemonCard[] = [];
-
-        for (let i = 0; i < uniqueApiIds.length; i += CHUNK_SIZE) {
-            const chunk = uniqueApiIds.slice(i, i + CHUNK_SIZE);
-            const response = await fetch('/api/master-cards-batch', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: chunk }),
-            });
-
-            if (!response.ok) {
-                console.error(`Failed to fetch chunk starting at index ${i}. Status: ${response.status}`);
-                // Continue to next chunk instead of throwing an error for the whole process
-                continue;
-            }
-
-            const chunkData: ApiPokemonCard[] = await response.json();
-            allFetchedCards.push(...chunkData);
-        }
-
-        const dataMap = new Map<string, ApiPokemonCard>();
-        allFetchedCards.forEach(card => dataMap.set(card.id, card));
-        setMasterCardData(dataMap);
-
-      } catch (error) {
-        console.error("Error fetching master card data in chunks:", error);
-        toast({
-          variant: "destructive",
-          title: "Update Error",
-          description: "Could not retrieve the latest market prices for some cards.",
-        });
-      } finally {
-        setLoadingMasterData(false);
-      }
-    };
-
-    if (!loadingCollection && !loadingWishlist && !loadingMyExchangeItems) {
-      fetchMasterData();
+    } catch (cacheError) {
+      console.warn('Cache read error, proceeding with fresh fetch:', cacheError);
     }
-  }, [collection, wishlist, myExchangeItems, loadingCollection, loadingWishlist, loadingMyExchangeItems, toast]);
+    
+    setLoadingMasterData(true);
+    try {
+      // Single batch request instead of chunked requests
+      const response = await fetch('/api/master-cards-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: uniqueApiIds }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch master card data: ${response.status}`);
+      }
+
+      const fetchedCards: ApiPokemonCard[] = await response.json();
+      const dataMap = new Map<string, ApiPokemonCard>();
+      fetchedCards.forEach(card => dataMap.set(card.id, card));
+      
+      // Cache the result
+      try {
+        sessionStorage.setItem(cacheKey, JSON.stringify([...dataMap]));
+        sessionStorage.setItem(cacheTimeKey, Date.now().toString());
+      } catch (cacheError) {
+        console.warn('Cache write error:', cacheError);
+      }
+      
+      setMasterCardData(dataMap);
+
+    } catch (error) {
+      console.error("Error fetching master card data:", error);
+      toast({
+        variant: "destructive",
+        title: "Update Error",
+        description: "Could not retrieve the latest market prices for some cards.",
+      });
+    } finally {
+      setLoadingMasterData(false);
+    }
+  }, [collection, wishlist, myExchangeItems, toast]);
+
+  // Debounced effect for master data fetching
+  useEffect(() => {
+    if (!loadingCollection && !loadingWishlist && !loadingMyExchangeItems) {
+      const timeoutId = setTimeout(() => {
+        fetchMasterData();
+      }, 100); // Small delay to batch rapid changes
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [fetchMasterData, loadingCollection, loadingWishlist, loadingMyExchangeItems]);
 
 
   const collectionStats = useMemo(() => {
@@ -178,48 +205,67 @@ export default function MyCollectionPage() {
   }, [collection, masterCardData]);
 
 
-  useEffect(() => {
-    // Filter and sort collection
-    let tempCards = [...collection];
-    if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
-      tempCards = tempCards.filter(
-        (card) =>
-          card.name?.toLowerCase().includes(lowerSearchTerm) ||
-          card.set.toLowerCase().includes(lowerSearchTerm) ||
-          card.cardNumber.toLowerCase().includes(lowerSearchTerm)
-      );
+  // Memoized filtering and sorting functions
+  const sortCards = useCallback((cards: PokemonCard[], option: string, masterData: Map<string, ApiPokemonCard>) => {
+    const sorted = [...cards];
+    
+    switch (option) {
+      case "favorites":
+        return sorted.sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0));
+      case "nameAsc":
+        return sorted.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      case "nameDesc":
+        return sorted.sort((a, b) => (b.name || "").localeCompare(a.name || ""));
+      case "valueDesc":
+        return sorted.sort((a, b) => {
+          const aValue = getMarketPrice(masterData.get(a.apiId), a.variant) || a.value || 0;
+          const bValue = getMarketPrice(masterData.get(b.apiId), b.variant) || b.value || 0;
+          return bValue - aValue;
+        });
+      case "valueAsc":
+        return sorted.sort((a, b) => {
+          const aValue = getMarketPrice(masterData.get(a.apiId), a.variant) || a.value || 0;
+          const bValue = getMarketPrice(masterData.get(b.apiId), b.variant) || b.value || 0;
+          return aValue - bValue;
+        });
+      case "setAsc":
+        return sorted.sort((a, b) => a.set.localeCompare(b.set) || (a.name || "").localeCompare(b.name || ""));
+      case "dateAddedAsc":
+        return sorted.reverse();
+      case "quantityDesc":
+        return sorted.sort((a, b) => (b.quantity || 1) - (a.quantity || 1));
+      case "quantityAsc":
+        return sorted.sort((a, b) => (a.quantity || 1) - (b.quantity || 1));
+      case "dateAddedDesc":
+      default:
+        return sorted; // Default sort from Firestore
     }
-    // Sort logic remains the same for collection
-    switch (sortOption) {
-      case "favorites": tempCards.sort((a, b) => (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0)); break;
-      case "nameAsc": tempCards.sort((a, b) => (a.name || "").localeCompare(b.name || "")); break;
-      case "nameDesc": tempCards.sort((a, b) => (b.name || "").localeCompare(a.name || "")); break;
-      case "valueDesc": tempCards.sort((a, b) => (getMarketPrice(masterCardData.get(b.apiId), b.variant) || b.value || 0) - (getMarketPrice(masterCardData.get(a.apiId), a.variant) || a.value || 0)); break;
-      case "valueAsc": tempCards.sort((a, b) => (getMarketPrice(masterCardData.get(a.apiId), a.variant) || a.value || 0) - (getMarketPrice(masterCardData.get(b.apiId), b.variant) || b.value || 0)); break;
-      case "setAsc": tempCards.sort((a, b) => a.set.localeCompare(b.set) || (a.name || "").localeCompare(b.name || "")); break;
-      case "dateAddedDesc": /* Default sort from Firestore */ break;
-      case "dateAddedAsc": tempCards.reverse(); break;
-      case "quantityDesc": tempCards.sort((a, b) => (b.quantity || 1) - (a.quantity || 1)); break;
-      case "quantityAsc": tempCards.sort((a, b) => (a.quantity || 1) - (b.quantity || 1)); break;
-    }
-    setFilteredCards(tempCards);
+  }, []);
 
-    const filterGeneric = (items: any[]) => {
-      if (!searchTerm) return items;
-      const lowerSearchTerm = searchTerm.toLowerCase();
-      return items.filter(
-        (item) =>
-         item.name?.toLowerCase().includes(lowerSearchTerm) ||
-         item.set.toLowerCase().includes(lowerSearchTerm) ||
-         item.cardNumber.toLowerCase().includes(lowerSearchTerm)
-      );
-    };
+  const filterItems = useCallback((items: any[], searchTerm: string) => {
+    if (!searchTerm) return items;
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return items.filter(
+      (item) =>
+        item.name?.toLowerCase().includes(lowerSearchTerm) ||
+        item.set?.toLowerCase().includes(lowerSearchTerm) ||
+        item.cardNumber?.toLowerCase().includes(lowerSearchTerm)
+    );
+  }, []);
 
-    setFilteredWishlist(filterGeneric(wishlist));
-    setFilteredExchangeItems(filterGeneric(myExchangeItems));
+  // Memoized filtered and sorted data
+  const filteredCards = useMemo(() => {
+    const filtered = filterItems(collection, debouncedSearchTerm);
+    return sortCards(filtered, sortOption, masterCardData);
+  }, [collection, debouncedSearchTerm, sortOption, masterCardData, filterItems, sortCards]);
 
-  }, [collection, wishlist, myExchangeItems, searchTerm, sortOption, masterCardData]);
+  const filteredWishlist = useMemo(() => {
+    return filterItems(wishlist, debouncedSearchTerm);
+  }, [wishlist, debouncedSearchTerm, filterItems]);
+
+  const filteredExchangeItems = useMemo(() => {
+    return filterItems(myExchangeItems, debouncedSearchTerm);
+  }, [myExchangeItems, debouncedSearchTerm, filterItems]);
 
   const handleRemoveCard = (cardId: string) => {
     const cardToRemove = collection.find(c => c.id === cardId);
