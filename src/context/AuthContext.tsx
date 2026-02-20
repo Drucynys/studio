@@ -1,7 +1,7 @@
 // src/context/AuthContext.tsx
 "use client";
 
-import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef, useMemo } from 'react';
 import { 
   getAuth, 
   onAuthStateChanged, 
@@ -87,25 +87,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [userCollection, setUserCollection] = useState<PokemonCard[]>([]);
-  const [loadingCollection, setLoadingCollection] = useState(true);
+  const [loadingCollection, setLoadingCollection] = useState(false);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
-  const [loadingWishlist, setLoadingWishlist] = useState(true);
+  const [loadingWishlist, setLoadingWishlist] = useState(false);
   const [myExchangeItems, setMyExchangeItems] = useState<ExchangeItem[]>([]);
-  const [loadingMyExchangeItems, setLoadingMyExchangeItems] = useState(true);
+  const [loadingMyExchangeItems, setLoadingMyExchangeItems] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [privacySetting, setPrivacySetting] = useState<PrivacySetting | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [following, setFollowing] = useState<string[]>([]);
-  const [loadingFollowing, setLoadingFollowing] = useState(true);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
 
-  // Refs to track subscriptions for proper cleanup
-  const subscriptionsRef = useRef<(() => void)[]>([]);
-  const isMountedRef = useRef(true);
-
-
-  const openAuthModal = () => setIsAuthModalOpen(true);
-  const closeAuthModal = () => setIsAuthModalOpen(false);
+  const openAuthModal = useCallback(() => setIsAuthModalOpen(true), []);
+  const closeAuthModal = useCallback(() => setIsAuthModalOpen(false), []);
   
   const handleAuthSuccess = useCallback(async (userCredential: UserCredential) => {
     const newUser = userCredential.user;
@@ -117,16 +112,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const userDocRef = doc(db, "users", newUser.uid);
-      
-      // Add timeout to Firestore operations (10 second timeout)
       const docSnap = await Promise.race([
         getDoc(userDocRef),
         createTimeout(10000)
       ]) as any;
 
       if (!docSnap.exists()) {
-        console.log(`User document for ${newUser.uid} not found. Creating...`);
-        
         const displayName = newUser.displayName || newUser.email?.split('@')[0] || 'New User';
 
         if (!newUser.displayName) {
@@ -135,7 +126,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               updateProfile(newUser, { displayName }),
               createTimeout(5000)
             ]);
-            console.log("Firebase Auth profile updated with displayName:", displayName);
           } catch (authError) {
             console.error("Error updating Auth profile:", authError);
           }
@@ -151,51 +141,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           followSetting: 'everyone' as PrivacySetting,
         };
 
-        console.log("Attempting to write this user data to Firestore:", userProfileData);
-
-        try {
-          await Promise.race([
-            setDoc(userDocRef, userProfileData),
-            createTimeout(10000)
-          ]);
-          console.log(`User document for ${newUser.uid} created successfully.`);
-          toast({
-            title: 'Welcome!',
-            description: 'Your user profile has been created.',
-          });
-        } catch (error: any) {
-          console.error("FATAL: Error creating user document in Firestore:", error);
-          
-          let description = 'Could not create your user profile in the database.';
-          if (error.message) {
-              description = error.message;
-          }
-
-          toast({
-            variant: 'destructive',
-            title: 'Account Setup Failed',
-            description: description,
-            duration: 9000,
-          });
-
-          await signOut(auth);
-          closeAuthModal();
-          return; 
-        }
+        await Promise.race([
+          setDoc(userDocRef, userProfileData),
+          createTimeout(10000)
+        ]);
+        
+        toast({
+          title: 'Welcome!',
+          description: 'Your user profile has been created.',
+        });
       } else {
-          const data = docSnap.data();
-          if (!data.displayName_lowercase && data.displayName) {
-              try {
-                  await Promise.race([
-                    setDoc(userDocRef, { displayName_lowercase: data.displayName.toLowerCase() }, { merge: true }),
-                    createTimeout(5000)
-                  ]);
-                  console.log(`Backfilled displayName_lowercase for user ${newUser.uid}.`);
-              } catch (error) {
-                  console.error("Error backfilling displayName_lowercase:", error);
-              }
-          }
-        console.log(`User document for ${newUser.uid} already exists.`);
+        const data = docSnap.data();
+        if (!data.displayName_lowercase && data.displayName) {
+          await setDoc(userDocRef, { displayName_lowercase: data.displayName.toLowerCase() }, { merge: true });
+        }
       }
       
       closeAuthModal();
@@ -204,131 +163,92 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({
         variant: 'destructive',
         title: 'Login Issue',
-        description: error.message === 'Operation timeout' ? 
-          'Authentication is taking longer than expected. Please try again.' : 
-          'There was an issue completing your login.',
-        duration: 5000,
+        description: 'There was an issue completing your login.',
       });
-      // Don't close modal on error - let the AuthModal handle it
-      // so user can retry without reopening modal
-      throw error; // Re-throw to let AuthModal handle the loading state
+      throw error;
     }
-  }, [toast]);
+  }, [toast, closeAuthModal]);
 
-  const signUp = async (email: string, pass: string) => {
+  const signUp = useCallback(async (email: string, pass: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     await handleAuthSuccess(userCredential);
     return userCredential;
-  };
+  }, [handleAuthSuccess]);
 
-  const signIn = async (email: string, pass: string) => {
+  const signIn = useCallback(async (email: string, pass: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, pass);
     await handleAuthSuccess(userCredential);
     return userCredential;
-  };
+  }, [handleAuthSuccess]);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = useCallback(async () => {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     
-    // Configure provider with additional settings for localhost
-    provider.setCustomParameters({
-      prompt: 'select_account'
-    });
-    
-    // Debug logging
-    const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'unknown';
-    const currentPort = typeof window !== 'undefined' ? window.location.port : 'unknown';
-    console.log(`Google Auth Debug - Host: ${currentHost}, Port: ${currentPort}`);
-    
-    // For localhost development, prefer redirect over popup
     const isLocalhost = typeof window !== 'undefined' && 
       (window.location.hostname === 'localhost' || 
        window.location.hostname === '127.0.0.1' || 
        window.location.hostname.includes('localhost'));
     
-    console.log(`Using ${isLocalhost ? 'redirect' : 'popup'} auth method`);
-    
     try {
       if (isLocalhost) {
-        // Use redirect for localhost to avoid domain issues
-        console.log('Initiating redirect auth for localhost...');
         await signInWithRedirect(auth, provider);
-        // This will redirect the page, so we won't reach the return statement
         return null;
       } else {
-        // Try popup for production domains
-        console.log('Attempting popup auth...');
         const userCredential = await signInWithPopup(auth, provider);
         await handleAuthSuccess(userCredential);
         return userCredential;
       }
     } catch (error: any) {
-      console.error('Google auth error:', error.code, error.message);
-      
-      // Fallback to redirect if popup fails
       if (error.code === 'auth/popup-blocked' || 
           error.code === 'auth/unauthorized-domain' ||
           error.message?.includes('refused to connect')) {
-        console.log('Popup failed, falling back to redirect...');
         await signInWithRedirect(auth, provider);
         return null;
       }
-      
       throw error;
     }
-  };
+  }, [handleAuthSuccess]);
 
-  const logOut = async () => {
+  const logOut = useCallback(async () => {
     await signOut(auth);
     setUserCollection([]);
     setFollowing([]);
     setWishlist([]);
     setMyExchangeItems([]);
     router.push('/');
-  };
+  }, [router]);
 
-  const addCardToCollection = async (card: Omit<PokemonCard, 'id' | 'userId' | 'timestamp'>) => {
+  const addCardToCollection = useCallback(async (card: Omit<PokemonCard, 'id' | 'userId' | 'timestamp'>) => {
     if (!user) throw new Error("You must be logged in to add cards.");
-    
     const userCardsRef = collection(db, 'users', user.uid, 'cards');
     const newCardRef = doc(userCardsRef);
-    
-    const cardDataWithMetadata = {
+    await setDoc(newCardRef, {
       ...card,
       id: newCardRef.id,
       userId: user.uid,
       timestamp: serverTimestamp()
-    };
-    
-    await setDoc(newCardRef, cardDataWithMetadata);
-  };
+    });
+  }, [user]);
 
-  const addCardToWishlist = async (item: Omit<WishlistItem, 'id' | 'userId' | 'timestamp'>) => {
+  const addCardToWishlist = useCallback(async (item: Omit<WishlistItem, 'id' | 'userId' | 'timestamp'>) => {
     if (!user) throw new Error("You must be logged in to add to a wishlist.");
-
     const userWishlistRef = collection(db, 'users', user.uid, 'wishlist');
     const newWishlistItemRef = doc(userWishlistRef);
-
-    const wishlistItemData = {
+    await setDoc(newWishlistItemRef, {
         ...item,
         id: newWishlistItemRef.id,
         userId: user.uid,
         timestamp: serverTimestamp(),
-    };
+    });
+  }, [user]);
 
-    await setDoc(newWishlistItemRef, wishlistItemData);
-  };
-
-  const removeCardFromWishlist = async (wishlistItemId: string) => {
-    if (!user) throw new Error("You must be logged in to remove from a wishlist.");
-    const wishlistItemRef = doc(db, 'users', user.uid, 'wishlist', wishlistItemId);
-    await deleteDoc(wishlistItemRef);
-  };
-
-  const moveCardFromWishlistToCollection = async (item: WishlistItem) => {
+  const removeCardFromWishlist = useCallback(async (wishlistItemId: string) => {
     if (!user) throw new Error("You must be logged in.");
+    await deleteDoc(doc(db, 'users', user.uid, 'wishlist', wishlistItemId));
+  }, [user]);
 
-    // Add to collection with default quantity 1 and value 0
+  const moveCardFromWishlistToCollection = useCallback(async (item: WishlistItem) => {
     await addCardToCollection({
         apiId: item.apiId,
         name: item.name,
@@ -336,306 +256,170 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         cardNumber: item.cardNumber,
         rarity: item.rarity,
         language: 'English',
-        variant: null, // User can edit this later
+        variant: null,
         imageUrl: item.imageUrl,
         value: 0,
         quantity: 1,
         artist: item.artist,
     });
-    
-    // Remove from wishlist
     await removeCardFromWishlist(item.id);
-  };
+  }, [addCardToCollection, removeCardFromWishlist]);
 
-  const updateCardInCollection = async (card: PokemonCard) => {
-     if (!user || user.uid !== card.userId) throw new Error("Not authorized to update this card.");
-     const cardRef = doc(db, 'users', user.uid, 'cards', card.id);
-     await setDoc(cardRef, card, { merge: true });
-  };
+  const updateCardInCollection = useCallback(async (card: PokemonCard) => {
+     if (!user || user.uid !== card.userId) throw new Error("Not authorized.");
+     await setDoc(doc(db, 'users', user.uid, 'cards', card.id), card, { merge: true });
+  }, [user]);
   
-  const removeCardFromCollection = async (cardId: string) => {
-      if (!user) throw new Error("You must be logged in to remove cards.");
-      const cardRef = doc(db, 'users', user.uid, 'cards', cardId);
-      await deleteDoc(cardRef);
-  };
+  const removeCardFromCollection = useCallback(async (cardId: string) => {
+      if (!user) throw new Error("User not logged in.");
+      await deleteDoc(doc(db, 'users', user.uid, 'cards', cardId));
+  }, [user]);
 
-  const addCardToExchange = async (card: PokemonCard) => {
-    if (!user) throw new Error("You must be logged in to add a card to the exchange.");
-    
-    const newExchangeDocRef = doc(collection(db, 'exchange'));
-
-    const exchangeItemData = {
+  const addCardToExchange = useCallback(async (card: PokemonCard) => {
+    if (!user) throw new Error("User not logged in.");
+    const newRef = doc(collection(db, 'exchange'));
+    await setDoc(newRef, {
       ...card,
       ownerId: user.uid,
       ownerDisplayName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
       listedAt: serverTimestamp(),
-      exchangeId: newExchangeDocRef.id,
-    };
+      exchangeId: newRef.id,
+    });
+  }, [user]);
 
-    await setDoc(newExchangeDocRef, exchangeItemData);
-  };
+  const removeCardFromExchange = useCallback(async (exchangeItemId: string) => {
+    if (!user) throw new Error("User not logged in.");
+    await deleteDoc(doc(db, 'exchange', exchangeItemId));
+  }, [user]);
 
-  const removeCardFromExchange = async (exchangeItemId: string) => {
-    if (!user) throw new Error("You must be logged in to remove a card from the exchange.");
-    const exchangeItemRef = doc(db, 'exchange', exchangeItemId);
-    await deleteDoc(exchangeItemRef);
-  };
-
-  const updateUserDisplayName = async (newName: string) => {
+  const updateUserDisplayName = useCallback(async (newName: string) => {
     if (!user) throw new Error("User not logged in.");
     await updateProfile(user, { displayName: newName });
-    const userDocRef = doc(db, "users", user.uid);
-    await setDoc(userDocRef, { 
+    await setDoc(doc(db, "users", user.uid), { 
         displayName: newName,
         displayName_lowercase: newName.toLowerCase()
     }, { merge: true });
-  };
+  }, [user]);
   
-  const reauthenticate = async (password: string) => {
-    if (!user || !user.email) throw new Error("User not found or email is missing.");
+  const reauthenticate = useCallback(async (password: string) => {
+    if (!user || !user.email) throw new Error("User not found.");
     const credential = EmailAuthProvider.credential(user.email, password);
     await reauthenticateWithCredential(user, credential);
-  };
+  }, [user]);
 
-  const updateUserEmail = async (newEmail: string) => {
+  const updateUserEmail = useCallback(async (newEmail: string) => {
     if (!user) throw new Error("User not logged in.");
     await updateEmail(user, newEmail);
-    const userDocRef = doc(db, "users", user.uid);
-    await setDoc(userDocRef, { email: newEmail }, { merge: true });
-  };
+    await setDoc(doc(db, "users", user.uid), { email: newEmail }, { merge: true });
+  }, [user]);
   
-  const updateUserPassword = async (newPassword: string) => {
+  const updateUserPassword = useCallback(async (newPassword: string) => {
     if (!user) throw new Error("User not logged in.");
     await updatePassword(user, newPassword);
     await signOut(auth);
-  };
+  }, [user]);
   
-  const updateUserPrivacySetting = async (setting: PrivacySetting) => {
+  const updateUserPrivacySetting = useCallback(async (setting: PrivacySetting) => {
     if (!user) throw new Error("User not logged in.");
-    const userDocRef = doc(db, "users", user.uid);
-    await setDoc(userDocRef, { followSetting: setting }, { merge: true });
-  };
+    await setDoc(doc(db, "users", user.uid), { followSetting: setting }, { merge: true });
+  }, [user]);
 
-  const markNotificationsAsRead = async (notificationsToUpdate: Notification[]) => {
+  const markNotificationsAsRead = useCallback(async (notificationsToUpdate: Notification[]) => {
     if (!user || notificationsToUpdate.length === 0) return;
-
-    try {
-      const batch = writeBatch(db);
-      notificationsToUpdate.forEach(notification => {
-        const notificationRef = doc(db, 'users', user.uid, 'notifications', notification.id);
-        batch.update(notificationRef, { read: true });
-      });
-      await batch.commit();
-      console.log(`${notificationsToUpdate.length} notifications marked as read.`);
-    } catch (error) {
-      console.error("Error marking notifications as read: ", error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Could not update notifications.'
-      });
-    }
-  };
-
-  // Cleanup function to properly unsubscribe from all listeners
-  const cleanupSubscriptions = useCallback(() => {
-    subscriptionsRef.current.forEach(unsubscribe => {
-      try {
-        unsubscribe();
-      } catch (error) {
-        console.warn('Error during subscription cleanup:', error);
-      }
+    const batch = writeBatch(db);
+    notificationsToUpdate.forEach(n => {
+      batch.update(doc(db, 'users', user.uid, 'notifications', n.id), { read: true });
     });
-    subscriptionsRef.current = [];
-  }, []);
+    await batch.commit();
+  }, [user]);
 
-  // Component unmount cleanup
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-      cleanupSubscriptions();
-    };
-  }, [cleanupSubscriptions]);
-
+  // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setLoading(false);
-      if (isMountedRef.current) {
-        setUser(currentUser);
-      }
     });
-    
-    subscriptionsRef.current.push(unsubscribe);
-    return () => {
-      const index = subscriptionsRef.current.indexOf(unsubscribe);
-      if (index > -1) {
-        subscriptionsRef.current.splice(index, 1);
-      }
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  // Handle redirect result for Google Sign-In
+  // Redirect Result Handler
   useEffect(() => {
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          // User came back from Google auth redirect
-          console.log('Redirect auth successful');
-          await handleAuthSuccess(result);
-          closeAuthModal();
-        }
-      } catch (error: any) {
-        console.error('Redirect auth error:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Authentication Error',
-          description: error.message || 'Failed to sign in with Google',
-        });
+    let isMounted = true;
+    getRedirectResult(auth).then((result) => {
+      if (result && isMounted) {
+        handleAuthSuccess(result);
       }
-    };
+    }).catch(console.error);
+    return () => { isMounted = false; };
+  }, [handleAuthSuccess]);
 
-    handleRedirectResult();
-  }, [handleAuthSuccess, closeAuthModal, toast]);
-
+  // Data Listeners
   useEffect(() => {
-    // Cleanup previous subscriptions when user changes
-    cleanupSubscriptions();
-    
-    if (user) {
-      const userDocRef = doc(db, 'users', user.uid);
-      const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
-        if (!isMountedRef.current) return;
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setRole(data.role || 'user');
-          setPrivacySetting(data.followSetting || 'everyone');
-        } else {
-          setRole('user');
-          setPrivacySetting('everyone');
-        }
-      }, (error) => {
-        console.error("Error fetching user data: ", error);
-        if (isMountedRef.current) {
-          setRole('user'); // Fallback to user role
-          setPrivacySetting('everyone'); // Fallback to default setting
-        }
-      });
-      
-      subscriptionsRef.current.push(unsubscribeUser);
-    } else {
+    if (!user) {
       setRole(null);
       setPrivacySetting(null);
-    }
-  }, [user, cleanupSubscriptions]);
-
-  useEffect(() => {
-    if (user) {
-      setLoadingCollection(true);
-      setLoadingWishlist(true);
-      setLoadingMyExchangeItems(true);
-      setLoadingFollowing(true);
-      setLoadingNotifications(true);
-
-      // Set maximum loading timeout (8 seconds)
-      const maxLoadingTimeout = setTimeout(() => {
-        console.warn('Loading timeout reached, showing UI with partial data');
-        setLoadingCollection(false);
-        setLoadingWishlist(false);
-        setLoadingMyExchangeItems(false);
-        setLoadingFollowing(false);
-        setLoadingNotifications(false);
-      }, 8000);
-
-      const collRef = collection(db, "users", user.uid, "cards");
-      const q = query(collRef);
-      const unsubscribeCards = onSnapshot(q, (snapshot) => {
-        const userCards = snapshot.docs.map(doc => doc.data() as PokemonCard);
-        userCards.sort((a, b) => {
-          const timeA = a.timestamp?.toMillis ? a.timestamp.toMillis() : 0;
-          const timeB = b.timestamp?.toMillis ? b.timestamp.toMillis() : 0;
-          return timeB - timeA;
-        });
-        setUserCollection(userCards);
-        setLoadingCollection(false);
-      }, (error) => {
-        console.error("Error fetching collection:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your collection.'});
-        setLoadingCollection(false);
-      });
-      
-      const wishlistRef = collection(db, "users", user.uid, "wishlist");
-      const qWishlist = query(wishlistRef, orderBy("timestamp", "desc"));
-      const unsubscribeWishlist = onSnapshot(qWishlist, (snapshot) => {
-          const userWishlist = snapshot.docs.map(doc => doc.data() as WishlistItem);
-          setWishlist(userWishlist);
-          setLoadingWishlist(false);
-      }, (error) => {
-          console.error("Error fetching wishlist:", error);
-          toast({ variant: 'destructive', title: 'Error', description: 'Could not load your wishlist.'});
-          setLoadingWishlist(false);
-      });
-
-      const exchangeQuery = query(collection(db, 'exchange'), where('ownerId', '==', user.uid));
-      const unsubscribeExchange = onSnapshot(exchangeQuery, (snapshot) => {
-        const items = snapshot.docs.map(doc => doc.data() as ExchangeItem);
-        setMyExchangeItems(items);
-        setLoadingMyExchangeItems(false);
-      }, (error) => {
-        console.error("Error fetching user's exchange items:", error);
-        toast({ variant: 'destructive', title: 'Error', description: "Could not load your exchange items." });
-        setLoadingMyExchangeItems(false);
-      });
-
-      const followingRef = collection(db, "users", user.uid, "following");
-      const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
-        const followingUIDs = snapshot.docs.map(doc => doc.id);
-        setFollowing(followingUIDs);
-        setLoadingFollowing(false);
-      }, (error) => {
-        console.error("Error fetching following list:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your following list.' });
-        setLoadingFollowing(false);
-      });
-
-      const notificationsRef = collection(db, "users", user.uid, "notifications");
-      const qNotifications = query(notificationsRef, orderBy("timestamp", "desc"));
-      const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
-        const allNotifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification));
-        const unread = allNotifications.filter(n => !n.read);
-        setNotifications(unread);
-        setLoadingNotifications(false);
-      }, (fallbackError) => {
-          console.error("Notification query failed:", fallbackError);
-          toast({ variant: 'destructive', title: 'Error', description: 'Could not load your notifications.' });
-          setLoadingNotifications(false);
-      });
-
-      return () => {
-        clearTimeout(maxLoadingTimeout);
-        unsubscribeCards();
-        unsubscribeWishlist();
-        unsubscribeExchange();
-        unsubscribeFollowing();
-        unsubscribeNotifications();
-      };
-    } else {
       setUserCollection([]);
       setWishlist([]);
+      setMyExchangeItems([]);
       setFollowing([]);
       setNotifications([]);
-      setMyExchangeItems([]);
-      setLoadingCollection(false);
-      setLoadingWishlist(false);
-      setLoadingFollowing(false);
-      setLoadingNotifications(false);
-      setLoadingMyExchangeItems(false);
+      return;
     }
-  }, [user, toast]);
 
-  const value: AuthContextType = {
+    const uid = user.uid;
+    const unsubs: (() => void)[] = [];
+
+    // User Profile
+    unsubs.push(onSnapshot(doc(db, 'users', uid), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setRole(data.role || 'user');
+        setPrivacySetting(data.followSetting || 'everyone');
+      }
+    }));
+
+    // Collection
+    setLoadingCollection(true);
+    unsubs.push(onSnapshot(collection(db, "users", uid, "cards"), (snap) => {
+      const cards = snap.docs.map(d => d.data() as PokemonCard);
+      cards.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
+      setUserCollection(cards);
+      setLoadingCollection(false);
+    }));
+
+    // Wishlist
+    setLoadingWishlist(true);
+    unsubs.push(onSnapshot(query(collection(db, "users", uid, "wishlist"), orderBy("timestamp", "desc")), (snap) => {
+      setWishlist(snap.docs.map(d => d.data() as WishlistItem));
+      setLoadingWishlist(false);
+    }));
+
+    // Exchange
+    setLoadingMyExchangeItems(true);
+    unsubs.push(onSnapshot(query(collection(db, 'exchange'), where('ownerId', '==', uid)), (snap) => {
+      setMyExchangeItems(snap.docs.map(d => d.data() as ExchangeItem));
+      setLoadingMyExchangeItems(false);
+    }));
+
+    // Following
+    setLoadingFollowing(true);
+    unsubs.push(onSnapshot(collection(db, "users", uid, "following"), (snap) => {
+      setFollowing(snap.docs.map(d => d.id));
+      setLoadingFollowing(false);
+    }));
+
+    // Notifications
+    setLoadingNotifications(true);
+    unsubs.push(onSnapshot(query(collection(db, "users", uid, "notifications"), orderBy("timestamp", "desc")), (snap) => {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
+      setNotifications(all.filter(n => !n.read));
+      setLoadingNotifications(false);
+    }));
+
+    return () => unsubs.forEach(fn => fn());
+  }, [user?.uid]);
+
+  const value = useMemo(() => ({
     user,
     loading,
     role,
@@ -671,7 +455,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     markNotificationsAsRead,
     following,
     loadingFollowing,
-  };
+  }), [
+    user, loading, role, userCollection, loadingCollection, wishlist, loadingWishlist,
+    myExchangeItems, loadingMyExchangeItems, isAuthModalOpen, openAuthModal, closeAuthModal,
+    signUp, signIn, signInWithGoogle, logOut, addCardToCollection, updateCardInCollection,
+    removeCardFromCollection, addCardToWishlist, removeCardFromWishlist,
+    moveCardFromWishlistToCollection, addCardToExchange, removeCardFromExchange,
+    updateUserDisplayName, reauthenticate, updateUserEmail, updateUserPassword,
+    privacySetting, updateUserPrivacySetting, notifications, loadingNotifications,
+    markNotificationsAsRead, following, loadingFollowing
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
