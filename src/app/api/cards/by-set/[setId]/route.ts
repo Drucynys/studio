@@ -17,7 +17,7 @@ export async function GET(
 ) {
   const { setId } = params;
   const { searchParams } = new URL(request.url);
-  const limit = parseInt(searchParams.get('limit') || '50', 10);
+  const limit = parseInt(searchParams.get('limit') || '1000', 10); // Default to a high limit for set view
   const startAfterNumber = searchParams.get('startAfterNumber');
 
   if (!setId) {
@@ -27,39 +27,40 @@ export async function GET(
   try {
     const cardsRef = db.collection('pokemon-tcg-cards');
     
-    // This query now uses the numberAsInt field for correct numeric sorting.
-    // An index for this query will likely be required.
-    let query: admin.firestore.Query = cardsRef
+    // We remove the orderBy and limit from the Firestore query to avoid the index requirement.
+    // Sets usually have < 300 cards, so fetching all and sorting in memory is fast and safe.
+    const querySnapshot = await cardsRef
         .where('set.id', '==', setId)
-        .orderBy('numberAsInt', 'asc') // Sort by the new integer field
-        .limit(limit);
-
-    if (startAfterNumber) {
-        // For pagination, we still use the string 'number' to find the document,
-        // but the query is already ordered correctly.
-        // This part needs careful implementation if startAfter is used.
-        // For now, focusing on the sort order.
-    }
-
-    const querySnapshot = await query.get();
+        .get();
 
     if (querySnapshot.empty) {
         return NextResponse.json([]);
     }
 
-    const cards = querySnapshot.docs.map(doc => doc.data());
-    return NextResponse.json(cards);
+    let cards = querySnapshot.docs.map(doc => doc.data());
+
+    // Sort in memory by numberAsInt
+    cards.sort((a, b) => {
+        const numA = a.numberAsInt ?? 999;
+        const numB = b.numberAsInt ?? 999;
+        if (numA !== numB) return numA - numB;
+        return (a.number || "").localeCompare(b.number || "");
+    });
+
+    // Apply pagination in memory if startAfterNumber is provided
+    if (startAfterNumber) {
+        const startIndex = cards.findIndex(c => c.number === startAfterNumber);
+        if (startIndex !== -1) {
+            cards = cards.slice(startIndex + 1);
+        }
+    }
+
+    // Apply limit
+    const paginatedCards = cards.slice(0, limit);
+
+    return NextResponse.json(paginatedCards);
   } catch (error: any) {
     console.error(`Error fetching cards for set ${setId}:`, error);
-    if (error.message && error.message.includes('requires an index')) {
-      return NextResponse.json(
-        {
-          message: `A database index is required to query by set ID and sort by number. Please create a composite index in Firestore for the 'pokemon-tcg-cards' collection on 'set.id' (ascending) and 'numberAsInt' (ascending).`,
-          details: error.message
-        },
-        { status: 500 }
-      );
-    }
     return NextResponse.json({ message: error.message || 'An unknown server error occurred.' }, { status: 500 });
   }
 }

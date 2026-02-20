@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 
@@ -16,7 +17,7 @@ export async function GET(
 ) {
     const { cardApiId } = context.params;
     const { searchParams } = new URL(request.url);
-    const range = searchParams.get('range') || '30d'; // Default to 30 days
+    const range = searchParams.get('range') || '30d';
 
     if (!cardApiId) {
         return NextResponse.json({ message: 'Card API ID is required' }, { status: 400 });
@@ -36,24 +37,34 @@ export async function GET(
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
 
-        // Firestore query to get all records for the card within the date range
+        // We only use the cardApiId filter in Firestore.
+        // We handle the date filtering and sorting in memory to bypass index requirements.
         const querySnapshot = await historyRef
             .where('cardApiId', '==', cardApiId)
-            .where('date', '>=', startDate)
-            .orderBy('date', 'asc') // Order by date ascending
             .get();
 
         if (querySnapshot.empty) {
             return NextResponse.json([]);
         }
 
-        const history = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                ...data,
-                date: data.date.toDate().toISOString().split('T')[0], // Format date for client
-            };
-        });
+        const history = querySnapshot.docs
+            .map(doc => {
+                const data = doc.data();
+                return {
+                    ...data,
+                    jsDate: data.date.toDate(),
+                    formattedDate: data.date.toDate().toISOString().split('T')[0],
+                };
+            })
+            // Filter by date range in memory
+            .filter(item => item.jsDate >= startDate)
+            // Sort by date ascending in memory
+            .sort((a, b) => a.jsDate.getTime() - b.jsDate.getTime())
+            .map(item => ({
+                ...item,
+                date: item.formattedDate,
+                jsDate: undefined // cleanup
+            }));
 
         return NextResponse.json(history);
     } catch (error: any) {
