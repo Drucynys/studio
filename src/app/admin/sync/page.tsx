@@ -28,8 +28,20 @@ interface ApiSet {
   total: number;
 }
 
-// Helper function to add a delay
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function safeFetch(url: string, options?: RequestInit) {
+    try {
+        const response = await fetch(url, options);
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return await response.json();
+        }
+        throw new Error(`Server returned non-JSON response (${response.status}). The platform may be experiencing issues.`);
+    } catch (err: any) {
+        return { status: 'error', message: err.message };
+    }
+}
 
 export default function SyncAdminPage() {
   const [setsSyncStatus, setSetsSyncStatus] = useState<SyncStatus>('idle');
@@ -72,47 +84,30 @@ export default function SyncAdminPage() {
   const [showCardSyncConfirm, setShowCardSyncConfirm] = useState(false);
   const [isCheckingCardDiff, setIsCheckingCardDiff] = useState(false);
 
-  // States for the Master Sync flow
   const [masterSyncStatus, setMasterSyncStatus] = useState<SyncStatus>('idle');
   const [masterSyncLogs, setMasterSyncLogs] = useState<string[]>([]);
   const [masterSyncError, setMasterSyncError] = useState<string | null>(null);
   const [masterSyncProgress, setMasterSyncProgress] = useState(0);
   const [masterSyncCurrentStep, setMasterSyncCurrentStep] = useState("");
 
-
   const checkDbStatus = useCallback(async () => {
     setIsCheckingStatus(true);
     setStatusError(null);
     try {
-        const [setsResponse, cardsResponse, artistsResponse, pokedexResponse] = await Promise.all([
-            fetch('/api/sets-count'),
-            fetch('/api/cards-count'),
-            fetch('/api/artists-count'),
-            fetch('/api/pokedex-count'),
+        const [sets, cards, artists, pokedex] = await Promise.all([
+            safeFetch('/api/sets-count'),
+            safeFetch('/api/cards-count'),
+            safeFetch('/api/artists-count'),
+            safeFetch('/api/pokedex-count'),
         ]);
         
-        if (!setsResponse.ok) throw new Error(`Failed to fetch set count: ${setsResponse.statusText}`);
-        const setsData = await setsResponse.json();
-        setSetCount(setsData.count);
-
-        if (!cardsResponse.ok) throw new Error(`Failed to fetch card count: ${cardsResponse.statusText}`);
-        const cardsData = await cardsResponse.json();
-        setCardCount(cardsData.count);
-
-        if (!artistsResponse.ok) throw new Error(`Failed to fetch artist count: ${artistsResponse.statusText}`);
-        const artistsData = await artistsResponse.json();
-        setArtistCount(artistsData.count);
-        
-        if (!pokedexResponse.ok) throw new Error(`Failed to fetch pokedex count: ${pokedexResponse.statusText}`);
-        const pokedexData = await pokedexResponse.json();
-        setPokedexCount(pokedexData.count);
+        setSetCount(sets.count ?? null);
+        setCardCount(cards.count ?? null);
+        setArtistCount(artists.count ?? null);
+        setPokedexCount(pokedex.count ?? null);
 
     } catch (err: any) {
         setStatusError(err.message);
-        setSetCount(null);
-        setCardCount(null);
-        setArtistCount(null);
-        setPokedexCount(null);
     } finally {
         setIsCheckingStatus(false);
     }
@@ -127,403 +122,124 @@ export default function SyncAdminPage() {
     setMasterSyncLogs(['🚀 Starting full data resynchronization...']);
     setMasterSyncError(null);
     setMasterSyncProgress(0);
+    isSyncStopped.current = false;
 
     try {
-        // Step 1: Check card counts
-        setMasterSyncCurrentStep("Checking for updates...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 1/4] Checking for new cards..."]);
-        const localCountResponse = await fetch('/api/cards-count');
-        const remoteCountResponse = await fetch('/api/tcg-api-stats');
-
-        if (!localCountResponse.ok || !remoteCountResponse.ok) {
-            throw new Error('Failed to fetch card counts to check for updates.');
-        }
-
-        const localData = await localCountResponse.json();
-        const remoteData = await remoteCountResponse.json();
-        setMasterSyncLogs(prev => [...prev, `Local card count: ${localData.count}`]);
-        setMasterSyncLogs(prev => [...prev, `Remote API card count: ${remoteData.totalCount}`]);
-
-        if (localData.count >= remoteData.totalCount) {
-             setMasterSyncLogs(prev => [...prev, "\n✅ Database is already up to date. No sync needed."]);
-             setMasterSyncStatus('success');
-             setMasterSyncProgress(100);
-             await checkDbStatus();
-             return;
-        }
-        setMasterSyncProgress(10);
-
-        // Step 2: Sync Sets
+        // Step 1: Sync Sets
         setMasterSyncCurrentStep("Syncing sets...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 2/4] Syncing latest set list..."]);
-        const setsResponse = await fetch('/api/sync-sets', { method: 'POST' });
-        const setsResult = await setsResponse.json();
+        setMasterSyncLogs(prev => [...prev, "\n[Step 1/3] Syncing latest set list..."]);
+        const setsResult = await safeFetch('/api/sync-sets', { method: 'POST' });
         setMasterSyncLogs(prev => [...prev, ...(setsResult.logs || [])]);
-        if (!setsResponse.ok || setsResult.status !== 'success') {
-             throw new Error(setsResult.message || `Set sync failed.`);
-        }
-        setMasterSyncLogs(prev => [...prev, `✅ Set sync complete. Found ${setsResult.count} sets.`]);
+        if (setsResult.status === 'error') throw new Error(setsResult.message || "Set sync failed.");
+        
+        setMasterSyncProgress(10);
         await checkDbStatus();
-        setMasterSyncProgress(25);
 
-        // Step 3: Sync All Cards
+        // Step 2: Sync All Cards
         setMasterSyncCurrentStep("Syncing all cards...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 3/4] Starting full card database sync..."]);
-        const setsToSyncResponse = await fetch('/api/sets');
-        if (!setsToSyncResponse.ok) throw new Error(`Failed to fetch set list for card sync: ${setsToSyncResponse.statusText}`);
-        const setsToSync: ApiSet[] = await setsToSyncResponse.json();
-        if (setsToSync.length === 0) {
-            throw new Error('No sets found in database to sync cards from.');
-        }
+        setMasterSyncLogs(prev => [...prev, "\n[Step 2/3] Starting full card database sync..."]);
+        const setsToSync = await safeFetch('/api/sets');
+        if (!Array.isArray(setsToSync)) throw new Error("Could not retrieve sets list.");
 
         let cumulativeCardCount = 0;
         for (let i = 0; i < setsToSync.length; i++) {
+            if (isSyncStopped.current) break;
             const currentSet = setsToSync[i];
-            const progressPercentage = 25 + ((i + 1) / setsToSync.length) * 50; // Card sync is 25% to 75%
-            setMasterSyncProgress(progressPercentage);
+            const progress = 10 + ((i + 1) / setsToSync.length) * 80;
+            setMasterSyncProgress(progress);
             setMasterSyncCurrentStep(`Syncing cards for set: ${currentSet.name}`);
-            setMasterSyncLogs(prev => [...prev, `\n[${i + 1}/${setsToSync.length}] Syncing set: ${currentSet.name} (${currentSet.id})`]);
             
-            await sleep(500); // Add a delay to avoid rate limiting
+            await sleep(1000); 
 
-            const syncResponse = await fetch('/api/sync-cards', {
+            const syncResult = await safeFetch('/api/sync-cards', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ setId: currentSet.id }),
             });
-            const syncResult = await syncResponse.json();
-            setMasterSyncLogs(prev => [...prev, ...(syncResult.logs || [])]);
-
-            // Resilient check: continue even if one set fails.
-            if (!syncResponse.ok || syncResult.status !== 'success') {
-                setMasterSyncLogs(prev => [...prev, `❌ Error syncing set ${currentSet.id}. Message: ${syncResult.message || 'Unknown error'}. Continuing to next set.`]);
-                continue; // Continue to the next set
+            
+            if (syncResult.status === 'error') {
+                setMasterSyncLogs(prev => [...prev, `⚠️ Error syncing set ${currentSet.id}: ${syncResult.message}. Skipping...`]);
+            } else {
+                cumulativeCardCount += syncResult.count || 0;
             }
-            cumulativeCardCount += syncResult.count || 0;
         }
-        setMasterSyncLogs(prev => [...prev, `\n✅ Card sync complete! Total cards processed in this run: ${cumulativeCardCount}.`]);
+        
+        setMasterSyncLogs(prev => [...prev, `\n✅ Card sync complete! Total cards: ${cumulativeCardCount}.`]);
         await checkDbStatus();
-        setMasterSyncProgress(75);
 
-        // Step 4: Sync Artists
+        // Step 3: Sync Artists
         setMasterSyncCurrentStep("Generating artist database...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 4/4] Generating artist database..."]);
-        const artistsResponse = await fetch('/api/artists', { method: 'POST' });
-        const artistsResult = await artistsResponse.json();
+        setMasterSyncLogs(prev => [...prev, "\n[Step 3/3] Generating artist database..."]);
+        const artistsResult = await safeFetch('/api/artists', { method: 'POST' });
         setMasterSyncLogs(prev => [...prev, ...(artistsResult.logs || [])]);
-        if (!artistsResponse.ok || artistsResult.status !== 'success') {
-             throw new Error(artistsResult.message || `Artist database generation failed.`);
-        }
-        setMasterSyncLogs(prev => [...prev, `✅ Artist sync complete. Found ${artistsResult.count} artists.`]);
-        await checkDbStatus();
+        
         setMasterSyncProgress(100);
-
-        // All done
         setMasterSyncCurrentStep("Completed!");
-        setMasterSyncLogs(prev => [...prev, "\n🎉🎉🎉 Full data resynchronization complete!"]);
         setMasterSyncStatus('success');
 
     } catch (err: any) {
         setMasterSyncStatus('error');
-        setMasterSyncError(err.message || "An unknown error occurred during the sync process.");
+        setMasterSyncError(err.message);
         setMasterSyncLogs(prev => [...prev, `❌ FATAL ERROR: ${err.message}`]);
     }
   };
 
-
   const handleSetsSync = async () => {
     setSetsSyncStatus('in-progress');
     setSetsLogs(['Starting set sync process...']);
-    setSetsError(null);
+    const result = await safeFetch('/api/sync-sets', { method: 'POST' });
+    setSetsLogs(result.logs || [result.message]);
+    setSetsSyncStatus(result.status === 'success' ? 'success' : 'error');
+    if (result.status === 'success') await checkDbStatus();
+  };
 
-    try {
-      const response = await fetch('/api/sync-sets', { method: 'POST' });
-      const result = await response.json();
-      
-      setSetsLogs(result.logs || []);
-
-      if (response.ok && result.status === 'success') {
-        setSetsSyncStatus('success');
-        setSetsLogs(prev => [...prev, `✅ Successfully synced ${result.count} sets.`]);
-        await checkDbStatus();
-      } else {
-        throw new Error(result.message || `Server responded with status ${response.status}`);
-      }
-    } catch (err: any) {
-      setSetsSyncStatus('error');
-      setSetsError(err.message || "An unknown client-side error occurred.");
-      setSetsLogs(prev => [...prev, `❌ Error: ${err.message}`]);
+  const handleCardSyncCheck = async () => {
+    setIsCheckingCardDiff(true);
+    const data = await safeFetch('/api/tcg-api-stats');
+    if (data.status === 'error') {
+        toast({ variant: 'destructive', title: 'Check Failed', description: data.message });
+    } else {
+        setRemoteApiCardCount(data.totalCount);
+        setShowCardSyncConfirm(true);
     }
+    setIsCheckingCardDiff(false);
+  };
+
+  const handleCardsSync = async () => {
+    setCardsSyncStatus('in-progress');
+    setCardsLogs(['Fetching list of all sets...']);
+    isSyncStopped.current = false;
+    
+    const sets = await safeFetch('/api/sets');
+    if (!Array.isArray(sets)) {
+        setCardsSyncStatus('error');
+        setCardsLogs(prev => [...prev, `❌ Error: ${sets.message}`]);
+        return;
+    }
+    
+    setAllSetsToSync(sets);
+    let cumulative = 0;
+    for (let i = 0; i < sets.length; i++) {
+        if (isSyncStopped.current) break;
+        setCurrentSetIndex(i);
+        await sleep(1000);
+        const result = await safeFetch('/api/sync-cards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ setId: sets[i].id }),
+        });
+        setCardsLogs(prev => [...prev, ...(result.logs || [result.message])]);
+        if (result.status === 'success') cumulative += result.count;
+        setTotalCardsSynced(cumulative);
+    }
+    setCardsSyncStatus('success');
+    await checkDbStatus();
   };
 
   const stopCardSync = () => {
     isSyncStopped.current = true;
     setCardsSyncStatus('stopped');
-    setPricesSyncStatus('stopped');
-    setCardsLogs(prev => [...prev, '🛑 Sync process stopped by user.']);
-    setPricesLogs(prev => [...prev, '🛑 Sync process stopped by user.']);
-  };
-  
-  const resetCardSync = (type: 'cards' | 'prices') => {
-    if (type === 'cards') {
-        setCardsSyncStatus('idle');
-        setCardsLogs([]);
-        setCardsError(null);
-    } else {
-        setPricesSyncStatus('idle');
-        setPricesLogs([]);
-        setPricesError(null);
-    }
-    setCurrentSetIndex(0);
-    setTotalCardsSynced(0);
-    setAllSetsToSync([]);
-    isSyncStopped.current = false;
-  };
-  
-  const handleCardSyncCheck = async () => {
-    setIsCheckingCardDiff(true);
-    setCardsError(null);
-    try {
-        await checkDbStatus(); // Ensure local count is up-to-date
-        const response = await fetch('/api/tcg-api-stats');
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to fetch API card count.');
-        }
-        const data = await response.json();
-        setRemoteApiCardCount(data.totalCount);
-        setShowCardSyncConfirm(true);
-    } catch (err: any) {
-        setCardsError(err.message);
-        setCardsSyncStatus('error');
-        setCardsLogs(prev => [...prev, `❌ Error during pre-sync check: ${err.message}`]);
-    } finally {
-        setIsCheckingCardDiff(false);
-    }
-  };
-
-  const handleCardsSync = async () => {
-    resetCardSync('cards');
-    setCardsSyncStatus('in-progress');
-    
-    setCardsLogs(prev => [...prev, 'Fetching list of all sets to sync...']);
-    try {
-      const setsResponse = await fetch('/api/sets');
-      if (!setsResponse.ok) throw new Error(`Failed to fetch set list: ${setsResponse.statusText}`);
-      const sets: ApiSet[] = await setsResponse.json();
-      if (sets.length === 0) {
-        setCardsLogs(prev => [...prev, '⚠️ No sets found in database. Please sync sets first.']);
-        setCardsSyncStatus('error');
-        setCardsError('No sets found in database. Please sync sets first.');
-        return;
-      }
-      setAllSetsToSync(sets);
-      setCardsLogs(prev => [...prev, `Found ${sets.length} sets. Starting incremental sync...`]);
-
-      let cumulativeCardCount = 0;
-      let hasEncounteredError = false;
-
-      for (let i = 0; i < sets.length; i++) {
-        if (isSyncStopped.current) break;
-
-        setCurrentSetIndex(i);
-        const currentSet = sets[i];
-        setCardsLogs(prev => [...prev, `\n[${i + 1}/${sets.length}] Syncing set: ${currentSet.name} (${currentSet.id})`]);
-        
-        await sleep(500); // Add a delay to avoid rate limiting
-
-        const syncResponse = await fetch('/api/sync-cards', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ setId: currentSet.id }),
-        });
-        
-        const syncResult = await syncResponse.json();
-        setCardsLogs(prev => [...prev, ...(syncResult.logs || [])]);
-
-        // Resilient check: continue even if one set fails.
-        if (!syncResponse.ok || syncResult.status !== 'success') {
-            setCardsLogs(prev => [...prev, `❌ Error syncing set ${currentSet.id}. Message: ${syncResult.message || 'Unknown error'}. Continuing...`]);
-            hasEncounteredError = true;
-            continue; // Continue to the next set
-        }
-        
-        cumulativeCardCount += syncResult.count || 0;
-        setTotalCardsSynced(cumulativeCardCount);
-      }
-      
-      if (!isSyncStopped.current) {
-        setCardsSyncStatus(hasEncounteredError ? 'error' : 'success');
-        setCardsLogs(prev => [...prev, `\n✅✅✅ Full sync finished! Total cards synced: ${cumulativeCardCount}. Some sets may have been skipped due to errors.`]);
-        await checkDbStatus();
-      }
-
-    } catch (err: any) {
-        setCardsSyncStatus('error');
-        setCardsError(err.message || "An unknown client-side error occurred during card sync.");
-        setCardsLogs(prev => [...prev, `❌ FATAL ERROR: ${err.message}`]);
-    }
-  };
-  
-  const handlePricesSync = async () => {
-    resetCardSync('prices');
-    setPricesSyncStatus('in-progress');
-    
-    setPricesLogs(prev => [...prev, 'Fetching list of all sets to sync for price updates...']);
-    try {
-      const setsResponse = await fetch('/api/sets');
-      if (!setsResponse.ok) throw new Error(`Failed to fetch set list: ${setsResponse.statusText}`);
-      const sets: ApiSet[] = await setsResponse.json();
-      if (sets.length === 0) {
-        setPricesLogs(prev => [...prev, '⚠️ No sets found in database. Please sync sets first.']);
-        setPricesSyncStatus('error');
-        setPricesError('No sets found in database. Please sync sets first.');
-        return;
-      }
-      setAllSetsToSync(sets);
-      setPricesLogs(prev => [...prev, `Found ${sets.length} sets. Starting incremental price update...`]);
-
-      let cumulativeCardCount = 0;
-      for (let i = 0; i < sets.length; i++) {
-        if (isSyncStopped.current) break;
-
-        setCurrentSetIndex(i);
-        const currentSet = sets[i];
-        setPricesLogs(prev => [...prev, `\n[${i + 1}/${sets.length}] Updating prices for set: ${currentSet.name} (${currentSet.id})`]);
-        
-        await sleep(500); // Add a delay to avoid rate limiting
-
-        const syncResponse = await fetch('/api/sync-prices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ setId: currentSet.id }),
-        });
-        
-        const syncResult = await syncResponse.json();
-        setPricesLogs(prev => [...prev, ...(syncResult.logs || [])]);
-
-        if (!syncResponse.ok || syncResult.status !== 'success') {
-          throw new Error(syncResult.message || `Failed to update prices for set ${currentSet.id}`);
-        }
-        
-        cumulativeCardCount += syncResult.count || 0;
-        setTotalCardsSynced(cumulativeCardCount);
-      }
-      
-      if (!isSyncStopped.current) {
-        setPricesSyncStatus('success');
-        setPricesLogs(prev => [...prev, `\n✅✅✅ Price update complete! Total cards updated: ${cumulativeCardCount}.`]);
-        await checkDbStatus();
-      }
-
-    } catch (err: any) {
-        setPricesSyncStatus('error');
-        setPricesError(err.message || "An unknown client-side error occurred during price sync.");
-        setPricesLogs(prev => [...prev, `❌ Error: ${err.message}`]);
-    }
-  };
-
-  const handleArtistsSync = async () => {
-    setArtistsSyncStatus('in-progress');
-    setArtistsLogs(['Starting artist database generation...']);
-    setArtistsError(null);
-    try {
-      const response = await fetch('/api/artists', { method: 'POST' });
-      const result = await response.json();
-
-      setArtistsLogs(result.logs || ['No logs returned from server.']);
-
-      if (response.ok && result.status === 'success') {
-        setArtistsSyncStatus('success');
-        setArtistsLogs(prev => [...prev, `✅ Successfully generated and stored ${result.count} artists.`]);
-        await checkDbStatus();
-      } else {
-        throw new Error(result.message || `Server responded with status ${response.status}`);
-      }
-    } catch (err: any) {
-      setArtistsSyncStatus('error');
-      setArtistsError(err.message || 'An unknown client-side error occurred.');
-      setArtistsLogs(prev => [...prev, `❌ Error: ${err.message}`]);
-    }
-  };
-
-  const handlePokedexSync = async () => {
-    setPokedexSyncStatus('in-progress');
-    setPokedexLogs(['Starting Pokédex sync from PokeAPI...']);
-    setPokedexError(null);
-    try {
-      const response = await fetch('/api/sync-pokedex', { method: 'POST' });
-      const result = await response.json();
-
-      setPokedexLogs(result.logs || ['No logs returned from server.']);
-
-      if (response.ok && result.status === 'success') {
-        setPokedexSyncStatus('success');
-        setPokedexLogs(prev => [...prev, `✅ Successfully synced ${result.count} Pokémon.`]);
-        await checkDbStatus();
-      } else {
-        throw new Error(result.message || `Server responded with status ${response.status}`);
-      }
-    } catch (err: any) {
-      setPokedexSyncStatus('error');
-      setPokedexError(err.message || 'An unknown client-side error occurred.');
-      setPokedexLogs(prev => [...prev, `❌ Error: ${err.message}`]);
-    }
-  };
-  
-  const overallProgress = allSetsToSync.length > 0 ? ((currentSetIndex + 1) / allSetsToSync.length) * 100 : 0;
-
-  const handleExport = async (type: 'sets' | 'cards') => {
-    const isSets = type === 'sets';
-    if (isSets) setIsExportingSets(true);
-    else setIsExportingCards(true);
-
-    toast({
-      title: `Preparing ${isSets ? 'Sets' : 'Cards'} Export...`,
-      description: `Fetching all ${type} data from the API. This may take a moment.`,
-    });
-
-    try {
-      const response = await fetch(isSets ? '/api/export-sets' : '/api/export-cards');
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Server responded with ${response.status}` }));
-        throw new Error(errorData.message || 'An unknown error occurred during export.');
-      }
-      
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = isSets ? "pokemon_tcg_sets.zip" : "pokemon_tcg_cards.zip";
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
-        if (filenameMatch?.[1]) filename = filenameMatch[1];
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Export Successful!",
-        description: `${filename} has been downloaded.`,
-        className: "bg-green-50 text-green-900 border-green-200",
-      });
-
-    } catch (err: any) {
-      toast({
-        variant: "destructive",
-        title: "Export Failed",
-        description: err.message || "An unknown client-side error occurred during export.",
-      });
-    } finally {
-      if (isSets) setIsExportingSets(false);
-      else setIsExportingCards(false);
-    }
+    setMasterSyncStatus('stopped');
   };
 
   return (
@@ -538,7 +254,7 @@ export default function SyncAdminPage() {
                     Full Data Resynchronization
                 </CardTitle>
                 <CardDescription>
-                    This will run the full data sync process in the correct order: check for updates, sync sets, sync all cards, then regenerate the artist database.
+                    This will run the full data sync process in order: sets, cards, then artists. Resilient to API errors.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -555,20 +271,11 @@ export default function SyncAdminPage() {
 
                 {masterSyncStatus !== 'idle' && (
                     <div className="space-y-4">
-                        {masterSyncStatus === 'in-progress' && (
-                            <Progress value={masterSyncProgress} className="w-full" />
-                        )}
+                        {masterSyncStatus === 'in-progress' && <Progress value={masterSyncProgress} className="w-full" />}
                         {masterSyncStatus === 'success' && (
-                            <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
+                            <Alert className="border-green-200 bg-green-50 text-green-900">
                               <CheckCircle className="h-4 w-4 text-green-600" />
                               <AlertTitle>Full Resync Successful!</AlertTitle>
-                            </Alert>
-                          )}
-                          {masterSyncStatus === 'error' && masterSyncError && (
-                            <Alert variant="destructive">
-                              <ServerCrash className="h-4 w-4" />
-                              <AlertTitle>Full Resync Failed</AlertTitle>
-                              <AlertDescription>{masterSyncError}</AlertDescription>
                             </Alert>
                           )}
                           <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Master Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
@@ -578,53 +285,27 @@ export default function SyncAdminPage() {
                 )}
             </CardContent>
           </Card>
+
            <Card className="shadow-lg">
               <CardHeader>
                   <CardTitle className="font-headline text-2xl flex items-center gap-2">
                       <Database className="h-6 w-6 text-primary" />
                       Database Status
                   </CardTitle>
-                  <CardDescription>
-                      A real-time check of the number of items currently stored in your Firestore database.
-                  </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                   {isCheckingStatus ? (
-                      <div className="flex items-center justify-center py-4 text-muted-foreground">
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Checking database status...
-                      </div>
-                  ) : statusError ? (
-                      <Alert variant="destructive">
-                          <ServerCrash className="h-4 w-4" />
-                          <AlertTitle>Could Not Check Status</AlertTitle>
-                          <AlertDescription>{statusError}</AlertDescription>
-                      </Alert>
+                      <div className="flex items-center justify-center py-4"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Checking...</div>
                   ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border text-center">
-                          <div>
-                              <p className="text-sm text-muted-foreground">Sets</p>
-                              <p className="text-5xl font-bold text-primary">{setCount}</p>
-                          </div>
-                          <div>
-                              <p className="text-sm text-muted-foreground">Cards</p>
-                              <p className="text-5xl font-bold text-primary">{cardCount}</p>
-                          </div>
-                           <div>
-                              <p className="text-sm text-muted-foreground">Artists</p>
-                              <p className="text-5xl font-bold text-primary">{artistCount}</p>
-                          </div>
-                          <div>
-                              <p className="text-sm text-muted-foreground">Pokédex</p>
-                              <p className="text-5xl font-bold text-primary">{pokedexCount}</p>
-                          </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 divide-x text-center">
+                          <div><p className="text-sm text-muted-foreground">Sets</p><p className="text-3xl font-bold">{setCount ?? '-'}</p></div>
+                          <div><p className="text-sm text-muted-foreground">Cards</p><p className="text-3xl font-bold">{cardCount ?? '-'}</p></div>
+                          <div><p className="text-sm text-muted-foreground">Artists</p><p className="text-3xl font-bold">{artistCount ?? '-'}</p></div>
+                          <div><p className="text-sm text-muted-foreground">Pokédex</p><p className="text-3xl font-bold">{pokedexCount ?? '-'}</p></div>
                       </div>
                   )}
                   <div className="text-center">
-                      <Button onClick={checkDbStatus} disabled={isCheckingStatus} variant="outline" size="sm">
-                          <RefreshCcw className="mr-2 h-3 w-3" />
-                          Refresh Status
-                      </Button>
+                      <Button onClick={checkDbStatus} variant="outline" size="sm"><RefreshCcw className="mr-2 h-3 w-3" />Refresh Status</Button>
                   </div>
               </CardContent>
           </Card>
@@ -633,40 +314,17 @@ export default function SyncAdminPage() {
             <CardHeader>
               <CardTitle className="font-headline text-2xl flex items-center gap-2">
                 <RefreshCw className="h-6 w-6 text-primary" />
-                Pokémon Sets Database Sync
+                Individual Sets Sync
               </CardTitle>
-              <CardDescription>
-                Fetch the latest set list from the Pokémon TCG API and store it in Firestore.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="text-center">
                 <Button onClick={handleSetsSync} disabled={setsSyncStatus === 'in-progress'} size="lg">
-                  {setsSyncStatus === 'in-progress' ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing Sets...</>
-                  ) : 'Start Set Sync'}
+                  {setsSyncStatus === 'in-progress' ? <Loader2 className="animate-spin" /> : 'Start Set Sync'}
                 </Button>
               </div>
-
-              {setsSyncStatus !== 'idle' && (
-                <div className="space-y-4">
-                  {setsSyncStatus === 'success' && (
-                    <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <AlertTitle>Set Sync Successful!</AlertTitle>
-                    </Alert>
-                  )}
-                  {setsSyncStatus === 'error' && setsError && (
-                    <Alert variant="destructive">
-                      <ServerCrash className="h-4 w-4" />
-                      <AlertTitle>Set Sync Failed</AlertTitle>
-                      <AlertDescription>{setsError}</AlertDescription>
-                    </Alert>
-                  )}
-                  <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Set Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
-                      <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{setsLogs.join('\n')}</pre></ScrollArea>
-                  </CardContent></Card>
-                </div>
+              {setsLogs.length > 0 && (
+                <ScrollArea className="h-32 rounded-md border p-2 bg-background font-mono text-xs">{setsLogs.join('\n')}</ScrollArea>
               )}
             </CardContent>
           </Card>
@@ -677,293 +335,35 @@ export default function SyncAdminPage() {
                 <Library className="h-6 w-6 text-primary" />
                 Full Card Database Sync
               </CardTitle>
-              <CardDescription>
-                Fetch **all** cards from the API and store them in Firestore, one set at a time. This now checks for updates before starting.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-               <Alert>
-                  <AlertTitle>Incremental Sync Process</AlertTitle>
-                  <AlertDescription>
-                    This tool syncs cards one set at a time to prevent server timeouts. The process may still take several minutes. You can stop the process at any time.
-                  </AlertDescription>
-                </Alert>
               <div className="flex gap-4 justify-center">
                  {cardsSyncStatus !== 'in-progress' ? (
                     <Button onClick={handleCardSyncCheck} disabled={isCheckingCardDiff} size="lg">
-                        {isCheckingCardDiff ? (
-                           <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Checking for Updates...</>
-                        ) : (
-                           <><Play className="mr-2 h-4 w-4"/> Start Full Card Sync</>
-                        )}
+                        {isCheckingCardDiff ? <Loader2 className="animate-spin"/> : 'Start Full Card Sync'}
                     </Button>
                  ) : (
-                    <Button onClick={stopCardSync} variant="destructive" size="lg">
-                        <Square className="mr-2 h-4 w-4"/> Stop Sync
-                    </Button>
-                 )}
-                 {(cardsSyncStatus === 'stopped' || cardsSyncStatus === 'error' || cardsSyncStatus === 'success') && (
-                    <Button onClick={() => resetCardSync('cards')} variant="outline" size="lg">
-                        <ListRestart className="mr-2 h-4 w-4"/> Reset
-                    </Button>
+                    <Button onClick={stopCardSync} variant="destructive" size="lg">Stop Sync</Button>
                  )}
               </div>
-
-              {cardsSyncStatus !== 'idle' && (
-                <div className="space-y-4">
-                  {cardsSyncStatus === 'in-progress' && (
-                    <div>
-                      <Progress value={overallProgress} className="w-full" />
-                      <p className="text-center text-sm text-muted-foreground mt-2">
-                        Overall Progress: Synced {currentSetIndex} of {allSetsToSync.length} sets ({overallProgress.toFixed(1)}%)
-                        <br/>
-                        Total Cards Added in this Session: {totalCardsSynced}
-                      </p>
-                    </div>
-                  )}
-                  {cardsSyncStatus === 'success' && (
-                    <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <AlertTitle>Card Sync Successful!</AlertTitle>
-                    </Alert>
-                  )}
-                  {cardsSyncStatus === 'error' && (
-                    <Alert variant="destructive">
-                      <ServerCrash className="h-4 w-4" />
-                      <AlertTitle>Card Sync Finished with Errors</AlertTitle>
-                      <AlertDescription>Some sets failed to sync. Check the logs for details.</AlertDescription>
-                    </Alert>
-                  )}
-                  {cardsSyncStatus === 'stopped' && (
-                    <Alert variant="default" className="border-yellow-300 bg-yellow-50 text-yellow-900">
-                        <CheckCircle className="h-4 w-4 text-yellow-600" />
-                        <AlertTitle>Sync Stopped</AlertTitle>
-                        <AlertDescription>The sync process was stopped. Click Reset to clear logs and start again.</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Card Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
-                      <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{cardsLogs.join('\n')}</pre></ScrollArea>
-                  </CardContent></Card>
-                </div>
+              {cardsLogs.length > 0 && (
+                <ScrollArea className="h-48 rounded-md border p-2 bg-background font-mono text-xs">{cardsLogs.join('\n')}</ScrollArea>
               )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                <DollarSign className="h-6 w-6 text-primary" />
-                Update Card Prices
-              </CardTitle>
-              <CardDescription>
-                Efficiently update TCGPlayer prices for all cards in your database without re-syncing all data.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <Alert>
-                <AlertTitle>Targeted & Efficient</AlertTitle>
-                <AlertDescription>
-                  This process fetches the latest prices and updates only the price fields on your existing card documents, making it much faster than a full sync.
-                </AlertDescription>
-              </Alert>
-              <div className="flex gap-4 justify-center">
-                 {pricesSyncStatus !== 'in-progress' ? (
-                    <Button onClick={handlePricesSync} size="lg">
-                      <Play className="mr-2 h-4 w-4"/> Start Price Update
-                    </Button>
-                 ) : (
-                    <Button onClick={stopCardSync} variant="destructive" size="lg">
-                        <Square className="mr-2 h-4 w-4"/> Stop Update
-                    </Button>
-                 )}
-                 {pricesSyncStatus === 'stopped' && (
-                    <Button onClick={() => resetCardSync('prices')} variant="outline" size="lg">
-                        <ListRestart className="mr-2 h-4 w-4"/> Reset
-                    </Button>
-                 )}
-              </div>
-
-              {pricesSyncStatus !== 'idle' && (
-                <div className="space-y-4">
-                  {pricesSyncStatus === 'in-progress' && (
-                    <div>
-                      <Progress value={overallProgress} className="w-full" />
-                      <p className="text-center text-sm text-muted-foreground mt-2">
-                        Overall Progress: Updated prices for {currentSetIndex} of {allSetsToSync.length} sets ({overallProgress.toFixed(1)}%)
-                        <br/>
-                        Total Cards Updated in this Session: {totalCardsSynced}
-                      </p>
-                    </div>
-                  )}
-                  {pricesSyncStatus === 'success' && (
-                    <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <AlertTitle>Price Update Successful!</AlertTitle>
-                    </Alert>
-                  )}
-                  {pricesSyncStatus === 'error' && pricesError && (
-                    <Alert variant="destructive">
-                      <ServerCrash className="h-4 w-4" />
-                      <AlertTitle>Price Update Failed</AlertTitle>
-                      <AlertDescription>{pricesError}</AlertDescription>
-                    </Alert>
-                  )}
-                  {pricesSyncStatus === 'stopped' && (
-                    <Alert variant="default" className="border-yellow-300 bg-yellow-50 text-yellow-900">
-                        <CheckCircle className="h-4 w-4 text-yellow-600" />
-                        <AlertTitle>Update Stopped</AlertTitle>
-                        <AlertDescription>The price update was stopped. Click Reset to clear logs and start again.</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Price Update Logs</CardTitle></CardHeader><CardContent className="p-2">
-                      <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{pricesLogs.join('\n')}</pre></ScrollArea>
-                  </CardContent></Card>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                <Users className="h-6 w-6 text-primary" />
-                Artist Database Sync
-              </CardTitle>
-              <CardDescription>
-                Scan all cards in the database to generate a list of artists and their card counts. This populates the `pokemon-tcg-artists` collection for the browse page.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center">
-                <Button onClick={handleArtistsSync} disabled={artistsSyncStatus === 'in-progress'} size="lg">
-                  {artistsSyncStatus === 'in-progress' ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating & Storing Artists...</>
-                  ) : 'Generate Artist Database'}
-                </Button>
-              </div>
-
-              {artistsSyncStatus !== 'idle' && (
-                <div className="space-y-4">
-                  {artistsSyncStatus === 'success' && (
-                    <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <AlertTitle>Artist Sync Successful!</AlertTitle>
-                    </Alert>
-                  )}
-                  {artistsSyncStatus === 'error' && artistsError && (
-                    <Alert variant="destructive">
-                      <ServerCrash className="h-4 w-4" />
-                      <AlertTitle>Artist Sync Failed</AlertTitle>
-                      <AlertDescription>{artistsError}</AlertDescription>
-                    </Alert>
-                  )}
-                  <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Artist Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
-                      <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{artistsLogs.join('\n')}</pre></ScrollArea>
-                  </CardContent></Card>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-           <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                <NotebookText className="h-6 w-6 text-primary" />
-                Pokédex Data Sync
-              </CardTitle>
-              <CardDescription>
-                Fetch data for all Pokémon from all generations from PokeAPI and store it in the `pokedex` collection.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center">
-                <Button onClick={handlePokedexSync} disabled={pokedexSyncStatus === 'in-progress'} size="lg">
-                  {pokedexSyncStatus === 'in-progress' ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing Pokédex...</>
-                  ) : 'Sync Pokédex Data'}
-                </Button>
-              </div>
-
-              {pokedexSyncStatus !== 'idle' && (
-                <div className="space-y-4">
-                  {pokedexSyncStatus === 'success' && (
-                    <Alert variant="default" className="border-green-200 bg-green-50 text-green-900">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <AlertTitle>Pokédex Sync Successful!</AlertTitle>
-                    </Alert>
-                  )}
-                  {pokedexSyncStatus === 'error' && pokedexError && (
-                    <Alert variant="destructive">
-                      <ServerCrash className="h-4 w-4" />
-                      <AlertTitle>Pokédex Sync Failed</AlertTitle>
-                      <AlertDescription>{pokedexError}</AlertDescription>
-                    </Alert>
-                  )}
-                  <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Pokédex Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
-                      <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{pokedexLogs.join('\n')}</pre></ScrollArea>
-                  </CardContent></Card>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-lg">
-            <CardHeader>
-                <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                  <Download className="h-6 w-6 text-primary" />
-                  Export Data as ZIP
-                </CardTitle>
-                <CardDescription>
-                  Download a local copy of all sets or all cards directly from the API.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="text-center space-y-3">
-                  <Button onClick={() => handleExport('sets')} disabled={isExportingSets} size="lg" className="w-full">
-                    {isExportingSets ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Exporting Sets...</> : 'Download Sets Data'}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">A zip file containing JSON data for all sets.</p>
-              </div>
-              <div className="text-center space-y-3">
-                  <Button onClick={() => handleExport('cards')} disabled={isExportingCards} size="lg" className="w-full">
-                    {isExportingCards ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Exporting Cards...</> : 'Download All Cards'}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">A zip file containing JSON data for all ~16,000+ cards.</p>
-              </div>
             </CardContent>
           </Card>
         </div>
+
         <AlertDialog open={showCardSyncConfirm} onOpenChange={setShowCardSyncConfirm}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Full Card Sync</AlertDialogTitle>
+              <AlertDialogTitle>Confirm Sync</AlertDialogTitle>
               <AlertDialogDescription>
-                An update check has been performed. Please review the counts before starting the sync.
-                <div className="grid grid-cols-2 gap-4 mt-4 text-foreground">
-                    <div className="p-3 bg-muted rounded-md text-center">
-                        <p className="text-sm text-muted-foreground">Cards in Your Database</p>
-                        <p className="text-2xl font-bold">{cardCount ?? 'N/A'}</p>
-                    </div>
-                    <div className="p-3 bg-muted rounded-md text-center">
-                        <p className="text-sm text-muted-foreground">Total Cards in API</p>
-                        <p className="text-2xl font-bold">{remoteApiCardCount ?? 'N/A'}</p>
-                    </div>
-                </div>
-                <p className="mt-4 text-sm">
-                    Proceeding will fetch all cards from the Pokémon TCG API and store them in your database. This process can take several minutes.
-                </p>
+                API has {remoteApiCardCount} cards. Local has {cardCount}. Proceed?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => {
-                  setShowCardSyncConfirm(false);
-                  handleCardsSync();
-              }}>
-                Proceed with Sync
-              </AlertDialogAction>
+              <AlertDialogAction onClick={handleCardsSync}>Proceed</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -971,4 +371,3 @@ export default function SyncAdminPage() {
     </div>
   );
 }
-

@@ -16,123 +16,69 @@ export async function POST() {
   const logs: string[] = ["- Starting Sync Process Checklist -"];
 
   try {
-    // Check 1: Project ID Environment Variable
     const projectId = process.env.FIREBASE_PROJECT_ID;
     if (!projectId) {
       logs.push("❌ FATAL: FIREBASE_PROJECT_ID environment variable is MISSING.");
-      throw new Error("Missing FIREBASE_PROJECT_ID.");
+      return NextResponse.json({ status: 'error', message: "Missing FIREBASE_PROJECT_ID.", logs });
     }
 
-    // Check 2: TCG API Key Environment Variable
     const apiKey = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
     if (!apiKey) {
       logs.push("❌ FATAL: NEXT_PUBLIC_POKEMONTCG_API_KEY environment variable is MISSING.");
-      throw new Error("Missing NEXT_PUBLIC_POKEMONTCG_API_KEY.");
+      return NextResponse.json({ status: 'error', message: "Missing NEXT_PUBLIC_POKEMONTCG_API_KEY.", logs });
     }
     
-    // Check 3: Firebase Admin initialized (handled by centralized module)
-    logs.push("✅ Firebase Admin SDK initialized via centralized module.");
-    
-    // Step 3: Fetch data from Pokémon TCG API with timeout and error handling
+    logs.push("✅ Firebase Admin SDK initialized.");
     logs.push("Fetching latest sets from Pokémon TCG API...");
     
     let response;
     try {
       response = await axios.get('https://api.pokemontcg.io/v2/sets', {
         headers: { 'X-Api-Key': apiKey },
-        timeout: 30000, // 30 second timeout
-        maxRedirects: 3,
-        validateStatus: (status) => status >= 200 && status < 300
+        timeout: 30000,
       });
     } catch (apiError: any) {
-      let errorMessage = 'Failed to fetch sets from Pokemon TCG API';
-      if (axios.isAxiosError(apiError)) {
-        if (apiError.code === 'ECONNABORTED') {
-          errorMessage = 'Request timeout - Pokemon TCG API took too long to respond';
-        } else if (apiError.response) {
-          errorMessage = `Pokemon TCG API Error: ${apiError.response.status} ${apiError.response.statusText}`;
-        } else {
-          errorMessage = `Network error: ${apiError.message}`;
-        }
-      }
+      let errorMessage = apiError.message || 'Failed to fetch sets from Pokemon TCG API';
       logs.push(`❌ ${errorMessage}`);
-      throw new Error(errorMessage);
+      return NextResponse.json({ status: 'error', message: errorMessage, logs });
     }
     
     const sets = response.data?.data;
     if (!sets || !Array.isArray(sets) || sets.length === 0) {
-      logs.push("⚠️ No sets found from API. This might indicate an API issue.");
+      logs.push("⚠️ No sets found from API.");
       return NextResponse.json({ status: 'noop', count: 0, message: 'No sets found from API.', logs });
     }
     
-    // Validate set data structure
     const validSets = sets.filter(set => set && set.id && typeof set.id === 'string');
-    if (validSets.length !== sets.length) {
-      logs.push(`⚠️ Filtered out ${sets.length - validSets.length} invalid sets`);
-    }
+    logs.push(`✅ Found ${validSets.length} valid sets. Writing to database...`);
     
-    logs.push(`✅ Found ${validSets.length} valid sets. Preparing to write to database...`);
-    
-    // Step 4: Write to Firestore with proper error handling
     const setsCollection = db.collection('pokemon-tcg-sets');
     let setsWritten = 0;
-    const FIRESTORE_BATCH_LIMIT = 500; // Firestore batch write limit
+    const BATCH_LIMIT = 400;
 
-    // Process sets in batches to avoid Firestore limits
-    for (let i = 0; i < validSets.length; i += FIRESTORE_BATCH_LIMIT) {
+    for (let i = 0; i < validSets.length; i += BATCH_LIMIT) {
       const batch = db.batch();
-      const chunk = validSets.slice(i, i + FIRESTORE_BATCH_LIMIT);
-      let batchCount = 0;
-
+      const chunk = validSets.slice(i, i + BATCH_LIMIT);
+      
       chunk.forEach((set: any) => {
-        try {
-          const docRef = setsCollection.doc(set.id);
-          // Save the entire, unmodified set object from the API.
-          // This is more robust and ensures all data is preserved.
-          batch.set(docRef, {
-            ...set,
-            lastSynced: admin.firestore.FieldValue.serverTimestamp()
-          });
-          batchCount++;
-        } catch (setError) {
-          logs.push(`⚠️ Error preparing set ${set.id}: ${setError}`);
-        }
+        const docRef = setsCollection.doc(set.id);
+        batch.set(docRef, {
+          ...set,
+          lastSynced: admin.firestore.FieldValue.serverTimestamp()
+        });
       });
 
-      if (batchCount > 0) {
-        try {
-          await batch.commit();
-          setsWritten += batchCount;
-          logs.push(`✅ Batch ${Math.floor(i / FIRESTORE_BATCH_LIMIT) + 1}: Wrote ${batchCount} sets`);
-          
-          // Small delay between batches to avoid rate limiting
-          if (i + FIRESTORE_BATCH_LIMIT < validSets.length) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        } catch (batchError: any) {
-          logs.push(`❌ Batch ${Math.floor(i / FIRESTORE_BATCH_LIMIT) + 1} failed: ${batchError.message}`);
-          // Continue with next batch instead of failing completely
-        }
-      }
+      await batch.commit();
+      setsWritten += chunk.length;
+      logs.push(`✅ Batch ${Math.floor(i / BATCH_LIMIT) + 1}: Wrote ${chunk.length} sets`);
     }
     
-    const successMessage = `Successfully synced ${setsWritten} sets to Firestore.`;
-    logs.push("✅ " + successMessage);
-    
-    return NextResponse.json({ status: 'success', count: setsWritten, message: successMessage, logs });
+    logs.push(`✅ Successfully synced ${setsWritten} sets.`);
+    return NextResponse.json({ status: 'success', count: setsWritten, logs });
 
   } catch (error: any) {
     console.error('Error during set sync API route:', error);
-    const errorMessage = error.message || 'An unknown error occurred on the server.';
-    logs.push(`❌ ERROR: ${errorMessage}`);
-    
-    return NextResponse.json(
-      { 
-        status: 'error', 
-        message: errorMessage, 
-        logs 
-      }, 
-      { status: 500 }
-    );
+    logs.push(`❌ FATAL ERROR: ${error.message}`);
+    return NextResponse.json({ status: 'error', message: error.message, logs });
   }
 }
