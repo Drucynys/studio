@@ -19,12 +19,6 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Turbopack configuration (stable in Next.js 15)
-  turbo: {
-    rules: {
-      // Turbo-specific optimizations can be added here
-    },
-  },
   
   // Allow your Cloud Workstation domain
   allowedDevOrigins: [

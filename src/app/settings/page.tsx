@@ -205,12 +205,24 @@ export default function SettingsPage() {
     }
   };
   
-  if (loading || !user) {
+  if (loading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
         <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-3 text-xl text-muted-foreground">Authenticating...</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <AppHeader />
+        <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
+          <p className="text-xl text-muted-foreground">Please log in to access settings.</p>
         </main>
       </div>
     );

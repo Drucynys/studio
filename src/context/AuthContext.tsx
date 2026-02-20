@@ -11,6 +11,8 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   UserCredential,
   updateProfile,
   EmailAuthProvider,
@@ -109,74 +111,108 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const newUser = userCredential.user;
     if (!newUser) return;
 
-    const userDocRef = doc(db, "users", newUser.uid);
-    const docSnap = await getDoc(userDocRef);
+    const createTimeout = (ms: number) => new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Operation timeout')), ms)
+    );
 
-    if (!docSnap.exists()) {
-      console.log(`User document for ${newUser.uid} not found. Creating...`);
+    try {
+      const userDocRef = doc(db, "users", newUser.uid);
       
-      const displayName = newUser.displayName || newUser.email?.split('@')[0] || 'New User';
+      // Add timeout to Firestore operations (10 second timeout)
+      const docSnap = await Promise.race([
+        getDoc(userDocRef),
+        createTimeout(10000)
+      ]) as any;
 
-      if (!newUser.displayName) {
-        try {
-          await updateProfile(newUser, { displayName });
-          console.log("Firebase Auth profile updated with displayName:", displayName);
-        } catch (authError) {
-          console.error("Error updating Auth profile:", authError);
-        }
-      }
-
-      const userProfileData = {
-        uid: newUser.uid,
-        email: newUser.email,
-        displayName: displayName,
-        displayName_lowercase: displayName.toLowerCase(),
-        createdAt: new Date(),
-        role: 'user',
-        followSetting: 'everyone' as PrivacySetting,
-      };
-
-      console.log("Attempting to write this user data to Firestore:", userProfileData);
-
-      try {
-        await setDoc(userDocRef, userProfileData);
-        console.log(`User document for ${newUser.uid} created successfully.`);
-        toast({
-          title: 'Welcome!',
-          description: 'Your user profile has been created.',
-        });
-      } catch (error: any) {
-        console.error("FATAL: Error creating user document in Firestore:", error);
+      if (!docSnap.exists()) {
+        console.log(`User document for ${newUser.uid} not found. Creating...`);
         
-        let description = 'Could not create your user profile in the database.';
-        if (error.message) {
-            description = error.message;
+        const displayName = newUser.displayName || newUser.email?.split('@')[0] || 'New User';
+
+        if (!newUser.displayName) {
+          try {
+            await Promise.race([
+              updateProfile(newUser, { displayName }),
+              createTimeout(5000)
+            ]);
+            console.log("Firebase Auth profile updated with displayName:", displayName);
+          } catch (authError) {
+            console.error("Error updating Auth profile:", authError);
+          }
         }
 
-        toast({
-          variant: 'destructive',
-          title: 'Account Setup Failed',
-          description: description,
-          duration: 9000,
-        });
+        const userProfileData = {
+          uid: newUser.uid,
+          email: newUser.email,
+          displayName: displayName,
+          displayName_lowercase: displayName.toLowerCase(),
+          createdAt: new Date(),
+          role: 'user',
+          followSetting: 'everyone' as PrivacySetting,
+        };
 
-        await signOut(auth);
-        return; 
+        console.log("Attempting to write this user data to Firestore:", userProfileData);
+
+        try {
+          await Promise.race([
+            setDoc(userDocRef, userProfileData),
+            createTimeout(10000)
+          ]);
+          console.log(`User document for ${newUser.uid} created successfully.`);
+          toast({
+            title: 'Welcome!',
+            description: 'Your user profile has been created.',
+          });
+        } catch (error: any) {
+          console.error("FATAL: Error creating user document in Firestore:", error);
+          
+          let description = 'Could not create your user profile in the database.';
+          if (error.message) {
+              description = error.message;
+          }
+
+          toast({
+            variant: 'destructive',
+            title: 'Account Setup Failed',
+            description: description,
+            duration: 9000,
+          });
+
+          await signOut(auth);
+          closeAuthModal();
+          return; 
+        }
+      } else {
+          const data = docSnap.data();
+          if (!data.displayName_lowercase && data.displayName) {
+              try {
+                  await Promise.race([
+                    setDoc(userDocRef, { displayName_lowercase: data.displayName.toLowerCase() }, { merge: true }),
+                    createTimeout(5000)
+                  ]);
+                  console.log(`Backfilled displayName_lowercase for user ${newUser.uid}.`);
+              } catch (error) {
+                  console.error("Error backfilling displayName_lowercase:", error);
+              }
+          }
+        console.log(`User document for ${newUser.uid} already exists.`);
       }
-    } else {
-        const data = docSnap.data();
-        if (!data.displayName_lowercase && data.displayName) {
-            try {
-                await setDoc(userDocRef, { displayName_lowercase: data.displayName.toLowerCase() }, { merge: true });
-                console.log(`Backfilled displayName_lowercase for user ${newUser.uid}.`);
-            } catch (error) {
-                console.error("Error backfilling displayName_lowercase:", error);
-            }
-        }
-      console.log(`User document for ${newUser.uid} already exists.`);
+      
+      closeAuthModal();
+    } catch (error: any) {
+      console.error("Auth success handler failed:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Login Issue',
+        description: error.message === 'Operation timeout' ? 
+          'Authentication is taking longer than expected. Please try again.' : 
+          'There was an issue completing your login.',
+        duration: 5000,
+      });
+      // Don't close modal on error - let the AuthModal handle it
+      // so user can retry without reopening modal
+      throw error; // Re-throw to let AuthModal handle the loading state
     }
-    
-    closeAuthModal();
   }, [toast]);
 
   const signUp = async (email: string, pass: string) => {
@@ -193,9 +229,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    const userCredential = await signInWithPopup(auth, provider);
-    await handleAuthSuccess(userCredential);
-    return userCredential;
+    
+    // Configure provider with additional settings for localhost
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    
+    // Debug logging
+    const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'unknown';
+    const currentPort = typeof window !== 'undefined' ? window.location.port : 'unknown';
+    console.log(`Google Auth Debug - Host: ${currentHost}, Port: ${currentPort}`);
+    
+    // For localhost development, prefer redirect over popup
+    const isLocalhost = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || 
+       window.location.hostname === '127.0.0.1' || 
+       window.location.hostname.includes('localhost'));
+    
+    console.log(`Using ${isLocalhost ? 'redirect' : 'popup'} auth method`);
+    
+    try {
+      if (isLocalhost) {
+        // Use redirect for localhost to avoid domain issues
+        console.log('Initiating redirect auth for localhost...');
+        await signInWithRedirect(auth, provider);
+        // This will redirect the page, so we won't reach the return statement
+        return null;
+      } else {
+        // Try popup for production domains
+        console.log('Attempting popup auth...');
+        const userCredential = await signInWithPopup(auth, provider);
+        await handleAuthSuccess(userCredential);
+        return userCredential;
+      }
+    } catch (error: any) {
+      console.error('Google auth error:', error.code, error.message);
+      
+      // Fallback to redirect if popup fails
+      if (error.code === 'auth/popup-blocked' || 
+          error.code === 'auth/unauthorized-domain' ||
+          error.message?.includes('refused to connect')) {
+        console.log('Popup failed, falling back to redirect...');
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
+      
+      throw error;
+    }
   };
 
   const logOut = async () => {
@@ -395,6 +475,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Handle redirect result for Google Sign-In
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          // User came back from Google auth redirect
+          console.log('Redirect auth successful');
+          await handleAuthSuccess(result);
+          closeAuthModal();
+        }
+      } catch (error: any) {
+        console.error('Redirect auth error:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Authentication Error',
+          description: error.message || 'Failed to sign in with Google',
+        });
+      }
+    };
+
+    handleRedirectResult();
+  }, [handleAuthSuccess, closeAuthModal, toast]);
+
   useEffect(() => {
     // Cleanup previous subscriptions when user changes
     cleanupSubscriptions();
@@ -415,8 +519,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }, (error) => {
         console.error("Error fetching user data: ", error);
         if (isMountedRef.current) {
-          setRole(null);
-          setPrivacySetting(null);
+          setRole('user'); // Fallback to user role
+          setPrivacySetting('everyone'); // Fallback to default setting
         }
       });
       
@@ -430,6 +534,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (user) {
       setLoadingCollection(true);
+      setLoadingWishlist(true);
+      setLoadingMyExchangeItems(true);
+      setLoadingFollowing(true);
+      setLoadingNotifications(true);
+
+      // Set maximum loading timeout (8 seconds)
+      const maxLoadingTimeout = setTimeout(() => {
+        console.warn('Loading timeout reached, showing UI with partial data');
+        setLoadingCollection(false);
+        setLoadingWishlist(false);
+        setLoadingMyExchangeItems(false);
+        setLoadingFollowing(false);
+        setLoadingNotifications(false);
+      }, 8000);
+
       const collRef = collection(db, "users", user.uid, "cards");
       const q = query(collRef);
       const unsubscribeCards = onSnapshot(q, (snapshot) => {
@@ -447,7 +566,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoadingCollection(false);
       });
       
-      setLoadingWishlist(true);
       const wishlistRef = collection(db, "users", user.uid, "wishlist");
       const qWishlist = query(wishlistRef, orderBy("timestamp", "desc"));
       const unsubscribeWishlist = onSnapshot(qWishlist, (snapshot) => {
@@ -460,7 +578,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setLoadingWishlist(false);
       });
 
-      setLoadingMyExchangeItems(true);
       const exchangeQuery = query(collection(db, 'exchange'), where('ownerId', '==', user.uid));
       const unsubscribeExchange = onSnapshot(exchangeQuery, (snapshot) => {
         const items = snapshot.docs.map(doc => doc.data() as ExchangeItem);
@@ -472,7 +589,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoadingMyExchangeItems(false);
       });
 
-      setLoadingFollowing(true);
       const followingRef = collection(db, "users", user.uid, "following");
       const unsubscribeFollowing = onSnapshot(followingRef, (snapshot) => {
         const followingUIDs = snapshot.docs.map(doc => doc.id);
@@ -484,7 +600,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLoadingFollowing(false);
       });
 
-      setLoadingNotifications(true);
       const notificationsRef = collection(db, "users", user.uid, "notifications");
       const qNotifications = query(notificationsRef, orderBy("timestamp", "desc"));
       const unsubscribeNotifications = onSnapshot(qNotifications, (snapshot) => {
@@ -499,6 +614,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       return () => {
+        clearTimeout(maxLoadingTimeout);
         unsubscribeCards();
         unsubscribeWishlist();
         unsubscribeExchange();

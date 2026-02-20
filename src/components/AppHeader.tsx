@@ -1,8 +1,10 @@
 // src/components/AppHeader.tsx
+"use client";
+
 import Link from "next/link";
 import { PokeballIcon } from '@/components/icons/PokeballIcon';
 import { Button } from "@/components/ui/button";
-import { PackageSearch, LayoutList, Search, Bell, Users, UserPlus, Replace, Menu } from "lucide-react";
+import { PackageSearch, LayoutList, Search, Bell, Users, UserPlus, Replace, Menu, PlusCircle } from "lucide-react";
 import { AuthButton } from "./AuthButton";
 import { PokedexIcon } from "./icons/PokedexIcon";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,7 +28,7 @@ import { useState } from "react";
 
 
 export function AppHeader() {
-  const { notifications, markNotificationsAsRead } = useAuth();
+  const { notifications, markNotificationsAsRead, user } = useAuth();
   const hasNotifications = notifications.length > 0;
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
@@ -48,55 +50,83 @@ export function AppHeader() {
           </h1>
         </Link>
         
+        {/* Navigation - Desktop */}
+        <nav className="hidden lg:flex items-center gap-1 mx-4">
+          <Link href="/search">
+            <Button variant="ghost" className="gap-2">
+              <Search className="h-4 w-4" /> Search
+            </Button>
+          </Link>
+          <Link href="/my-collection">
+            <Button variant="ghost" className="gap-2">
+              <LayoutList className="h-4 w-4" /> Collection
+            </Button>
+          </Link>
+          <Link href="/add-card">
+            <Button variant="ghost" className="gap-2 text-primary font-semibold">
+              <PlusCircle className="h-4 w-4" /> Add Card
+            </Button>
+          </Link>
+          <Link href="/browse-sets">
+            <Button variant="ghost" className="gap-2">
+              <PackageSearch className="h-4 w-4" /> Browse
+            </Button>
+          </Link>
+        </nav>
+
         {/* Right side icons */}
         <div className="flex items-center gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                {hasNotifications && (
-                  <span className="absolute top-2 right-2 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
-                  </span>
-                )}
-                <span className="sr-only">Notifications</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 md:w-96">
-              <div className="flex items-center justify-between p-2">
-                  <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="h-5 w-5" />
                   {hasNotifications && (
-                      <Button variant="link" size="sm" className="text-xs h-auto p-0" onClick={handleMarkAllRead}>
-                          Mark all as read
-                      </Button>
+                    <span className="absolute top-2 right-2 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-accent"></span>
+                    </span>
                   )}
-              </div>
-              <DropdownMenuSeparator />
-              {hasNotifications ? (
-                notifications.map((notif) => (
-                  <DropdownMenuItem key={notif.id} className="flex gap-3 p-3 cursor-pointer" asChild>
-                    <Link href="/friends">
-                      <UserPlus className="h-4 w-4 text-primary mt-1"/>
-                      <div className="flex-1">
-                        <p><span className="font-semibold">{notif.followerDisplayName}</span> started following you.</p>
-                        <p className="text-xs text-muted-foreground pt-1">
-                          {notif.timestamp?.toDate ? formatDistanceToNow(notif.timestamp.toDate(), { addSuffix: true }) : ''}
-                        </p>
-                      </div>
-                    </Link>
-                  </DropdownMenuItem>
-                ))
-              ) : (
-                 <div className="text-center text-sm text-muted-foreground p-4">
-                  You're all caught up!
+                  <span className="sr-only">Notifications</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80 md:w-96">
+                <div className="flex items-center justify-between p-2">
+                    <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                    {hasNotifications && (
+                        <Button variant="link" size="sm" className="text-xs h-auto p-0" onClick={handleMarkAllRead}>
+                            Mark all as read
+                        </Button>
+                    )}
                 </div>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuSeparator />
+                {hasNotifications ? (
+                  notifications.map((notif) => (
+                    <DropdownMenuItem key={notif.id} className="flex gap-3 p-3 cursor-pointer" asChild>
+                      <Link href="/friends">
+                        <UserPlus className="h-4 w-4 text-primary mt-1"/>
+                        <div className="flex-1">
+                          <p><span className="font-semibold">{notif.followerDisplayName}</span> started following you.</p>
+                          <p className="text-xs text-muted-foreground pt-1">
+                            {notif.timestamp?.toDate ? formatDistanceToNow(notif.timestamp.toDate(), { addSuffix: true }) : ''}
+                          </p>
+                        </div>
+                      </Link>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                   <div className="text-center text-sm text-muted-foreground p-4">
+                    You're all caught up!
+                  </div>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          
           <AuthButton />
-           {/* Mobile Navigation */}
-          <div>
+          
+           {/* Mobile Navigation Trigger */}
+          <div className="lg:hidden">
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -104,44 +134,49 @@ export function AppHeader() {
                   <span className="sr-only">Open menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[240px]">
+              <SheetContent side="right" className="w-[280px]">
                 <SheetHeader>
                   <SheetTitle>
                     <Link href="/" className="flex items-center gap-3" onClick={closeSheet}>
                       <PokeballIcon className="h-8 w-8" />
-                      <span className="text-2xl font-headline font-bold">PokéTRKR</span>
+                      <span className="text-2xl font-headline font-bold text-primary">PokéTRKR</span>
                     </Link>
                   </SheetTitle>
                 </SheetHeader>
                 <nav className="mt-8 flex flex-col gap-2">
                   <Link href="/search" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-2 text-md">
-                      <Search /> Search
+                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
+                      <Search className="h-5 w-5" /> Search
                     </Button>
                   </Link>
                   <Link href="/my-collection" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-2 text-md">
-                      <LayoutList /> My Collection
+                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
+                      <LayoutList className="h-5 w-5" /> My Collection
+                    </Button>
+                  </Link>
+                  <Link href="/add-card" onClick={closeSheet}>
+                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg text-primary font-semibold">
+                      <PlusCircle className="h-5 w-5" /> Add Card
                     </Button>
                   </Link>
                   <Link href="/browse-sets" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-2 text-md">
-                      <PackageSearch /> Browse
+                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
+                      <PackageSearch className="h-5 w-5" /> Browse Sets
                     </Button>
                   </Link>
                   <Link href="/pokedex" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-2 text-md">
+                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
                       <PokedexIcon className="h-6 w-6"/> Pokédex
                     </Button>
                   </Link>
                   <Link href="/exchange" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-2 text-md">
-                      <Replace /> Exchange
+                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
+                      <Replace className="h-5 w-5" /> Exchange
                     </Button>
                   </Link>
                   <Link href="/friends" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-2 text-md">
-                      <Users /> Friends
+                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
+                      <Users className="h-5 w-5" /> Friends
                     </Button>
                   </Link>
                 </nav>

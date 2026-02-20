@@ -6,7 +6,7 @@ import { getFirebaseAdmin } from '@/lib/firebase-admin'; // Use the singleton in
 const db = getFirebaseAdmin().firestore();
 
 const POKEMON_TCG_API_BASE = 'https://api.pokemontcg.io/v2/cards';
-const PAGE_SIZE = 250; // Max page size allowed by the API
+const PAGE_SIZE = 100; // Reduced for better reliability
 const BATCH_SIZE = 400; // Reduced for a safer margin below the 500 limit
 
 const convertCardNumberToInt = (cardNumber: string): number => {
@@ -30,9 +30,10 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Constants for safety limits
 const MAX_PAGES = 50; // Safety limit to prevent infinite loops
-const MAX_RETRIES = 3;
-const REQUEST_TIMEOUT = 15000; // 15 second timeout
-const INITIAL_RETRY_DELAY = 1000; // 1 second
+const MAX_RETRIES = 5; // Increased retries
+const REQUEST_TIMEOUT = 30000; // 30 second timeout for better reliability
+const INITIAL_RETRY_DELAY = 2000; // 2 seconds initial delay
+const MAX_RETRY_DELAY = 30000; // Cap exponential backoff at 30 seconds
 
 export async function POST(request: Request) {
     const logs: string[] = [];
@@ -54,14 +55,20 @@ export async function POST(request: Request) {
         let apiTotalCount = 0;
         let retryCount = 0;
         let consecutiveEmptyPages = 0;
+        let consecutiveFailures = 0;
 
         logs.push(`Fetching all cards for set '${setId}' from API...`);
 
         while (hasMore && page <= MAX_PAGES) {
             try {
                 // Rate limiting with exponential backoff on retries
-                const delay = page > 1 ? (retryCount > 0 ? INITIAL_RETRY_DELAY * Math.pow(2, retryCount) : 500) : 0;
-                if (delay > 0) await sleep(delay);
+                const baseDelay = page > 1 ? 500 : 0; // Base delay between pages
+                const retryDelay = retryCount > 0 ? Math.min(INITIAL_RETRY_DELAY * Math.pow(2, retryCount - 1), MAX_RETRY_DELAY) : 0;
+                const delay = baseDelay + retryDelay;
+                if (delay > 0) {
+                    logs.push(`⏳ Waiting ${delay}ms before next request...`);
+                    await sleep(delay);
+                }
 
                 const response = await axios.get(POKEMON_TCG_API_BASE, {
                     timeout: REQUEST_TIMEOUT,
@@ -93,6 +100,7 @@ export async function POST(request: Request) {
                 // Reset counters on successful data retrieval
                 retryCount = 0;
                 consecutiveEmptyPages = 0;
+                consecutiveFailures = 0;
                 
                 allCardsForSet = allCardsForSet.concat(data);
                 logs.push(`✅ Fetched page ${page}. ${allCardsForSet.length} of ${apiTotalCount || 'unknown'} cards for this set.`);
@@ -110,6 +118,7 @@ export async function POST(request: Request) {
 
             } catch (apiError: any) {
                 retryCount++;
+                consecutiveFailures++;
                 let errorMessage = 'An unknown error occurred while fetching from API.';
                 
                 if (axios.isAxiosError(apiError)) {
@@ -125,6 +134,17 @@ export async function POST(request: Request) {
                 }
 
                 logs.push(`⚠️ Error fetching page ${page}, attempt ${retryCount}/${MAX_RETRIES}: ${errorMessage}`);
+
+                // Circuit breaker: if too many consecutive failures, stop early
+                if (consecutiveFailures >= 10) {
+                    logs.push(`🚨 Circuit breaker triggered: ${consecutiveFailures} consecutive failures. API appears to be down.`);
+                    return NextResponse.json({ 
+                        status: 'error', 
+                        count: allCardsForSet.length, 
+                        logs, 
+                        message: `Circuit breaker triggered after ${consecutiveFailures} consecutive failures` 
+                    });
+                }
 
                 if (retryCount >= MAX_RETRIES) {
                     logs.push(`❌ Failed after ${MAX_RETRIES} retries. Stopping sync for set ${setId}.`);

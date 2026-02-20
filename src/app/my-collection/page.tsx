@@ -442,13 +442,13 @@ export default function MyCollectionPage() {
       }
   };
 
-  if (loading || loadingCollection || loadingWishlist || loadingMyExchangeItems) {
+  if (loading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
         <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="ml-3 text-xl text-muted-foreground">Loading your collection...</p>
+          <p className="ml-3 text-xl text-muted-foreground">Authenticating...</p>
         </main>
       </div>
     );
@@ -557,20 +557,40 @@ export default function MyCollectionPage() {
             </section>
             
             <TabsContent value="collection" className="mt-6">
-                <CardList
-                  cards={filteredCards}
-                  masterCardData={masterCardData}
-                  onEditCard={handleEditCard}
-                  onRemoveCard={handleRemoveCard}
-                  onViewCard={openFullScreenView}
-                  onToggleFavorite={handleToggleFavorite}
-                  onAddToExchange={handleAddToExchange}
-                  isLoadingMasterData={loadingMasterData}
-                />
+                {loadingCollection ? (
+                  <Card className="shadow-lg">
+                    <CardContent className="p-6">
+                      <div className="text-center py-8 flex flex-col items-center gap-2">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+                        <p className="text-muted-foreground">Loading your collection...</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <CardList
+                    cards={filteredCards}
+                    masterCardData={masterCardData}
+                    onEditCard={handleEditCard}
+                    onRemoveCard={handleRemoveCard}
+                    onViewCard={openFullScreenView}
+                    onToggleFavorite={handleToggleFavorite}
+                    onAddToExchange={handleAddToExchange}
+                    isLoadingMasterData={loadingMasterData}
+                  />
+                )}
             </TabsContent>
             
             <TabsContent value="wishlist" className="mt-6">
-              {filteredWishlist.length === 0 ? (
+              {loadingWishlist ? (
+                <Card className="shadow-lg">
+                  <CardContent className="p-6">
+                    <div className="text-center py-8 flex flex-col items-center gap-2">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary"/>
+                      <p className="text-muted-foreground">Loading your wishlist...</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : filteredWishlist.length === 0 ? (
                   <Card className="shadow-lg"><CardContent className="p-6">
                     <div className="text-center py-8 flex flex-col items-center gap-2">
                       <Heart className="h-12 w-12 text-muted-foreground opacity-70"/>

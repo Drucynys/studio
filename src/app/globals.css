@@ -105,3 +105,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes scan-line {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+.animate-scan-line {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background-color: hsl(var(--primary));
+  animation: scan-line 2s linear infinite;
+}

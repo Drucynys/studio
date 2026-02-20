@@ -21,11 +21,21 @@ export function AuthModal() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const { toast } = useToast();
 
   const handleAuthAction = async (action: 'signUp' | 'signIn' | 'google') => {
-    setLoading(true);
     setError(null);
+    
+    // For Google auth, don't set loading state immediately - let popup open first
+    if (action !== 'google') {
+      setLoading(true);
+    }
+    
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Authentication timeout')), 15000)
+    );
+    
     try {
       if (action === 'signUp') {
         if (email !== confirmEmail) {
@@ -34,11 +44,16 @@ export function AuthModal() {
         if (password !== confirmPassword) {
           throw new Error("Passwords do not match.");
         }
-        await signUp(email, password);
+        await Promise.race([signUp(email, password), timeout]);
       }
-      if (action === 'signIn') await signIn(email, password);
-      if (action === 'google') await signInWithGoogle();
+      if (action === 'signIn') await Promise.race([signIn(email, password), timeout]);
+      if (action === 'google') {
+        // Set loading only after user interaction is complete
+        setLoading(true);
+        await signInWithGoogle();
+      }
       
+      setRetryCount(0); // Reset retry count on success
       toast({
         title: "Success!",
         description: "You're now logged in.",
@@ -49,8 +64,10 @@ export function AuthModal() {
 
       // Gracefully handle popup closed by user
       if (err.code === 'auth/popup-closed-by-user') {
-        // Don't show an error message for this case
         setError(null);
+      } else if (err.message === 'Authentication timeout' || err.message === 'Operation timeout') {
+        setRetryCount(prev => prev + 1);
+        setError(`Authentication is taking longer than expected. ${retryCount >= 2 ? 'Please check your internet connection.' : 'Try again?'}`);
       } else {
         let friendlyMessage = 'An unknown error occurred.';
         if (err.message && (err.message.includes("match") || err.message.includes("valid"))) {
@@ -59,6 +76,7 @@ export function AuthModal() {
             friendlyMessage = err.code.replace('auth/', '').replace(/-/g, ' ');
         }
         setError(friendlyMessage.charAt(0).toUpperCase() + friendlyMessage.slice(1));
+        setRetryCount(0); // Reset retry count on non-timeout errors
       }
     } finally {
       setLoading(false);
@@ -71,6 +89,7 @@ export function AuthModal() {
     setPassword('');
     setConfirmEmail('');
     setConfirmPassword('');
+    setRetryCount(0);
   };
   
   const onOpenChange = (open: boolean) => {
@@ -141,8 +160,50 @@ export function AuthModal() {
           <span className="absolute left-1/2 -translate-x-1/2 -top-3 bg-background px-2 text-sm text-muted-foreground">OR</span>
         </div>
 
-        <Button variant="outline" className="w-full" disabled={loading} onClick={() => handleAuthAction('google')}>
-           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Image src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="Google" width={16} height={16} className="mr-2"/>}
+        <Button 
+          variant="outline" 
+          className="w-full" 
+          disabled={loading} 
+          onClick={(e) => {
+            // Prevent any default behavior but keep this synchronous to preserve user gesture
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Show loading state immediately
+            setLoading(true);
+            setError(null);
+            
+            // Call auth function immediately to preserve user gesture context
+            signInWithGoogle()
+              .then((result) => {
+                // Only show success if we got a result (popup worked)
+                // If result is null, it means we're redirecting
+                if (result) {
+                  toast({
+                    title: "Success!",
+                    description: "You're now logged in.",
+                  });
+                }
+                setLoading(false);
+              })
+              .catch((err: any) => {
+                console.error('Google auth error:', err);
+                setLoading(false);
+                
+                // Handle different error types
+                if (err.code === 'auth/popup-blocked') {
+                  setError('Popup blocked. Redirecting to Google...');
+                } else if (err.code === 'auth/unauthorized-domain') {
+                  setError('Domain not authorized. Please check Firebase console settings.');
+                } else if (err.message?.includes('refused to connect')) {
+                  setError('Connection refused. Redirecting to Google...');
+                } else if (err.code !== 'auth/popup-closed-by-user') {
+                  setError(err.message || 'Authentication failed');
+                }
+              });
+          }}
+        >
+          <Image src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="Google" width={16} height={16} className="mr-2"/>
           Continue with Google
         </Button>
       </DialogContent>
