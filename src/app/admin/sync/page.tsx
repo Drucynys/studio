@@ -42,15 +42,12 @@ async function safeFetch(url: string, options?: RequestInit) {
 
         if (contentType && contentType.includes('application/json')) {
             const data = await response.json();
-            // If the backend returned status: 'error', we treat it as an error here
             if (data.status === 'error') {
                 throw new Error(data.message || "Unknown backend error");
             }
             return data;
         }
         
-        const errorText = await response.text();
-        console.error("Non-JSON Response received:", errorText.substring(0, 500));
         throw new Error(`Server returned unexpected format (${response.status}).`);
     } catch (err: any) {
         return { status: 'error', message: err.message };
@@ -68,13 +65,7 @@ export default function SyncAdminPage() {
 
   const { toast } = useToast();
 
-  const [cardsSyncStatus, setCardsSyncStatus] = useState<SyncStatus>('idle');
-  const [cardsLogs, setCardsLogs] = useState<string[]>([]);
   const isSyncStopped = useRef(false);
-  
-  const [remoteApiCardCount, setRemoteApiCardCount] = useState<number | null>(null);
-  const [showCardSyncConfirm, setShowCardSyncConfirm] = useState(false);
-
   const [masterSyncStatus, setMasterSyncStatus] = useState<SyncStatus>('idle');
   const [masterSyncLogs, setMasterSyncLogs] = useState<string[]>([]);
   const [masterSyncProgress, setMasterSyncProgress] = useState(0);
@@ -125,7 +116,7 @@ export default function SyncAdminPage() {
         const isTimeout = result.message?.toLowerCase().includes('timeout');
         
         if (isTimeout && i < maxRetries - 1) {
-            const waitTime = (i + 1) * 2000;
+            const waitTime = (i + 1) * 3000; // Increased retry delay
             addLog(`⚠️ Attempt ${i + 1} timed out. Retrying in ${waitTime/1000}s...`);
             await sleep(waitTime);
             continue;
@@ -142,10 +133,10 @@ export default function SyncAdminPage() {
     isSyncStopped.current = false;
 
     try {
-        // Step 1: Granular Set Discovery (Reduced page size for speed)
+        // Step 1: Granular Set Discovery
         const PAGE_SIZE = 25; 
         setMasterSyncCurrentStep("Step 1/3: Discovering latest sets...");
-        addLog(`\n[Step 1/3] Fetching expansion list in small pages (${PAGE_SIZE})...`);
+        addLog(`\n[Step 1/3] Fetching expansion list from TCG API in pages (${PAGE_SIZE} per page)...`);
         
         let allDiscoveredSets: any[] = [];
         let page = 1;
@@ -164,13 +155,13 @@ export default function SyncAdminPage() {
             allDiscoveredSets.push(...(discoveryResult.data || []));
             totalSetsCount = discoveryResult.totalCount || 0;
             
-            addLog(`✅ Page ${page}: Discovered ${allDiscoveredSets.length} / ${totalSetsCount} sets.`);
+            addLog(`✅ Discovered ${allDiscoveredSets.length} / ${totalSetsCount} sets.`);
 
             if (allDiscoveredSets.length >= totalSetsCount || !discoveryResult.data?.length) {
                 break;
             }
             page++;
-            await sleep(800); // Respectful delay
+            await sleep(1000); // 1-second pause between requests
         }
 
         if (isSyncStopped.current) throw new Error("Sync stopped by user.");
@@ -186,6 +177,7 @@ export default function SyncAdminPage() {
         addLog(`✅ Successfully saved ${allDiscoveredSets.length} expansions.`);
         setMasterSyncProgress(10);
         await checkDbStatus();
+        await sleep(1000);
 
         // Step 2: Sync All Cards
         setMasterSyncCurrentStep("Step 2/3: Populating card database...");
@@ -208,12 +200,18 @@ export default function SyncAdminPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ setId: currentSet.id }),
                 });
-                cumulativeCardCount += syncResult.count || 0;
+                
+                if (syncResult.status !== 'error') {
+                    cumulativeCardCount += syncResult.count || 0;
+                    addLog(`✅ ${currentSet.name}: +${syncResult.count} cards`);
+                } else {
+                    addLog(`⚠️ ${currentSet.name}: ${syncResult.message}`);
+                }
             } catch (err: any) {
                 addLog(`⚠️ Failed ${currentSet.name}: ${err.message}. Skipping...`);
             }
             
-            await sleep(800); // Cooldown
+            await sleep(1000); // 1-second pause between sets
         }
         
         addLog(`\n✅ Card population complete! Total cards processed: ${cumulativeCardCount}.`);
@@ -237,36 +235,6 @@ export default function SyncAdminPage() {
     }
   };
 
-  const handleCardsSync = async () => {
-    setCardsSyncStatus('in-progress');
-    setCardsLogs(['Fetching list of sets...']);
-    isSyncStopped.current = false;
-    
-    const sets = await safeFetch('/api/sets');
-    if (!Array.isArray(sets)) {
-        setCardsSyncStatus('error');
-        return;
-    }
-    
-    let cumulative = 0;
-    for (let i = 0; i < sets.length; i++) {
-        if (isSyncStopped.current) break;
-        await sleep(1000);
-        const result = await safeFetch('/api/sync-cards', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ setId: sets[i].id }),
-        });
-        
-        if (result.status !== 'error') {
-            cumulative += result.count || 0;
-            setCardsLogs(prev => [...prev, `✅ Synced ${sets[i].name} (+${result.count})`]);
-        }
-    }
-    setCardsSyncStatus('success');
-    await checkDbStatus();
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
@@ -279,7 +247,7 @@ export default function SyncAdminPage() {
                     Full Data Resynchronization
                 </CardTitle>
                 <CardDescription>
-                    Resilient iterative synchronization designed to handle external API timeouts.
+                    Resilient iterative synchronization with 1-second delays to respect API rate limits.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -349,21 +317,6 @@ export default function SyncAdminPage() {
               </CardContent>
           </Card>
         </div>
-
-        <AlertDialog open={showCardSyncConfirm} onOpenChange={setShowCardSyncConfirm}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirm Sync</AlertDialogTitle>
-              <AlertDialogDescription>
-                API has {remoteApiCardCount} cards. Local has {cardCount}. Proceed?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleCardsSync}>Proceed</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </main>
     </div>
   );
