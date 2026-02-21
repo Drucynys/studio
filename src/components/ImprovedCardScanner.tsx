@@ -44,7 +44,7 @@ export function ImprovedCardScanner({ onScanResult }: ImprovedCardScannerProps) 
       setProcessingStep("AI is analyzing card...");
       const result = await findCardByImageEnhanced({ imageDataUri: imageDataUrl });
       
-      const cleanedResult = validateCardData(result);
+      const cleanedResult = await validateCardData(result);
       
       if (cleanedResult.name) {
         onScanResult(cleanedResult);

@@ -69,9 +69,10 @@ export async function findCardByImageEnhanced(input: FindCardInput): Promise<Fin
 }
 
 /**
- * Validates and cleans AI-generated card data
+ * Validates and cleans AI-generated card data.
+ * Must be async because it is exported from a 'use server' file.
  */
-export function validateCardData(data: FindCardOutput): FindCardOutput {
+export async function validateCardData(data: FindCardOutput): Promise<FindCardOutput> {
   const result = { ...data };
   
   // Clean up card numbers (e.g. remove "No. " prefix if AI adds it)
