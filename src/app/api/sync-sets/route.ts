@@ -29,16 +29,20 @@ export async function POST() {
     }
     
     logs.push("✅ Firebase Admin SDK initialized.");
-    logs.push("Fetching latest sets from Pokémon TCG API...");
+    logs.push("Fetching latest sets from Pokémon TCG API (this can take a moment)...");
     
     let response;
     try {
+      // Increased timeout to 90 seconds for discovery phase
       response = await axios.get('https://api.pokemontcg.io/v2/sets', {
         headers: { 'X-Api-Key': apiKey },
-        timeout: 30000,
+        timeout: 90000, 
       });
     } catch (apiError: any) {
       let errorMessage = apiError.message || 'Failed to fetch sets from Pokemon TCG API';
+      if (apiError.code === 'ECONNABORTED') {
+          errorMessage = "The TCG API took too long to respond (90s timeout exceeded). Please try again in a few minutes.";
+      }
       logs.push(`❌ ${errorMessage}`);
       return NextResponse.json({ status: 'error', message: errorMessage, logs });
     }
@@ -65,7 +69,7 @@ export async function POST() {
         batch.set(docRef, {
           ...set,
           lastSynced: admin.firestore.FieldValue.serverTimestamp()
-        });
+        }, { merge: true });
       });
 
       await batch.commit();

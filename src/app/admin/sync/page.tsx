@@ -126,20 +126,24 @@ export default function SyncAdminPage() {
 
     try {
         // Step 1: Sync Sets
-        setMasterSyncCurrentStep("Syncing sets...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 1/3] Syncing latest set list..."]);
+        setMasterSyncCurrentStep("Step 1/3: Discovering sets...");
+        setMasterSyncLogs(prev => [...prev, "\n[Step 1/3] Syncing latest set list from API..."]);
         const setsResult = await safeFetch('/api/sync-sets', { method: 'POST' });
-        setMasterSyncLogs(prev => [...prev, ...(setsResult.logs || [])]);
-        if (setsResult.status === 'error') throw new Error(setsResult.message || "Set sync failed.");
+        
+        if (setsResult.logs) setMasterSyncLogs(prev => [...prev, ...setsResult.logs]);
+        
+        if (setsResult.status === 'error') {
+            throw new Error(setsResult.message || "Discovery phase failed. See logs.");
+        }
         
         setMasterSyncProgress(10);
         await checkDbStatus();
 
         // Step 2: Sync All Cards
-        setMasterSyncCurrentStep("Syncing all cards...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 2/3] Starting full card database sync..."]);
+        setMasterSyncCurrentStep("Step 2/3: Downloading cards...");
+        setMasterSyncLogs(prev => [...prev, "\n[Step 2/3] Starting full card database population..."]);
         const setsToSync = await safeFetch('/api/sets');
-        if (!Array.isArray(setsToSync)) throw new Error("Could not retrieve sets list.");
+        if (!Array.isArray(setsToSync)) throw new Error("Could not retrieve locally synced sets list.");
 
         let cumulativeCardCount = 0;
         for (let i = 0; i < setsToSync.length; i++) {
@@ -147,8 +151,9 @@ export default function SyncAdminPage() {
             const currentSet = setsToSync[i];
             const progress = 10 + ((i + 1) / setsToSync.length) * 80;
             setMasterSyncProgress(progress);
-            setMasterSyncCurrentStep(`Syncing cards for set: ${currentSet.name}`);
+            setMasterSyncCurrentStep(`Syncing: ${currentSet.name} (${i + 1}/${setsToSync.length})`);
             
+            // Delays to prevent API blocks
             await sleep(1000); 
 
             const syncResult = await safeFetch('/api/sync-cards', {
@@ -158,29 +163,31 @@ export default function SyncAdminPage() {
             });
             
             if (syncResult.status === 'error') {
-                setMasterSyncLogs(prev => [...prev, `⚠️ Error syncing set ${currentSet.id}: ${syncResult.message}. Skipping...`]);
+                setMasterSyncLogs(prev => [...prev, `⚠️ Error syncing ${currentSet.name}: ${syncResult.message}. Continuing...`]);
             } else {
                 cumulativeCardCount += syncResult.count || 0;
             }
         }
         
-        setMasterSyncLogs(prev => [...prev, `\n✅ Card sync complete! Total cards: ${cumulativeCardCount}.`]);
+        setMasterSyncLogs(prev => [...prev, `\n✅ Card population complete! Total cards processed: ${cumulativeCardCount}.`]);
         await checkDbStatus();
 
         // Step 3: Sync Artists
-        setMasterSyncCurrentStep("Generating artist database...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 3/3] Generating artist database..."]);
+        setMasterSyncCurrentStep("Step 3/3: Rebuilding artist index...");
+        setMasterSyncLogs(prev => [...prev, "\n[Step 3/3] Aggregating unique illustrators..."]);
         const artistsResult = await safeFetch('/api/artists', { method: 'POST' });
-        setMasterSyncLogs(prev => [...prev, ...(artistsResult.logs || [])]);
+        if (artistsResult.logs) setMasterSyncLogs(prev => [...prev, ...artistsResult.logs]);
         
         setMasterSyncProgress(100);
-        setMasterSyncCurrentStep("Completed!");
+        setMasterSyncCurrentStep("Resynchronization Completed Successfully!");
         setMasterSyncStatus('success');
+        toast({ title: "Full Sync Complete", description: "Database is now fully up to date." });
 
     } catch (err: any) {
         setMasterSyncStatus('error');
         setMasterSyncError(err.message);
         setMasterSyncLogs(prev => [...prev, `❌ FATAL ERROR: ${err.message}`]);
+        toast({ variant: "destructive", title: "Resync Failed", description: err.message });
     }
   };
 
@@ -254,18 +261,19 @@ export default function SyncAdminPage() {
                     Full Data Resynchronization
                 </CardTitle>
                 <CardDescription>
-                    This will run the full data sync process in order: sets, cards, then artists. Resilient to API errors.
+                    This will run the full data sync process in order: sets, cards, then artists. 
+                    Discovery timeout is set to 90s to handle slow API days.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="text-center">
-                    <Button onClick={handleFullResync} disabled={masterSyncStatus === 'in-progress'} size="lg">
+                    <Button onClick={handleFullResync} disabled={masterSyncStatus === 'in-progress'} size="lg" className="w-full sm:w-auto">
                         {masterSyncStatus === 'in-progress' ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Syncing ({masterSyncProgress.toFixed(0)}%)...</>
                         ) : 'Start Full Resync'}
                     </Button>
                     {masterSyncStatus === 'in-progress' && (
-                        <p className="text-sm text-muted-foreground mt-2">{masterSyncCurrentStep}</p>
+                        <p className="text-sm font-medium text-primary mt-4 animate-pulse">{masterSyncCurrentStep}</p>
                     )}
                 </div>
 
@@ -276,10 +284,11 @@ export default function SyncAdminPage() {
                             <Alert className="border-green-200 bg-green-50 text-green-900">
                               <CheckCircle className="h-4 w-4 text-green-600" />
                               <AlertTitle>Full Resync Successful!</AlertTitle>
+                              <AlertDescription>Your database is completely populated.</AlertDescription>
                             </Alert>
                           )}
                           <Card className="bg-muted/50"><CardHeader className="py-2"><CardTitle className="text-sm">Master Sync Logs</CardTitle></CardHeader><CardContent className="p-2">
-                              <ScrollArea className="h-48 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{masterSyncLogs.join('\n')}</pre></ScrollArea>
+                              <ScrollArea className="h-64 w-full rounded-md border p-2 bg-background"><pre className="text-xs font-mono whitespace-pre-wrap">{masterSyncLogs.join('\n')}</pre></ScrollArea>
                           </CardContent></Card>
                     </div>
                 )}
@@ -308,48 +317,6 @@ export default function SyncAdminPage() {
                       <Button onClick={checkDbStatus} variant="outline" size="sm"><RefreshCcw className="mr-2 h-3 w-3" />Refresh Status</Button>
                   </div>
               </CardContent>
-          </Card>
-        
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                <RefreshCw className="h-6 w-6 text-primary" />
-                Individual Sets Sync
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center">
-                <Button onClick={handleSetsSync} disabled={setsSyncStatus === 'in-progress'} size="lg">
-                  {setsSyncStatus === 'in-progress' ? <Loader2 className="animate-spin" /> : 'Start Set Sync'}
-                </Button>
-              </div>
-              {setsLogs.length > 0 && (
-                <ScrollArea className="h-32 rounded-md border p-2 bg-background font-mono text-xs">{setsLogs.join('\n')}</ScrollArea>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl flex items-center gap-2">
-                <Library className="h-6 w-6 text-primary" />
-                Full Card Database Sync
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex gap-4 justify-center">
-                 {cardsSyncStatus !== 'in-progress' ? (
-                    <Button onClick={handleCardSyncCheck} disabled={isCheckingCardDiff} size="lg">
-                        {isCheckingCardDiff ? <Loader2 className="animate-spin"/> : 'Start Full Card Sync'}
-                    </Button>
-                 ) : (
-                    <Button onClick={stopCardSync} variant="destructive" size="lg">Stop Sync</Button>
-                 )}
-              </div>
-              {cardsLogs.length > 0 && (
-                <ScrollArea className="h-48 rounded-md border p-2 bg-background font-mono text-xs">{cardsLogs.join('\n')}</ScrollArea>
-              )}
-            </CardContent>
           </Card>
         </div>
 
