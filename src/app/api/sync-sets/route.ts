@@ -29,21 +29,23 @@ export async function POST() {
     }
     
     logs.push("✅ Firebase Admin SDK initialized.");
-    logs.push("Fetching latest sets from Pokémon TCG API (this can take a moment)...");
+    logs.push("Fetching latest sets from Pokémon TCG API...");
     
     let response;
     try {
-      // Increased timeout to 90 seconds for discovery phase
+      // Use a timeout that is shorter than the platform's gateway timeout (usually 60s)
+      // This allows us to return a proper JSON error rather than a generic 504 HTML page.
       response = await axios.get('https://api.pokemontcg.io/v2/sets', {
         headers: { 'X-Api-Key': apiKey },
-        timeout: 90000, 
+        timeout: 45000, 
       });
     } catch (apiError: any) {
       let errorMessage = apiError.message || 'Failed to fetch sets from Pokemon TCG API';
-      if (apiError.code === 'ECONNABORTED') {
-          errorMessage = "The TCG API took too long to respond (90s timeout exceeded). Please try again in a few minutes.";
+      if (apiError.code === 'ECONNABORTED' || apiError.message.includes('timeout')) {
+          errorMessage = "The TCG API took too long to respond (45s internal timeout). The platform's gateway might have also timed out.";
       }
       logs.push(`❌ ${errorMessage}`);
+      // Return 200 with status: error to avoid platform-injected HTML error pages
       return NextResponse.json({ status: 'error', message: errorMessage, logs });
     }
     
@@ -72,9 +74,13 @@ export async function POST() {
         }, { merge: true });
       });
 
-      await batch.commit();
-      setsWritten += chunk.length;
-      logs.push(`✅ Batch ${Math.floor(i / BATCH_LIMIT) + 1}: Wrote ${chunk.length} sets`);
+      try {
+        await batch.commit();
+        setsWritten += chunk.length;
+        logs.push(`✅ Batch ${Math.floor(i / BATCH_LIMIT) + 1}: Wrote ${chunk.length} sets`);
+      } catch (dbError: any) {
+        logs.push(`⚠️ Batch error: ${dbError.message}`);
+      }
     }
     
     logs.push(`✅ Successfully synced ${setsWritten} sets.`);
@@ -82,7 +88,8 @@ export async function POST() {
 
   } catch (error: any) {
     console.error('Error during set sync API route:', error);
-    logs.push(`❌ FATAL ERROR: ${error.message}`);
-    return NextResponse.json({ status: 'error', message: error.message, logs });
+    const msg = error.message || 'An unknown error occurred.';
+    logs.push(`❌ FATAL ERROR: ${msg}`);
+    return NextResponse.json({ status: 'error', message: msg, logs });
   }
 }

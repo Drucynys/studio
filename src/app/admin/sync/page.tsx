@@ -34,10 +34,22 @@ async function safeFetch(url: string, options?: RequestInit) {
     try {
         const response = await fetch(url, options);
         const contentType = response.headers.get('content-type');
+        
+        // Handle common gateway errors before trying to parse JSON
+        if (response.status === 504) {
+            throw new Error("Gateway Timeout (504). The server took too long to respond. This usually happens when the external TCG API is slow.");
+        }
+        if (response.status === 502) {
+            throw new Error("Bad Gateway (502). The server is temporarily unavailable.");
+        }
+
         if (contentType && contentType.includes('application/json')) {
             return await response.json();
         }
-        throw new Error(`Server returned non-JSON response (${response.status}). The platform may be experiencing issues.`);
+        
+        const errorText = await response.text();
+        console.error("Non-JSON Response received:", errorText.substring(0, 500));
+        throw new Error(`Server returned unexpected format (${response.status}). The platform may be experiencing issues.`);
     } catch (err: any) {
         return { status: 'error', message: err.message };
     }
@@ -153,7 +165,7 @@ export default function SyncAdminPage() {
             setMasterSyncProgress(progress);
             setMasterSyncCurrentStep(`Syncing: ${currentSet.name} (${i + 1}/${setsToSync.length})`);
             
-            // Delays to prevent API blocks
+            // Respectful delay to prevent API blocks
             await sleep(1000); 
 
             const syncResult = await safeFetch('/api/sync-cards', {
@@ -235,8 +247,13 @@ export default function SyncAdminPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ setId: sets[i].id }),
         });
-        setCardsLogs(prev => [...prev, ...(result.logs || [result.message])]);
-        if (result.status === 'success') cumulative += result.count;
+        
+        if (result.status === 'error') {
+            setCardsLogs(prev => [...prev, `⚠️ Error syncing ${sets[i].name}: ${result.message}. Continuing...`]);
+        } else {
+            setCardsLogs(prev => [...prev, ...(result.logs || [])]);
+            cumulative += result.count || 0;
+        }
         setTotalCardsSynced(cumulative);
     }
     setCardsSyncStatus('success');
@@ -262,7 +279,7 @@ export default function SyncAdminPage() {
                 </CardTitle>
                 <CardDescription>
                     This will run the full data sync process in order: sets, cards, then artists. 
-                    Discovery timeout is set to 90s to handle slow API days.
+                    Discovery phase is designed to be patient with external API load.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
