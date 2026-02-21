@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
@@ -26,7 +25,6 @@ export async function POST(request: Request) {
         const { setId } = await request.json();
         if (!setId) return NextResponse.json({ status: 'error', message: "Missing setId", logs });
 
-        logs.push(`- Syncing set: ${setId} -`);
         const apiKey = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
         if (!apiKey) return NextResponse.json({ status: 'error', message: "Missing API Key", logs });
 
@@ -35,12 +33,13 @@ export async function POST(request: Request) {
         let hasMore = true;
         let totalProcessed = 0;
 
+        // Fetch phase
         while (hasMore && page <= 50) {
             try {
-                if (page > 1) await sleep(1000); // Respectful delay between pages
+                if (page > 1) await sleep(1000); 
 
                 const response = await axios.get(POKEMON_TCG_API_BASE, {
-                    timeout: 50000, // Increased to 50s to handle slow API responses
+                    timeout: 50000, 
                     headers: { 'X-Api-Key': apiKey },
                     params: { q: `set.id:${setId}`, page, pageSize: PAGE_SIZE, orderBy: 'number' },
                 });
@@ -49,18 +48,17 @@ export async function POST(request: Request) {
                 if (!data || data.length === 0) break;
                 
                 allCards = allCards.concat(data);
-                logs.push(`✅ Fetched page ${page}. (${allCards.length}/${totalCount || '?'})`);
                 
                 if (allCards.length >= (totalCount || 0) || data.length < PAGE_SIZE) hasMore = false;
                 else page++;
 
             } catch (apiError: any) {
-                const msg = apiError.response?.status === 429 ? "Rate limited by API" : apiError.message;
-                logs.push(`⚠️ API Error on page ${page}: ${msg}`);
-                return NextResponse.json({ status: 'error', message: msg, logs });
+                const msg = apiError.response?.status === 429 ? "Rate limited by TCG API" : apiError.message;
+                return NextResponse.json({ status: 'error', message: `API Error on page ${page}: ${msg}`, logs });
             }
         }
 
+        // Save phase
         const cardsCollection = db.collection('pokemon-tcg-cards');
         for (let i = 0; i < allCards.length; i += BATCH_SIZE) {
             const chunk = allCards.slice(i, i + BATCH_SIZE);
@@ -83,10 +81,10 @@ export async function POST(request: Request) {
                 try {
                     await batch.commit();
                     totalProcessed += batchCount;
-                    logs.push(`- Batch wrote ${batchCount} cards.`);
-                    await sleep(200); // Throttling Firestore writes
+                    await sleep(200); // Throttling
                 } catch (dbError: any) {
-                    logs.push(`❌ Batch failed: ${dbError.message}`);
+                    // Log but don't crash the whole set
+                    console.error(`Batch failed for set ${setId}:`, dbError.message);
                 }
             }
         }

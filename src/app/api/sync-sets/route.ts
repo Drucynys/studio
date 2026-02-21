@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import admin from 'firebase-admin';
@@ -18,7 +17,7 @@ export async function POST(request: Request) {
   
   try {
     const body = await request.json().catch(() => ({}));
-    const { action = 'legacy', page = 1, pageSize = 50, sets = [] } = body;
+    const { action = 'legacy', page = 1, pageSize = 25, sets = [] } = body;
 
     const apiKey = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
     if (!apiKey) {
@@ -26,12 +25,13 @@ export async function POST(request: Request) {
     }
 
     // --- ACTION: DISCOVER (Proxy to TCG API) ---
+    // Reduced page size ensures each individual request is fast.
     if (action === 'discover') {
       try {
         const response = await axios.get(POKEMON_TCG_API_SETS, {
           headers: { 'X-Api-Key': apiKey },
           params: { page, pageSize, orderBy: 'releaseDate' },
-          timeout: 50000, // Increased to 50s to handle slow API responses
+          timeout: 50000, 
         });
 
         return NextResponse.json({
@@ -74,17 +74,15 @@ export async function POST(request: Request) {
       });
     }
 
-    // --- LEGACY MODE: Single-request Discovery + Save (Backward compatibility) ---
-    logs.push("Starting single-pass discovery (Legacy Mode)...");
+    // --- LEGACY MODE ---
     const response = await axios.get(POKEMON_TCG_API_SETS, {
       headers: { 'X-Api-Key': apiKey },
-      timeout: 50000, // Increased to 50s
+      timeout: 50000,
     });
 
     const validSets = (response.data?.data || []).filter((s: any) => s && s.id);
     const setsCollection = db.collection('pokemon-tcg-sets');
     
-    // Process in one batch (usually < 200 sets)
     const batch = db.batch();
     validSets.forEach((set: any) => {
       batch.set(setsCollection.doc(set.id), {

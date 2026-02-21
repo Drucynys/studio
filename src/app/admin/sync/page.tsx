@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -22,14 +21,13 @@ import {
 } from "@/components/ui/alert-dialog";
 
 type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error' | 'stopped';
-interface ApiSet {
-  id: string;
-  name: string;
-  total: number;
-}
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+/**
+ * Fetches data from internal API and ensures JSON response.
+ * Handles platform-level HTML errors (504/502).
+ */
 async function safeFetch(url: string, options?: RequestInit) {
     try {
         const response = await fetch(url, options);
@@ -43,12 +41,17 @@ async function safeFetch(url: string, options?: RequestInit) {
         }
 
         if (contentType && contentType.includes('application/json')) {
-            return await response.json();
+            const data = await response.json();
+            // If the backend returned status: 'error', we treat it as an error here
+            if (data.status === 'error') {
+                throw new Error(data.message || "Unknown backend error");
+            }
+            return data;
         }
         
         const errorText = await response.text();
         console.error("Non-JSON Response received:", errorText.substring(0, 500));
-        throw new Error(`Server returned unexpected format (${response.status}). The platform may be experiencing issues.`);
+        throw new Error(`Server returned unexpected format (${response.status}).`);
     } catch (err: any) {
         return { status: 'error', message: err.message };
     }
@@ -104,6 +107,34 @@ export default function SyncAdminPage() {
     checkDbStatus();
   }, [checkDbStatus]);
 
+  const addLog = (msg: string) => {
+    setMasterSyncLogs(prev => [...prev, msg]);
+  };
+
+  /**
+   * Helper to perform a fetch with retries for resilient sync
+   */
+  const fetchWithRetry = async (url: string, options?: RequestInit, maxRetries = 3): Promise<any> => {
+    let lastError: any;
+    for (let i = 0; i < maxRetries; i++) {
+        const result = await safeFetch(url, options);
+        if (result.status !== 'error') {
+            return result;
+        }
+        lastError = new Error(result.message);
+        const isTimeout = result.message?.toLowerCase().includes('timeout');
+        
+        if (isTimeout && i < maxRetries - 1) {
+            const waitTime = (i + 1) * 2000;
+            addLog(`⚠️ Attempt ${i + 1} timed out. Retrying in ${waitTime/1000}s...`);
+            await sleep(waitTime);
+            continue;
+        }
+        break;
+    }
+    throw lastError;
+  };
+
   const handleFullResync = async () => {
     setMasterSyncStatus('in-progress');
     setMasterSyncLogs(['🚀 Starting granular data resynchronization...']);
@@ -111,59 +142,54 @@ export default function SyncAdminPage() {
     isSyncStopped.current = false;
 
     try {
-        // Step 1: Granular Set Discovery
+        // Step 1: Granular Set Discovery (Reduced page size for speed)
+        const PAGE_SIZE = 25; 
         setMasterSyncCurrentStep("Step 1/3: Discovering latest sets...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 1/3] Fetching expansion list from TCG API in pages..."]);
+        addLog(`\n[Step 1/3] Fetching expansion list in small pages (${PAGE_SIZE})...`);
         
         let allDiscoveredSets: any[] = [];
         let page = 1;
         let totalSetsCount = 0;
-        const PAGE_SIZE = 50;
 
         while (true) {
             if (isSyncStopped.current) break;
             
             setMasterSyncCurrentStep(`Discovering sets (Page ${page})...`);
-            const discoveryResult = await safeFetch('/api/sync-sets', {
+            const discoveryResult = await fetchWithRetry('/api/sync-sets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'discover', page, pageSize: PAGE_SIZE }),
             });
 
-            if (discoveryResult.status === 'error') {
-                throw new Error(`Discovery failed on page ${page}: ${discoveryResult.message}`);
-            }
-
             allDiscoveredSets.push(...(discoveryResult.data || []));
             totalSetsCount = discoveryResult.totalCount || 0;
             
-            setMasterSyncLogs(prev => [...prev, `✅ Discovered ${allDiscoveredSets.length} / ${totalSetsCount} sets.`]);
+            addLog(`✅ Page ${page}: Discovered ${allDiscoveredSets.length} / ${totalSetsCount} sets.`);
 
             if (allDiscoveredSets.length >= totalSetsCount || !discoveryResult.data?.length) {
                 break;
             }
             page++;
-            await sleep(500); // Small pause to be gentle on external API
+            await sleep(800); // Respectful delay
         }
 
         if (isSyncStopped.current) throw new Error("Sync stopped by user.");
 
         // Step 1.1: Save Discovery Results
         setMasterSyncCurrentStep("Step 1.1/3: Saving expansion list to database...");
-        const saveResult = await safeFetch('/api/sync-sets', {
+        await fetchWithRetry('/api/sync-sets', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'save', sets: allDiscoveredSets }),
         });
 
-        if (saveResult.status === 'error') throw new Error(`Failed to save set list: ${saveResult.message}`);
-        
+        addLog(`✅ Successfully saved ${allDiscoveredSets.length} expansions.`);
         setMasterSyncProgress(10);
         await checkDbStatus();
 
         // Step 2: Sync All Cards
         setMasterSyncCurrentStep("Step 2/3: Populating card database...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 2/3] Starting full card population loop..."]);
+        addLog("\n[Step 2/3] Starting full card population loop...");
         
         const localSets = await safeFetch('/api/sets');
         if (!Array.isArray(localSets)) throw new Error("Could not retrieve local sets list.");
@@ -174,31 +200,29 @@ export default function SyncAdminPage() {
             const currentSet = localSets[i];
             const progress = 10 + ((i + 1) / localSets.length) * 80;
             setMasterSyncProgress(progress);
-            setMasterSyncCurrentStep(`Syncing Cards: ${currentSet.name} (${i + 1}/${localSets.length})`);
+            setMasterSyncCurrentStep(`Syncing: ${currentSet.name} (${i + 1}/${localSets.length})`);
             
-            const syncResult = await safeFetch('/api/sync-cards', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ setId: currentSet.id }),
-            });
-            
-            if (syncResult.status === 'error') {
-                setMasterSyncLogs(prev => [...prev, `⚠️ Error syncing ${currentSet.name}: ${syncResult.message}. Skipping...`]);
-            } else {
+            try {
+                const syncResult = await fetchWithRetry('/api/sync-cards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ setId: currentSet.id }),
+                });
                 cumulativeCardCount += syncResult.count || 0;
+            } catch (err: any) {
+                addLog(`⚠️ Failed ${currentSet.name}: ${err.message}. Skipping...`);
             }
             
-            // Cooldown between sets
-            await sleep(800); 
+            await sleep(800); // Cooldown
         }
         
-        setMasterSyncLogs(prev => [...prev, `\n✅ Card population complete! Total cards processed: ${cumulativeCardCount}.`]);
+        addLog(`\n✅ Card population complete! Total cards processed: ${cumulativeCardCount}.`);
         await checkDbStatus();
 
         // Step 3: Rebuild Artist Index
         setMasterSyncCurrentStep("Step 3/3: Rebuilding artist index...");
-        setMasterSyncLogs(prev => [...prev, "\n[Step 3/3] Aggregating unique illustrators..."]);
-        const artistsResult = await safeFetch('/api/artists', { method: 'POST' });
+        addLog("\n[Step 3/3] Aggregating unique illustrators...");
+        const artistsResult = await fetchWithRetry('/api/artists', { method: 'POST' });
         if (artistsResult.logs) setMasterSyncLogs(prev => [...prev, ...artistsResult.logs]);
         
         setMasterSyncProgress(100);
@@ -208,7 +232,7 @@ export default function SyncAdminPage() {
 
     } catch (err: any) {
         setMasterSyncStatus('error');
-        setMasterSyncLogs(prev => [...prev, `❌ FATAL ERROR: ${err.message}`]);
+        addLog(`❌ FATAL ERROR: ${err.message}`);
         toast({ variant: "destructive", title: "Resync Failed", description: err.message });
     }
   };
@@ -255,7 +279,7 @@ export default function SyncAdminPage() {
                     Full Data Resynchronization
                 </CardTitle>
                 <CardDescription>
-                    Iterative synchronization designed to bypass platform timeouts and respect external API limits.
+                    Resilient iterative synchronization designed to handle external API timeouts.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
