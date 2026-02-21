@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
+import axios from 'axios';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 
 const db = getFirebaseAdmin().firestore();
@@ -26,34 +27,32 @@ export async function POST(request: Request) {
     // --- ACTION: DISCOVER (Proxy to TCG API) ---
     if (action === 'discover') {
       try {
-        const url = new URL(POKEMON_TCG_API_SETS);
-        url.searchParams.append('page', String(page));
-        url.searchParams.append('pageSize', String(pageSize));
-        // Removed orderBy to ensure maximum compatibility and speed during discovery
-
-        const response = await fetch(url.toString(), {
-          headers: { 'X-Api-Key': apiKey },
-          signal: AbortSignal.timeout(50000), // 50s timeout
+        console.log(`[Backend] Discovering sets: Page ${page}, Size ${pageSize}`);
+        
+        const response = await axios.get(POKEMON_TCG_API_SETS, {
+          timeout: 50000,
+          headers: { 
+            'X-Api-Key': apiKey,
+            'User-Agent': 'PokéTRKR/1.0'
+          },
+          params: { page, pageSize }
         });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`External API Error (${response.status}): ${errorText.substring(0, 100)}`);
-        }
-
-        const data = await response.json();
 
         return NextResponse.json({
           status: 'success',
-          data: data.data,
-          totalCount: data.totalCount,
-          page: data.page,
-          pageSize: data.pageSize,
+          data: response.data.data,
+          totalCount: response.data.totalCount,
+          page: response.data.page,
+          pageSize: response.data.pageSize,
         });
       } catch (apiError: any) {
-        const isTimeout = apiError.name === 'TimeoutError' || apiError.message?.includes('timeout');
-        const msg = isTimeout ? "The external TCG API timed out." : apiError.message;
-        return NextResponse.json({ status: 'error', message: msg });
+        const status = apiError.response?.status || 'Unknown';
+        const errorData = apiError.response?.data ? JSON.stringify(apiError.response.data).substring(0, 100) : apiError.message;
+        console.error(`[Backend] TCG API Error (${status}):`, errorData);
+        return NextResponse.json({ 
+          status: 'error', 
+          message: `External API Error (${status}): ${errorData}` 
+        });
       }
     }
 
@@ -84,31 +83,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // --- LEGACY MODE ---
-    const response = await fetch(POKEMON_TCG_API_SETS, {
-      headers: { 'X-Api-Key': apiKey },
-      signal: AbortSignal.timeout(50000),
-    });
-
-    if (!response.ok) throw new Error(`API Error: ${response.status}`);
-    
-    const data = await response.json();
-    const validSets = (data.data || []).filter((s: any) => s && s.id);
-    const setsCollection = db.collection('pokemon-tcg-sets');
-    
-    const batch = db.batch();
-    validSets.forEach((set: any) => {
-      batch.set(setsCollection.doc(set.id), {
-        ...set,
-        lastSynced: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
-    });
-    
-    await batch.commit();
-    return NextResponse.json({ status: 'success', count: validSets.length, logs });
+    return NextResponse.json({ status: 'error', message: "Unsupported action." });
 
   } catch (error: any) {
-    console.error('Error in sync-sets:', error);
+    console.error('Fatal error in sync-sets:', error);
     return NextResponse.json({ 
       status: 'error', 
       message: error.message || 'An unknown error occurred.',

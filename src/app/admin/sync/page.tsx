@@ -25,7 +25,7 @@ async function safeFetch(url: string, options?: RequestInit) {
         
         if (response.status === 504) throw new Error("Gateway Timeout (504). The server is busy.");
         if (response.status === 502) throw new Error("Bad Gateway (502). The server is down.");
-        if (response.status === 404) throw new Error("Route not found (404). Please check the API path.");
+        if (response.status === 404) throw new Error("Internal Route Not Found (404). Please verify API paths.");
 
         if (contentType && contentType.includes('application/json')) {
             const data = await response.json();
@@ -35,7 +35,8 @@ async function safeFetch(url: string, options?: RequestInit) {
             return data;
         }
         
-        throw new Error(`Server returned status ${response.status} with invalid format.`);
+        const text = await response.text();
+        throw new Error(`Server returned status ${response.status} with non-JSON content: ${text.substring(0, 50)}...`);
     } catch (err: any) {
         return { status: 'error', message: err.message };
     }
@@ -101,7 +102,10 @@ export default function SyncAdminPage() {
         }
         
         lastError = new Error(result.message);
-        const isRetryable = result.message?.toLowerCase().includes('timeout') || result.message?.includes('504') || result.message?.includes('502');
+        const isRetryable = result.message?.toLowerCase().includes('timeout') || 
+                           result.message?.includes('504') || 
+                           result.message?.includes('502') ||
+                           result.message?.includes('Unknown'); // Try again on mysterious errors
         
         if (isRetryable && i < maxRetries - 1) {
             const waitTime = (i + 1) * 3000;
@@ -140,16 +144,17 @@ export default function SyncAdminPage() {
                 body: JSON.stringify({ action: 'discover', page, pageSize: PAGE_SIZE }),
             });
 
-            allDiscoveredSets.push(...(discoveryResult.data || []));
+            const newData = discoveryResult.data || [];
+            allDiscoveredSets.push(...newData);
             totalSetsCount = discoveryResult.totalCount || 0;
             
             addLog(`✅ Discovered ${allDiscoveredSets.length} / ${totalSetsCount} sets.`);
 
-            if (allDiscoveredSets.length >= totalSetsCount || !discoveryResult.data?.length) {
+            if (allDiscoveredSets.length >= totalSetsCount || newData.length === 0) {
                 break;
             }
             page++;
-            await sleep(1000); // Throttling: 1-second pause between requests
+            await sleep(1000); // 1-second pause between requests
         }
 
         if (isSyncStopped.current) throw new Error("Sync stopped by user.");
