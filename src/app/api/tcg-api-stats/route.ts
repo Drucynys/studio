@@ -17,7 +17,7 @@ export async function GET() {
       params: {
         pageSize: 1,
       },
-      timeout: 10000,
+      timeout: 30000, // Increased to 30s for stability
     });
 
     const totalCount = response.data.totalCount;

@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         const response = await axios.get(POKEMON_TCG_API_SETS, {
           headers: { 'X-Api-Key': apiKey },
           params: { page, pageSize, orderBy: 'releaseDate' },
-          timeout: 20000, // 20s internal timeout for fast proxying
+          timeout: 50000, // Increased to 50s to handle slow API responses
         });
 
         return NextResponse.json({
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     logs.push("Starting single-pass discovery (Legacy Mode)...");
     const response = await axios.get(POKEMON_TCG_API_SETS, {
       headers: { 'X-Api-Key': apiKey },
-      timeout: 40000, 
+      timeout: 50000, // Increased to 50s
     });
 
     const validSets = (response.data?.data || []).filter((s: any) => s && s.id);

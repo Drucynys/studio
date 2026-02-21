@@ -40,7 +40,7 @@ export async function POST(request: Request) {
                 if (page > 1) await sleep(1000); // Respectful delay between pages
 
                 const response = await axios.get(POKEMON_TCG_API_BASE, {
-                    timeout: 30000,
+                    timeout: 50000, // Increased to 50s to handle slow API responses
                     headers: { 'X-Api-Key': apiKey },
                     params: { q: `set.id:${setId}`, page, pageSize: PAGE_SIZE, orderBy: 'number' },
                 });
