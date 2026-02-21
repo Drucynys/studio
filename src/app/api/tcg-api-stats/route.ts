@@ -1,6 +1,4 @@
-
 import { NextResponse } from 'next/server';
-import axios from 'axios';
 
 const POKEMON_TCG_API_BASE = 'https://api.pokemontcg.io/v2/cards';
 
@@ -12,15 +10,20 @@ export async function GET() {
     }
 
     // We only need the totalCount, so we fetch the smallest possible page size.
-    const response = await axios.get(POKEMON_TCG_API_BASE, {
+    const url = new URL(POKEMON_TCG_API_BASE);
+    url.searchParams.append('pageSize', '1');
+
+    const response = await fetch(url.toString(), {
       headers: { 'X-Api-Key': apiKey },
-      params: {
-        pageSize: 1,
-      },
-      timeout: 30000, // Increased to 30s for stability
+      signal: AbortSignal.timeout(30000), // 30s timeout
     });
 
-    const totalCount = response.data.totalCount;
+    if (!response.ok) {
+      return NextResponse.json({ status: 'error', message: `TCG API returned status ${response.status}` });
+    }
+
+    const data = await response.json();
+    const totalCount = data.totalCount;
 
     if (typeof totalCount !== 'number') {
         return NextResponse.json({ status: 'error', message: 'Could not retrieve total card count from the API response.' });
@@ -30,8 +33,9 @@ export async function GET() {
 
   } catch (error: any) {
     console.error('Error fetching total card count from TCG API:', error);
+    const isTimeout = error.name === 'TimeoutError' || error.message?.includes('timeout');
     return NextResponse.json(
-      { status: 'error', message: error.message || 'An unknown error occurred while fetching API stats.' }
+      { status: 'error', message: isTimeout ? "API request timed out." : (error.message || 'An unknown server error occurred.') }
     );
   }
 }

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import axios from 'axios';
 import admin from 'firebase-admin';
 import { getFirebaseAdmin } from '@/lib/firebase-admin';
 
@@ -25,24 +24,35 @@ export async function POST(request: Request) {
     }
 
     // --- ACTION: DISCOVER (Proxy to TCG API) ---
-    // Reduced page size ensures each individual request is fast.
     if (action === 'discover') {
       try {
-        const response = await axios.get(POKEMON_TCG_API_SETS, {
+        const url = new URL(POKEMON_TCG_API_SETS);
+        url.searchParams.append('page', String(page));
+        url.searchParams.append('pageSize', String(pageSize));
+        // Removed orderBy to ensure maximum compatibility and speed during discovery
+
+        const response = await fetch(url.toString(), {
           headers: { 'X-Api-Key': apiKey },
-          params: { page, pageSize, orderBy: 'releaseDate' },
-          timeout: 50000, 
+          signal: AbortSignal.timeout(50000), // 50s timeout
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`External API Error (${response.status}): ${errorText.substring(0, 100)}`);
+        }
+
+        const data = await response.json();
 
         return NextResponse.json({
           status: 'success',
-          data: response.data.data,
-          totalCount: response.data.totalCount,
-          page: response.data.page,
-          pageSize: response.data.pageSize,
+          data: data.data,
+          totalCount: data.totalCount,
+          page: data.page,
+          pageSize: data.pageSize,
         });
       } catch (apiError: any) {
-        const msg = apiError.response?.status === 429 ? "Rate limited by TCG API" : apiError.message;
+        const isTimeout = apiError.name === 'TimeoutError' || apiError.message?.includes('timeout');
+        const msg = isTimeout ? "The external TCG API timed out." : apiError.message;
         return NextResponse.json({ status: 'error', message: msg });
       }
     }
@@ -75,12 +85,15 @@ export async function POST(request: Request) {
     }
 
     // --- LEGACY MODE ---
-    const response = await axios.get(POKEMON_TCG_API_SETS, {
+    const response = await fetch(POKEMON_TCG_API_SETS, {
       headers: { 'X-Api-Key': apiKey },
-      timeout: 50000,
+      signal: AbortSignal.timeout(50000),
     });
 
-    const validSets = (response.data?.data || []).filter((s: any) => s && s.id);
+    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+    
+    const data = await response.json();
+    const validSets = (data.data || []).filter((s: any) => s && s.id);
     const setsCollection = db.collection('pokemon-tcg-sets');
     
     const batch = db.batch();

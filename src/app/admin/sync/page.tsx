@@ -9,16 +9,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, CheckCircle, Database, RefreshCcw, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 type SyncStatus = 'idle' | 'in-progress' | 'success' | 'error' | 'stopped';
 
@@ -26,19 +16,16 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Fetches data from internal API and ensures JSON response.
- * Handles platform-level HTML errors (504/502).
+ * Handles platform-level HTML errors (504/502/404).
  */
 async function safeFetch(url: string, options?: RequestInit) {
     try {
         const response = await fetch(url, options);
         const contentType = response.headers.get('content-type');
         
-        if (response.status === 504) {
-            throw new Error("Gateway Timeout (504). The server took too long to respond. This usually happens when the external TCG API is slow.");
-        }
-        if (response.status === 502) {
-            throw new Error("Bad Gateway (502). The server is temporarily unavailable.");
-        }
+        if (response.status === 504) throw new Error("Gateway Timeout (504). The server is busy.");
+        if (response.status === 502) throw new Error("Bad Gateway (502). The server is down.");
+        if (response.status === 404) throw new Error("Route not found (404). Please check the API path.");
 
         if (contentType && contentType.includes('application/json')) {
             const data = await response.json();
@@ -48,7 +35,7 @@ async function safeFetch(url: string, options?: RequestInit) {
             return data;
         }
         
-        throw new Error(`Server returned unexpected format (${response.status}).`);
+        throw new Error(`Server returned status ${response.status} with invalid format.`);
     } catch (err: any) {
         return { status: 'error', message: err.message };
     }
@@ -99,7 +86,7 @@ export default function SyncAdminPage() {
   }, [checkDbStatus]);
 
   const addLog = (msg: string) => {
-    setMasterSyncLogs(prev => [...prev, msg]);
+    setMasterSyncLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
   };
 
   /**
@@ -112,12 +99,13 @@ export default function SyncAdminPage() {
         if (result.status !== 'error') {
             return result;
         }
-        lastError = new Error(result.message);
-        const isTimeout = result.message?.toLowerCase().includes('timeout');
         
-        if (isTimeout && i < maxRetries - 1) {
-            const waitTime = (i + 1) * 3000; // Increased retry delay
-            addLog(`⚠️ Attempt ${i + 1} timed out. Retrying in ${waitTime/1000}s...`);
+        lastError = new Error(result.message);
+        const isRetryable = result.message?.toLowerCase().includes('timeout') || result.message?.includes('504') || result.message?.includes('502');
+        
+        if (isRetryable && i < maxRetries - 1) {
+            const waitTime = (i + 1) * 3000;
+            addLog(`⚠️ Attempt ${i + 1} failed: ${result.message}. Retrying in ${waitTime/1000}s...`);
             await sleep(waitTime);
             continue;
         }
@@ -136,7 +124,7 @@ export default function SyncAdminPage() {
         // Step 1: Granular Set Discovery
         const PAGE_SIZE = 25; 
         setMasterSyncCurrentStep("Step 1/3: Discovering latest sets...");
-        addLog(`\n[Step 1/3] Fetching expansion list from TCG API in pages (${PAGE_SIZE} per page)...`);
+        addLog(`[Step 1/3] Fetching expansion list from TCG API in pages (${PAGE_SIZE} per page)...`);
         
         let allDiscoveredSets: any[] = [];
         let page = 1;
@@ -161,7 +149,7 @@ export default function SyncAdminPage() {
                 break;
             }
             page++;
-            await sleep(1000); // 1-second pause between requests
+            await sleep(1000); // Throttling: 1-second pause between requests
         }
 
         if (isSyncStopped.current) throw new Error("Sync stopped by user.");
@@ -181,10 +169,11 @@ export default function SyncAdminPage() {
 
         // Step 2: Sync All Cards
         setMasterSyncCurrentStep("Step 2/3: Populating card database...");
-        addLog("\n[Step 2/3] Starting full card population loop...");
+        addLog("[Step 2/3] Starting full card population loop...");
         
-        const localSets = await safeFetch('/api/sets');
-        if (!Array.isArray(localSets)) throw new Error("Could not retrieve local sets list.");
+        const localSetsResult = await safeFetch('/api/sets');
+        const localSets = Array.isArray(localSetsResult) ? localSetsResult : [];
+        if (localSets.length === 0) throw new Error("Could not retrieve local sets list.");
 
         let cumulativeCardCount = 0;
         for (let i = 0; i < localSets.length; i++) {
@@ -211,17 +200,19 @@ export default function SyncAdminPage() {
                 addLog(`⚠️ Failed ${currentSet.name}: ${err.message}. Skipping...`);
             }
             
-            await sleep(1000); // 1-second pause between sets
+            await sleep(1000); // Throttling: 1-second pause between sets
         }
         
-        addLog(`\n✅ Card population complete! Total cards processed: ${cumulativeCardCount}.`);
+        addLog(`✅ Card population complete! Total cards processed: ${cumulativeCardCount}.`);
         await checkDbStatus();
 
         // Step 3: Rebuild Artist Index
         setMasterSyncCurrentStep("Step 3/3: Rebuilding artist index...");
-        addLog("\n[Step 3/3] Aggregating unique illustrators...");
+        addLog("[Step 3/3] Aggregating unique illustrators...");
         const artistsResult = await fetchWithRetry('/api/artists', { method: 'POST' });
-        if (artistsResult.logs) setMasterSyncLogs(prev => [...prev, ...artistsResult.logs]);
+        if (artistsResult.logs) {
+            artistsResult.logs.forEach((l: string) => addLog(l));
+        }
         
         setMasterSyncProgress(100);
         setMasterSyncCurrentStep("Resynchronization Completed Successfully!");
