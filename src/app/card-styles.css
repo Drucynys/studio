@@ -1,6 +1,6 @@
 /* 
-  Core styles adapted from https://github.com/simeydotme/pokemon-cards-css 
-  for the holographic card effect. 
+  Core styles adapted from simeydotme/pokemon-cards-css 
+  for premium holographic & 3D tilt effects. 
 */
 
 :root {
@@ -10,8 +10,8 @@
 	--o: 0.9;
 	--tx: 0;
 	--ty: 0;
-	--rx: 0;
-	--ry: 0;
+	--rx: 0deg;
+	--ry: 0deg;
 	--pos: center center;
 	--posx: 50%;
 	--posy: 50%;
@@ -19,7 +19,7 @@
 }
 
 .card-container {
-    perspective: 1500px;
+    perspective: 2000px;
 }
 
 .card {
@@ -30,47 +30,240 @@
 		translateY(var(--ty)) 
 		rotateX(var(--rx)) 
 		rotateY(var(--ry));
-	transition: transform 0.25s;
+	transition: transform 0.1s ease-out; /* Quick transition since we smooth with JS lerp */
     position: relative;
-    border-radius: 1.3rem;
+    border-radius: 4.7%; /* Authentic TCG rounded corners that perfectly mask rectangular black asset borders */
     overflow: hidden;
-    box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.3);
+    box-shadow: 0 30px 60px -15px rgba(0,0,0,0.55), 0 0 20px 5px rgba(255,255,255,0.05);
+    background-color: #040404;
 }
 
+/* Dynamic Glossy Light Reflection (Moves in opposite direction of tilt for physical realism) */
 .card:before {
 	content: '';
 	position: absolute;
-	left: 0;
-	top: 0;
-	width: 100%;
-	height: 100%;
+	inset: 0;
 	background: linear-gradient(
-		135deg,
-		rgba(255,255,255,0.25) 0%,
-		rgba(255,255,255,0) 40%,
-		rgba(255,255,255,0) 100%
+		115deg,
+		transparent 0%,
+		rgba(255, 255, 255, 0.3) 30%,
+		rgba(255, 255, 255, 0.6) 48%,
+		rgba(255, 255, 255, 0.3) 52%,
+		transparent 100%
 	);
-	opacity: var(--o);
+	background-size: 200% 200%;
+	background-position: calc(100% - var(--posx)) calc(100% - var(--posy));
+	background-repeat: no-repeat;
+	mix-blend-mode: overlay;
+	opacity: 0.85;
+	pointer-events: none;
+	z-index: 4;
+}
+
+/* Premium Holographic Foil Rainbow Shimmer Layer (Triggered on hover or device tilt) */
+.card > .shine {
+	position: absolute;
+	inset: 0;
+	background: 
+		linear-gradient(
+			115deg,
+			transparent 0%,
+			rgba(255, 0, 128, 0.25) 25%,
+			rgba(0, 255, 255, 0.25) 45%,
+			rgba(255, 255, 0, 0.25) 50%,
+			rgba(0, 255, 0, 0.25) 55%,
+			rgba(0, 0, 255, 0.25) 75%,
+			transparent 100%
+		),
+		radial-gradient(
+			circle farthest-corner at var(--posx) var(--posy),
+			rgba(255, 255, 255, 0.75) 0%,
+			rgba(255, 255, 255, 0.1) 50%,
+			transparent 100%
+		);
+	background-size: 150% 150%;
+	background-position: var(--posx) var(--posy);
+	background-repeat: no-repeat;
+	mix-blend-mode: color-dodge;
+	opacity: 0.8;
+	pointer-events: none;
+	z-index: 3;
+    border-radius: inherit;
+}
+
+/* Diagonal Sparkle Holo Foil Mask Overlay (Simulates card textures) */
+.card:after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background-image: 
+		repeating-linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.08) 0px,
+			rgba(255, 255, 255, 0.08) 3px,
+			transparent 3px,
+			transparent 6px
+		),
+		repeating-linear-gradient(
+			45deg,
+			rgba(255, 255, 255, 0.04) 0px,
+			rgba(255, 255, 255, 0.04) 2px,
+			transparent 2px,
+			transparent 4px
+		);
+	opacity: 0.65;
 	mix-blend-mode: color-dodge;
 	pointer-events: none;
 	z-index: 2;
 }
 
+/* ==========================================================================
+   Rarity-Based Holographic & Shimmer Scaling (Sequenced by Pokémon TCG Rarity)
+   ========================================================================== */
 
-.card > .shine {
-	position: absolute;
-	inset: 0;
+/* 1. Common / Standard Holo (Classic Cosmos Rainbow Bands & Moving Glare Sheet) */
+.card[data-rarity="common"]:before {
+	opacity: 0.55;
+}
+.card[data-rarity="common"] > .shine {
+	opacity: 0.65;
 	background: 
+		linear-gradient(
+			115deg,
+			transparent 0%,
+			rgba(255, 0, 128, 0.35) 25%,
+			rgba(0, 255, 255, 0.35) 45%,
+			rgba(255, 255, 0, 0.35) 50%,
+			rgba(0, 255, 0, 0.35) 55%,
+			rgba(0, 0, 255, 0.35) 75%,
+			transparent 100%
+		),
 		radial-gradient(
 			circle farthest-corner at var(--posx) var(--posy),
-			rgba(255,255,255,0.8) 0%,
-			rgba(255,255,255,0.3) 40%
+			rgba(255, 255, 255, 0.8) 0%,
+			rgba(255, 255, 255, 0.1) 45%,
+			transparent 90%
 		);
-	mix-blend-mode: overlay;
-	opacity: var(--o);
-	pointer-events: none;
-	z-index: 3;
-    border-radius: inherit;
+}
+.card[data-rarity="common"]:after {
+	opacity: 0.25;
+	background-image: 
+		repeating-linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.05) 0px,
+			rgba(255, 255, 255, 0.05) 4px,
+			transparent 4px,
+			transparent 8px
+		);
+}
+
+/* 2. Rare Holo / Galaxy Foil (Classic Sparkle Starfoil & High-Contrast Shimmer) */
+.card[data-rarity="holo"]:before {
+	opacity: 0.7;
+}
+.card[data-rarity="holo"] > .shine {
+	opacity: 0.75;
+	background: 
+		linear-gradient(
+			115deg,
+			rgba(255, 0, 128, 0.4) 0%,
+			rgba(0, 255, 255, 0.4) 25%,
+			rgba(255, 255, 0, 0.4) 50%,
+			rgba(0, 255, 0, 0.4) 75%,
+			rgba(0, 0, 255, 0.4) 100%
+		),
+		radial-gradient(
+			circle farthest-corner at var(--posx) var(--posy),
+			rgba(255, 255, 255, 0.9) 0%,
+			rgba(0, 255, 255, 0.2) 30%,
+			transparent 80%
+		);
+}
+.card[data-rarity="holo"]:after {
+	opacity: 0.55;
+	background-image: 
+		radial-gradient(circle at 50% 50%, rgba(255,255,255,0.4) 1px, transparent 1px),
+		radial-gradient(circle at 0 0, rgba(255,255,255,0.3) 2px, transparent 2px),
+		radial-gradient(circle at 100% 100%, rgba(255,255,255,0.3) 2px, transparent 2px),
+		repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 2px, transparent 2px, transparent 6px);
+	background-size: 40px 40px, 60px 60px, 50px 50px, 100%;
+}
+
+/* 3. Ultra Rare / Double Rare (ex, V, VMAX) (Vivid Neon Glare, Sweeping Colors, & Geometric Crosshatch) */
+.card[data-rarity="ultra"]:before {
+	opacity: 0.8;
+}
+.card[data-rarity="ultra"] > .shine {
+	opacity: 0.85;
+	background: 
+		linear-gradient(
+			115deg,
+			rgba(255, 0, 128, 0.55) 0%,
+			rgba(0, 255, 255, 0.55) 30%,
+			rgba(255, 255, 0, 0.55) 50%,
+			rgba(0, 255, 255, 0.55) 70%,
+			rgba(255, 0, 128, 0.55) 100%
+		),
+		radial-gradient(
+			circle farthest-corner at var(--posx) var(--posy),
+			rgba(255, 255, 255, 0.95) 0%,
+			rgba(255, 0, 128, 0.3) 25%,
+			transparent 80%
+		);
+}
+.card[data-rarity="ultra"]:after {
+	opacity: 0.65;
+	background-image: 
+		repeating-linear-gradient(
+			135deg,
+			rgba(255, 255, 255, 0.08) 0px,
+			rgba(255, 255, 255, 0.08) 3px,
+			transparent 3px,
+			transparent 6px
+		),
+		repeating-linear-gradient(
+			45deg,
+			rgba(255, 255, 255, 0.08) 0px,
+			rgba(255, 255, 255, 0.08) 3px,
+			transparent 3px,
+			transparent 6px
+		);
+}
+
+/* 4. Special Illustration Rare / Secret Rare (SAR, Gold, Alternate Art) (Golden Shimmers, Cosmic Halos, Starfoil sparklers) */
+.card[data-rarity="secret"]:before {
+	opacity: 0.9;
+}
+.card[data-rarity="secret"] > .shine {
+	opacity: 0.92;
+	background: 
+		linear-gradient(
+			115deg,
+			rgba(255, 223, 0, 0.4) 0%, 
+			rgba(255, 0, 128, 0.45) 20%,
+			rgba(0, 255, 255, 0.45) 40%,
+			rgba(255, 255, 0, 0.45) 50%,
+			rgba(0, 255, 0, 0.45) 60%,
+			rgba(0, 0, 255, 0.45) 80%,
+			rgba(255, 223, 0, 0.4) 100%
+		),
+		radial-gradient(
+			circle farthest-corner at var(--posx) var(--posy),
+			rgba(255, 255, 255, 1) 0%,
+			rgba(255, 223, 0, 0.5) 30%, 
+			rgba(255, 255, 255, 0.2) 60%,
+			transparent 100%
+		);
+}
+.card[data-rarity="secret"]:after {
+	opacity: 0.85;
+	background-image: 
+		radial-gradient(circle at 30% 20%, rgba(255,223,0,0.6) 2px, transparent 2px),
+		radial-gradient(circle at 80% 70%, rgba(255,223,0,0.5) 3px, transparent 3px),
+		radial-gradient(circle at 10% 80%, rgba(255,255,255,0.4) 1px, transparent 1px),
+		repeating-linear-gradient(135deg, rgba(255, 223, 0, 0.12) 0px, rgba(255, 223, 0, 0.12) 3px, transparent 3px, transparent 6px),
+		repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.08) 0px, rgba(255, 255, 255, 0.08) 2px, transparent 2px, transparent 4px);
+	background-size: 50px 50px, 70px 70px, 40px 40px, 100%, 100%;
 }
 
 .card .card-image {
@@ -78,7 +271,141 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: fill;
     z-index: 1;
     border-radius: inherit;
+}
+
+/* 
+  Optimized auto-shimmer for list card items (no JS coordinate tracking required)
+  Provides instant premium holographic signal on hover
+*/
+.list-card-holo {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.375rem;
+}
+
+.list-card-holo:before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 30%,
+    rgba(255, 255, 255, 0.4) 48%,
+    rgba(255, 255, 255, 0.2) 52%,
+    transparent 100%
+  );
+  background-size: 200% 200%;
+  background-position: -200% -200%;
+  mix-blend-mode: overlay;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+  transition: opacity 0.3s ease;
+}
+
+.list-card-holo:after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    rgba(255, 0, 128, 0.15) 25%,
+    rgba(0, 255, 255, 0.15) 45%,
+    rgba(255, 255, 0, 0.15) 50%,
+    rgba(0, 255, 0, 0.15) 55%,
+    rgba(0, 0, 255, 0.15) 75%,
+    transparent 100%
+  );
+  background-size: 200% 200%;
+  background-position: -200% -200%;
+  mix-blend-mode: color-dodge;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 3;
+  transition: opacity 0.3s ease;
+}
+
+.list-card-holo:hover:before {
+  opacity: 1;
+  animation: holoShimmer 2s infinite linear;
+}
+
+.list-card-holo:hover:after {
+  opacity: 1;
+  animation: holoShimmer 2s infinite linear;
+}
+
+@keyframes holoShimmer {
+  0% {
+    background-position: 200% 200%;
+  }
+  100% {
+    background-position: -200% -200%;
+  }
+}
+
+/* Satisfying swipe transitions between cards */
+@keyframes slideOutLeft {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-65px) scale(0.93);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInRight {
+  0% {
+    transform: translateX(65px) scale(0.93);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  0% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(65px) scale(0.93);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInLeft {
+  0% {
+    transform: translateX(-65px) scale(0.93);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-slide-out-left {
+  animation: slideOutLeft 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-slide-out-right {
+  animation: slideOutRight 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }

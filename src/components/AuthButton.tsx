@@ -2,6 +2,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useUIStore } from "@/store/useUIStore";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -12,11 +13,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Loader2, LogIn, LogOut, User, Settings, Shield } from "lucide-react";
+import { Loader2, LogIn, LogOut, User, Settings, Shield, Replace, Users } from "lucide-react";
 import Link from "next/link";
 
 export function AuthButton() {
-  const { user, loading, role, openAuthModal, logOut } = useAuth();
+  const { user, loading, role, logOut } = useAuth();
+  const { openAuthModal } = useUIStore();
 
   if (loading) {
     return <Button variant="ghost" size="icon" disabled><Loader2 className="h-5 w-5 animate-spin" /></Button>;
@@ -60,6 +62,18 @@ export function AuthButton() {
             </Link>
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem asChild>
+          <Link href="/exchange">
+            <Replace className="mr-2 h-4 w-4" />
+            <span>Exchange</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/friends">
+            <Users className="mr-2 h-4 w-4" />
+            <span>Friends</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings">
             <Settings className="mr-2 h-4 w-4" />

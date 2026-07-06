@@ -12,9 +12,9 @@ const db = admin.firestore();
 
 export async function GET(
     request: Request,
-    context: { params: { apiId: string } }
+    context: { params: Promise<{ apiId: string }> }
 ) {
-    const { apiId } = context.params;
+    const { apiId } = await context.params;
     if (!apiId) {
         return NextResponse.json({ message: 'Card API ID is required' }, { status: 400 });
     }

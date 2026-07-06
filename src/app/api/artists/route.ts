@@ -17,7 +17,11 @@ const BATCH_SIZE = 400;
 export async function GET() {
     try {
         const snapshot = await db.collection(ARTISTS_COLLECTION).orderBy('cardCount', 'desc').get();
-        return NextResponse.json(snapshot.docs.map(doc => doc.data()));
+        const artists = snapshot.docs.map(doc => doc.data());
+        
+        const response = NextResponse.json(artists);
+        response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+        return response;
     } catch (error: any) {
         return NextResponse.json({ status: 'error', message: error.message });
     }

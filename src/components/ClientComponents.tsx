@@ -20,11 +20,20 @@ const AuthModal = dynamic(() =>
   }
 );
 
+const ThemeCustomizer = dynamic(() => 
+  import('@/components/ThemeCustomizer').then(mod => ({ default: mod.ThemeCustomizer })), 
+  { 
+    ssr: false,
+    loading: () => null
+  }
+);
+
 export function ClientComponents() {
   return (
     <>
       <Toaster />
       <AuthModal />
+      <ThemeCustomizer />
     </>
   );
 }

@@ -13,9 +13,9 @@ const db = admin.firestore();
 
 export async function GET(
     request: Request,
-    context: { params: { cardApiId: string } }
+    context: { params: Promise<{ cardApiId: string }> }
 ) {
-    const { cardApiId } = context.params;
+    const { cardApiId } = await context.params;
     const { searchParams } = new URL(request.url);
     const range = searchParams.get('range') || '30d';
 

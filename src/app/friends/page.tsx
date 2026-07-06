@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Search, Users, UserPlus, Info, UserX } from 'lucide-react';
 import type { PokemonCard } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useFollowing } from "@/hooks/useNotifications";
+import { useUIStore } from '@/store/useUIStore';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
@@ -26,7 +28,9 @@ interface FollowedUser {
 }
 
 export default function FriendsPage() {
-    const { user, openAuthModal, following, loadingFollowing } = useAuth();
+    const { user } = useAuth();
+    const { following, loadingFollowing } = useFollowing(user?.uid);
+    const { openAuthModal } = useUIStore();
     const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
     const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);

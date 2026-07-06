@@ -11,8 +11,8 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-export async function GET(request: Request, { params }: { params: { setId: string } }) {
-    const { setId } = params;
+export async function GET(request: Request, { params }: { params: Promise<{ setId: string }> }) {
+    const { setId } = await params;
     if (!setId) {
         return NextResponse.json({ message: 'Set ID is required' }, { status: 400 });
     }
@@ -21,11 +21,10 @@ export async function GET(request: Request, { params }: { params: { setId: strin
         const setRef = db.collection('pokemon-tcg-sets').doc(setId);
         const doc = await setRef.get();
 
-        if (!doc.exists) {
-            return NextResponse.json({ message: 'Set not found in database' }, { status: 404 });
-        }
-
-        return NextResponse.json({ id: doc.id, ...doc.data() });
+        const setData = { id: doc.id, ...doc.data() };
+        const response = NextResponse.json(setData);
+        response.headers.set('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+        return response;
     } catch (error: any) {
         console.error(`Error fetching set ${setId}:`, error);
         return NextResponse.json({ message: error.message || 'An unknown server error occurred.' }, { status: 500 });

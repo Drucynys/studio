@@ -11,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserCollection } from "@/hooks/useUserCollection";
+import { useWishlist } from "@/hooks/useWishlist";
+import { useExchange } from "@/hooks/useExchange";
+import { collectionService } from "@/services/collectionService";
+import { wishlistService } from "@/services/wishlistService";
+import { exchangeService } from "@/services/exchangeService";
+import { useUIStore } from "@/store/useUIStore";
 import { useDebounce } from "@/hooks/useDebounce";
 import { EditCardDialog } from "@/components/EditCardDialog";
 import { FullScreenCardView } from "@/components/FullScreenCardView";
@@ -47,23 +54,56 @@ const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | 
 };
 
 export default function MyCollectionPage() {
-  const { 
-    user, 
-    loading, 
-    collection, 
-    loadingCollection,
-    wishlist,
-    loadingWishlist,
-    myExchangeItems,
-    loadingMyExchangeItems,
-    updateCardInCollection, 
-    removeCardFromCollection,
-    removeCardFromWishlist,
-    moveCardFromWishlistToCollection,
-    addCardToExchange,
-    removeCardFromExchange,
-    openAuthModal
-  } = useAuth();
+  const { openAuthModal } = useUIStore();
+  const { user, loading } = useAuth();
+  const { collection, loadingCollection } = useUserCollection(user?.uid);
+  const { wishlist, loadingWishlist } = useWishlist(user?.uid);
+  const { myExchangeItems, loadingMyExchangeItems } = useExchange(user?.uid);
+  const { toast } = useToast();
+
+  const updateCardInCollection = async (card: PokemonCard) => {
+    if (!user) return;
+    await collectionService.updateCard(user.uid, card);
+  };
+
+  const removeCardFromCollection = async (cardId: string) => {
+    if (!user) return;
+    await collectionService.removeCard(user.uid, cardId);
+  };
+
+  const removeCardFromWishlist = async (itemId: string) => {
+    if (!user) return;
+    await wishlistService.removeItem(user.uid, itemId);
+  };
+
+  const moveCardFromWishlistToCollection = async (item: WishlistItem) => {
+    if (!user) return;
+    await wishlistService.removeItem(user.uid, item.id);
+    await collectionService.addCard(user.uid, {
+      apiId: item.apiId,
+      name: item.name,
+      set: item.set,
+      cardNumber: item.cardNumber,
+      rarity: item.rarity || 'N/A',
+      imageUrl: item.imageUrl || null,
+      artist: item.artist || null,
+      language: 'English',
+      quantity: 1,
+      value: 0,
+      variant: null,
+    });
+    toast({ title: "Moved to Collection", description: `${item.name} moved to your collection.` });
+  };
+
+  const addCardToExchange = async (card: PokemonCard) => {
+    if (!user) return;
+    await exchangeService.addItem(user.uid, user.displayName || "Anonymous", user.email, card);
+    toast({ title: "Added to Exchange", description: `${card.name} is now listed for trade.` });
+  };
+
+  const removeCardFromExchange = async (exchangeId: string) => {
+    await exchangeService.removeItem(exchangeId);
+  };
   
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState("dateAddedDesc");
@@ -80,7 +120,6 @@ export default function MyCollectionPage() {
   const [masterCardData, setMasterCardData] = useState<Map<string, ApiPokemonCard>>(new Map());
   const [loadingMasterData, setLoadingMasterData] = useState(false);
 
-  const { toast } = useToast();
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const fetchMasterData = useCallback(async () => {

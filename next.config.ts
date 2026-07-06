@@ -3,8 +3,8 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   // Updated syntax for external packages
-  serverExternalPackages: ['sharp', 'onnxruntime-node'],
-  
+  serverExternalPackages: ['sharp', 'onnxruntime-node', '@opentelemetry/sdk-node', '@opentelemetry/api'],
+
   // Performance optimizations
   experimental: {
     optimizePackageImports: [
@@ -16,17 +16,21 @@ const nextConfig: NextConfig = {
       '@radix-ui/react-checkbox',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
-    ],
+    ]
   },
 
-  
+
   // Allow your Cloud Workstation domain
   allowedDevOrigins: [
+    'localhost:3000',
+    '127.0.0.1:3000',
+    '192.168.1.241:3000',
+    '192.168.1.241',
     '3000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
     '3001-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
     '6000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev'
   ],
-  
+
   // If you plan to use external images
   images: {
     remotePatterns: [
@@ -53,6 +57,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'placehold.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images.scrydex.com',
       }
     ],
     formats: ['image/avif', 'image/webp'], // Modern formats for better compression
@@ -69,47 +77,7 @@ const nextConfig: NextConfig = {
       };
     }
 
-    // Optimize bundle splitting for better caching and loading
-    if (!dev) {
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          default: {
-            minChunks: 2,
-            priority: -20,
-            reuseExistingChunk: true,
-          },
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-            priority: -10,
-          },
-          firebase: {
-            test: /[\\/]node_modules[\\/](firebase|@firebase)[\\/]/,
-            name: 'firebase',
-            chunks: 'all',
-            priority: 10,
-          },
-          radix: {
-            test: /[\\/]node_modules[\\/]@radix-ui[\\/]/,
-            name: 'radix-ui',
-            chunks: 'all',
-            priority: 5,
-          },
-          icons: {
-            test: /[\\/]node_modules[\\/](lucide-react|@radix-ui\/react-icons)[\\/]/,
-            name: 'icons',
-            chunks: 'all',
-            priority: 5,
-          },
-        },
-      };
 
-      // Tree shaking optimizations
-      config.optimization.usedExports = true;
-      config.optimization.sideEffects = false;
-    }
 
     return config;
   },

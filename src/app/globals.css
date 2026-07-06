@@ -98,8 +98,106 @@
 }
 
 @layer base {
+  /* Emerald Forest Theme */
+  :root.theme-emerald {
+    --background: 140 40% 98%;
+    --primary: 142 70% 45%;
+    --ring: 142 70% 45%;
+    --sidebar-primary: 142 70% 45%;
+    --sidebar-ring: 142 70% 45%;
+  }
+  .dark.theme-emerald {
+    --background: 160 84% 5%;
+    --primary: 142 72% 55%;
+    --card: 160 80% 9%;
+    --popover: 160 84% 5%;
+    --border: 160 50% 15%;
+    --input: 160 50% 15%;
+    --ring: 142 72% 55%;
+    --sidebar-background: 160 84% 6%;
+    --sidebar-primary: 142 72% 55%;
+    --sidebar-border: 160 50% 15%;
+    --sidebar-ring: 142 72% 55%;
+  }
+
+  /* Cyberpunk Violet Theme */
+  :root.theme-cyberpunk {
+    --background: 270 50% 98%;
+    --primary: 258 90% 77%;
+    --ring: 258 90% 77%;
+    --sidebar-primary: 258 90% 77%;
+    --sidebar-ring: 258 90% 77%;
+  }
+  .dark.theme-cyberpunk {
+    --background: 260 50% 5%;
+    --primary: 258 90% 77%;
+    --card: 260 52% 13%;
+    --popover: 260 50% 5%;
+    --border: 260 40% 20%;
+    --input: 260 40% 20%;
+    --ring: 258 90% 77%;
+    --sidebar-background: 260 50% 6%;
+    --sidebar-primary: 258 90% 77%;
+    --sidebar-border: 260 40% 20%;
+    --sidebar-ring: 258 90% 77%;
+  }
+
+  /* Rose Obsidian Theme */
+  :root.theme-rose {
+    --background: 343 100% 98%;
+    --primary: 343 91% 60%;
+    --ring: 343 91% 60%;
+    --sidebar-primary: 343 91% 60%;
+    --sidebar-ring: 343 91% 60%;
+  }
+  .dark.theme-rose {
+    --background: 340 50% 4%;
+    --primary: 343 95% 71%;
+    --card: 340 55% 10%;
+    --popover: 340 50% 4%;
+    --border: 340 40% 16%;
+    --input: 340 40% 16%;
+    --ring: 343 95% 71%;
+    --sidebar-background: 340 50% 5%;
+    --sidebar-primary: 343 95% 71%;
+    --sidebar-border: 340 40% 16%;
+    --sidebar-ring: 343 95% 71%;
+  }
+
+  /* Amber Gold Theme */
+  :root.theme-amber {
+    --background: 48 100% 98%;
+    --primary: 38 92% 50%;
+    --ring: 38 92% 50%;
+    --sidebar-primary: 38 92% 50%;
+    --sidebar-ring: 38 92% 50%;
+  }
+  .dark.theme-amber {
+    --background: 35 50% 4%;
+    --primary: 40 96% 57%;
+    --card: 35 50% 10%;
+    --popover: 35 50% 4%;
+    --border: 35 40% 15%;
+    --input: 35 40% 15%;
+    --ring: 40 96% 57%;
+    --sidebar-background: 35 50% 5%;
+    --sidebar-primary: 40 96% 57%;
+    --sidebar-border: 35 40% 15%;
+    --sidebar-ring: 40 96% 57%;
+  }
+}
+
+@layer base {
   * {
     @apply border-border;
+  }
+  html {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
   }
   body {
     @apply bg-background text-foreground;
@@ -118,3 +216,24 @@
   background-color: hsl(var(--primary));
   animation: scan-line 2s linear infinite;
 }
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted-foreground) / 0.15) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+

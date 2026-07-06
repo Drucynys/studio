@@ -2,6 +2,8 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useUserCollection } from "@/hooks/useUserCollection";
+import { useUIStore } from "@/store/useUIStore";
 import { AppHeader } from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -59,18 +61,18 @@ const privacyFormSchema = z.object({
 
 
 export default function SettingsPage() {
+  const { openAuthModal } = useUIStore();
   const { 
     user, 
     loading, 
-    collection,
     updateUserDisplayName, 
     reauthenticate, 
     updateUserEmail, 
     updateUserPassword, 
-    openAuthModal,
     privacySetting,
     updateUserPrivacySetting,
   } = useAuth();
+  const { collection } = useUserCollection(user?.uid);
 
   const { toast } = useToast();
   const router = useRouter();
@@ -101,13 +103,13 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!loading && !user) {
       router.push('/');
-      openAuthModal();
+      useUIStore.getState().openAuthModal();
     }
     if (user) {
       profileForm.reset({ displayName: user.displayName || "" });
       emailForm.reset({ newEmail: user.email || "", password: "" });
     }
-  }, [user, loading, router, openAuthModal, profileForm, emailForm]);
+  }, [user, loading, router, profileForm, emailForm]);
 
   useEffect(() => {
     if (privacySetting) {
@@ -157,7 +159,7 @@ export default function SettingsPage() {
 
   const handleExport = async () => {
     if (!user) {
-      openAuthModal();
+      useUIStore.getState().openAuthModal();
       return;
     }
     setIsExporting(true);
@@ -234,7 +236,7 @@ export default function SettingsPage() {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <div className="max-w-2xl mx-auto space-y-8">
-          <div className="space-y-2">
+          <div className="space-y-2 hidden md:block">
             <h1 className="text-3xl font-bold font-headline flex items-center gap-2"><SettingsIcon className="h-7 w-7 text-primary"/> Account Settings</h1>
             <p className="text-muted-foreground">Manage your profile, email, and password settings.</p>
           </div>

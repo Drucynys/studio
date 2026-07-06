@@ -8,12 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Camera, FileEdit, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { collectionService } from "@/services/collectionService";
+import { useUIStore } from "@/store/useUIStore";
 import { useToast } from "@/hooks/use-toast";
 import type { PokemonCard } from "@/types";
 import type { FindCardOutput } from "@/ai/flows/find-card-by-image-flow";
 
 export default function AddCardPage() {
-  const { user, addCardToCollection, openAuthModal } = useAuth();
+  const { user } = useAuth();
+  const { openAuthModal } = useUIStore();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("scan");
   const [preFillData, setPreFillData] = useState<Partial<FindCardOutput> | null>(null);
@@ -35,7 +38,7 @@ export default function AddCardPage() {
     }
 
     try {
-      await addCardToCollection(card);
+      await collectionService.addCard(user.uid, card);
       toast({
         title: "Success!",
         description: `${card.name} added to your collection.`,
@@ -81,7 +84,7 @@ export default function AddCardPage() {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8 max-w-4xl">
         <div className="space-y-6">
-          <div>
+          <div className="hidden md:block">
             <h1 className="text-3xl font-headline font-bold text-primary">Add to Collection</h1>
             <p className="text-muted-foreground">Scan a card with AI or enter details manually.</p>
           </div>

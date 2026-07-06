@@ -8,6 +8,8 @@ import { PackageSearch, LayoutList, Search, Bell, Users, UserPlus, Replace, Menu
 import { AuthButton } from "./AuthButton";
 import { PokedexIcon } from "./icons/PokedexIcon";
 import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
+import { notificationService } from "@/services/notificationService";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,23 +27,27 @@ import {
 } from "@/components/ui/sheet";
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from "react";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { SwipeBackIndicator } from "@/components/SwipeBackIndicator";
 
 
 export function AppHeader() {
-  const { notifications, markNotificationsAsRead, user } = useAuth();
+  const { user } = useAuth();
+  const { notifications } = useNotifications(user?.uid);
   const hasNotifications = notifications.length > 0;
   const [isSheetOpen, setIsSheetOpen] = useState(false);
 
   const handleMarkAllRead = () => {
-    if (hasNotifications) {
-      markNotificationsAsRead(notifications);
+    if (hasNotifications && user) {
+      notificationService.markAsRead(user.uid, notifications);
     }
   };
 
   const closeSheet = () => setIsSheetOpen(false);
 
   return (
-    <header className="bg-card text-foreground border-b shadow-md sticky top-0 z-50">
+    <>
+      <header className="bg-card text-foreground border-b shadow-md fixed lg:sticky top-0 left-0 right-0 z-50">
       <div className="container mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <PokeballIcon className="h-8 w-8 md:h-10 md:w-10" />
@@ -69,7 +75,12 @@ export function AppHeader() {
           </Link>
           <Link href="/browse-sets">
             <Button variant="ghost" className="gap-2">
-              <PackageSearch className="h-4 w-4" /> Browse
+              <PackageSearch className="h-4 w-4" /> Browse Sets
+            </Button>
+          </Link>
+          <Link href="/pokedex">
+            <Button variant="ghost" className="gap-2">
+              <PokedexIcon className="h-4 w-4 text-primary" /> Pokédex
             </Button>
           </Link>
         </nav>
@@ -123,68 +134,14 @@ export function AppHeader() {
             </DropdownMenu>
           )}
           
-          <AuthButton />
           
-           {/* Mobile Navigation Trigger */}
-          <div className="lg:hidden">
-            <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Menu className="h-6 w-6" />
-                  <span className="sr-only">Open menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[280px]">
-                <SheetHeader>
-                  <SheetTitle>
-                    <Link href="/" className="flex items-center gap-3" onClick={closeSheet}>
-                      <PokeballIcon className="h-8 w-8" />
-                      <span className="text-2xl font-headline font-bold text-primary">PokéTRKR</span>
-                    </Link>
-                  </SheetTitle>
-                </SheetHeader>
-                <nav className="mt-8 flex flex-col gap-2">
-                  <Link href="/search" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
-                      <Search className="h-5 w-5" /> Search
-                    </Button>
-                  </Link>
-                  <Link href="/my-collection" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
-                      <LayoutList className="h-5 w-5" /> My Collection
-                    </Button>
-                  </Link>
-                  <Link href="/add-card" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg text-primary font-semibold">
-                      <PlusCircle className="h-5 w-5" /> Add Card
-                    </Button>
-                  </Link>
-                  <Link href="/browse-sets" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
-                      <PackageSearch className="h-5 w-5" /> Browse Sets
-                    </Button>
-                  </Link>
-                  <Link href="/pokedex" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
-                      <PokedexIcon className="h-6 w-6"/> Pokédex
-                    </Button>
-                  </Link>
-                  <Link href="/exchange" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
-                      <Replace className="h-5 w-5" /> Exchange
-                    </Button>
-                  </Link>
-                  <Link href="/friends" onClick={closeSheet}>
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-lg">
-                      <Users className="h-5 w-5" /> Friends
-                    </Button>
-                  </Link>
-                </nav>
-              </SheetContent>
-            </Sheet>
-          </div>
+          <AuthButton />
         </div>
       </div>
-    </header>
+      </header>
+      <div className="h-[56px] lg:hidden" />
+      <MobileBottomNav />
+      <SwipeBackIndicator />
+    </>
   );
 }

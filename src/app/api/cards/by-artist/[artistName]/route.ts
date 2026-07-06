@@ -14,9 +14,9 @@ const db = admin.firestore();
 
 export async function GET(
     request: Request,
-    { params }: { params: { artistName: string } }
+    { params }: { params: Promise<{ artistName: string }> }
 ) {
-    const { artistName } = params;
+    const { artistName } = await params;
     
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '1000', 10);

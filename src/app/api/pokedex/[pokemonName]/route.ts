@@ -11,8 +11,8 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-export async function GET(request: Request, { params }: { params: { pokemonName: string } }) {
-    const { pokemonName } = params;
+export async function GET(request: Request, { params }: { params: Promise<{ pokemonName: string }> }) {
+    const { pokemonName } = await params;
     if (!pokemonName) {
         return NextResponse.json({ message: 'Pokémon name is required' }, { status: 400 });
     }

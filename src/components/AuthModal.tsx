@@ -3,18 +3,20 @@
 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useUIStore } from "@/store/useUIStore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Image from 'next/image';
 
 export function AuthModal() {
-  const { isAuthModalOpen, closeAuthModal, signUp, signIn, signInWithGoogle } = useAuth();
+  const { signUp, signIn, signInWithGoogle, loginAsDemoGuest } = useAuth();
+  const { isAuthModalOpen, closeAuthModal } = useUIStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmEmail, setConfirmEmail] = useState("");
@@ -36,17 +38,20 @@ export function AuthModal() {
       setTimeout(() => reject(new Error('Authentication timeout')), 15000)
     );
     
+    const trimmedEmail = email.trim();
+    const trimmedConfirmEmail = confirmEmail.trim();
+    
     try {
       if (action === 'signUp') {
-        if (email !== confirmEmail) {
+        if (trimmedEmail !== trimmedConfirmEmail) {
           throw new Error("Emails do not match.");
         }
         if (password !== confirmPassword) {
           throw new Error("Passwords do not match.");
         }
-        await Promise.race([signUp(email, password), timeout]);
+        await Promise.race([signUp(trimmedEmail, password), timeout]);
       }
-      if (action === 'signIn') await Promise.race([signIn(email, password), timeout]);
+      if (action === 'signIn') await Promise.race([signIn(trimmedEmail, password), timeout]);
       if (action === 'google') {
         // Set loading only after user interaction is complete
         setLoading(true);
@@ -205,6 +210,20 @@ export function AuthModal() {
         >
           <Image src="https://www.vectorlogo.zone/logos/google/google-icon.svg" alt="Google" width={16} height={16} className="mr-2"/>
           Continue with Google
+        </Button>
+
+        <Button 
+          variant="secondary" 
+          className="w-full bg-primary/10 hover:bg-primary/20 text-primary border-primary/20 hover:border-primary/40 border transition-all mt-2" 
+          disabled={loading} 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            loginAsDemoGuest();
+          }}
+        >
+          <Sparkles className="mr-2 h-4 w-4" />
+          Explore in Demo Sandbox Mode
         </Button>
       </DialogContent>
     </Dialog>

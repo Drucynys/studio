@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Sparkles, ExternalLink, Palette, Edit3, Trash2, Layers, Eye, Languages, Paintbrush, Star, ArrowDown, ArrowRight, ArrowUp, DollarSign, Replace } from "lucide-react";
-import React, { memo, useMemo } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
 
@@ -52,6 +52,8 @@ const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | 
 export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, onView, onToggleFavorite, onAddToExchange }: CardItemProps) => {
   if (!card) return null;
 
+  const [isImageLoading, setIsImageLoading] = useState(true);
+
   // Memoize expensive calculations
   const tcgPlayerSearchUrl = useMemo(() => 
     `https://www.tcgplayer.com/search/pokemon/product?productLineName=pokemon&q=${encodeURIComponent(card.name || '')}${card.variant ? '&ProductTypeName=' + encodeURIComponent(card.variant || '') : ''}&view=grid`,
@@ -77,6 +79,21 @@ export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, o
     };
   }, [card.value, card.quantity, masterCard, card.variant]);
 
+  const isHolo = useMemo(() => {
+    const rarity = (card.rarity || "").toLowerCase();
+    const variant = (card.variant || "").toLowerCase();
+    return (
+      rarity.includes("holo") ||
+      rarity.includes("rare") ||
+      rarity.includes("secret") ||
+      rarity.includes("promo") ||
+      rarity.includes("shiny") ||
+      rarity.includes("ultra") ||
+      variant.includes("holo") ||
+      variant.includes("shiny")
+    );
+  }, [card.rarity, card.variant]);
+
   return (
     <Card className={cn(
       "relative shadow-lg hover:shadow-primary/20 transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-1 hover:z-10 flex flex-col bg-card"
@@ -93,7 +110,11 @@ export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, o
       </CardHeader>
       <CardContent className="space-y-2 flex-grow pb-3">
         <div
-          className="relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner cursor-pointer group"
+          className={cn(
+            "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner cursor-pointer group",
+            isImageLoading && "animate-shimmer bg-muted/40",
+            isHolo && "list-card-holo"
+          )}
           onClick={() => onView(cardIndex)}
         >
           <Image
@@ -101,7 +122,11 @@ export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, o
             alt={card.name || card.cardNumber}
             width={250}
             height={350}
-            className="object-contain w-full h-full transition-transform duration-200"
+            className={cn(
+              "object-contain w-full h-full transition-all duration-300",
+              isImageLoading ? "opacity-0 scale-95" : "opacity-100 scale-100"
+            )}
+            onLoad={() => setIsImageLoading(false)}
             data-ai-hint="pokemon card front"
           />
           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">

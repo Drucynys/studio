@@ -21,7 +21,11 @@ export async function GET() {
         }
 
         const sets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        return NextResponse.json(sets);
+        
+        const response = NextResponse.json(sets);
+        // Cache for 1 hour, serve stale data for up to 24 hours while revalidating
+        response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+        return response;
 
     } catch (error: any) {
         console.error('Error fetching sets:', error);

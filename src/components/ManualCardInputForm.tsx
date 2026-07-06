@@ -26,7 +26,6 @@ import type { PokemonCard } from "@/types";
 import { FilePlus, Loader2, Layers, Languages } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "@/hooks/useAuth";
 import Image from "next/image";
 import type { FindCardOutput } from "@/ai/flows/find-card-by-image-flow";
 
@@ -164,14 +163,11 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
     setIsLoadingEnglishSets(true);
     setErrorEnglishSets(null);
     try {
-      const headers: HeadersInit = {};
-      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
-        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-      }
-      const response = await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate", { headers });
+      const response = await fetch("/api/sets");
       if (!response.ok) throw new Error(`Failed to fetch English sets: ${response.statusText}`);
       const data = await response.json();
-      const sortedSets = (data.data as ApiSet[]).sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+      const setsArray = Array.isArray(data) ? data : (data.data || []);
+      const sortedSets = (setsArray as ApiSet[]).sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
       setEnglishSets(sortedSets);
       return sortedSets;
     } catch (err) {
@@ -188,19 +184,11 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
     setIsLoadingEnglishCards(true);
     setErrorEnglishCards(null);
     try {
-      const headers: HeadersInit = {};
-      if (process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY) {
-        headers['X-Api-Key'] = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-      }
-      let allCards: ApiPokemonCard[] = [];
-      let page = 1; let hasMore = true;
-      while(hasMore) {
-        const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=set.id:${setId}&page=${page}&pageSize=250&orderBy=number`, { headers });
-        if (!response.ok) throw new Error(`Failed to fetch cards for set ${setId}: ${response.statusText}`);
-        const data = await response.json();
-        allCards = allCards.concat(data.data as ApiPokemonCard[]);
-        page++; hasMore = data.page * data.pageSize < data.totalCount;
-      }
+      const response = await fetch(`/api/cards/by-set/${encodeURIComponent(setId)}?limit=500`);
+      if (!response.ok) throw new Error(`Failed to fetch cards for set ${setId}: ${response.statusText}`);
+      const data = await response.json();
+      const allCards = (Array.isArray(data) ? data : (data.data || [])) as ApiPokemonCard[];
+      
       allCards.sort((a, b) => {
           const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
           const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
@@ -404,7 +392,6 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     let cardToSave: Omit<PokemonCard, 'id' | 'userId' | 'timestamp'>;
-    const { addCardToCollection } = useAuth();
 
     if (values.language === "English") {
       const selectedSet = englishSets.find(s => s.id === values.selectedSetId);
