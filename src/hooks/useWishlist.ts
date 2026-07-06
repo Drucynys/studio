@@ -4,7 +4,7 @@
  * Real-time hook for the authenticated user's wishlist.
  * Uses the same onSnapshot → queryClient.setQueryData pattern as useUserCollection.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { wishlistService } from '@/services/wishlistService';
@@ -18,7 +18,7 @@ export function useWishlist(uid: string | undefined) {
   const isGuest = useGuestStore((s) => s.isGuest);
   const guestWishlist = useGuestStore((s) => s.wishlist);
 
-  const key = queryKeys.wishlist(uid ?? '__none__');
+  const key = useMemo(() => queryKeys.wishlist(uid ?? '__none__'), [uid]);
 
   const { data: wishlist = EMPTY_ARRAY } = useQuery<WishlistItem[]>({
     queryKey: key,

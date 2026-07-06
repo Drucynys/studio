@@ -99,7 +99,7 @@ export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, o
       "relative shadow-lg hover:shadow-primary/20 transition-all duration-300 ease-in-out transform hover:scale-105 hover:-translate-y-1 hover:z-10 flex flex-col bg-card"
     )}>
       <CardHeader className="pb-3 relative">
-        <Button variant="ghost" size="icon" onClick={onToggleFavorite} className={cn("absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-amber-500 z-10", card.isFavorite && "text-amber-500")}>
+        <Button variant="ghost" size="icon" onClick={onToggleFavorite} className={cn("absolute top-2 right-2 h-11 w-11 flex items-center justify-center text-muted-foreground hover:text-amber-500 z-10", card.isFavorite && "text-amber-500")}>
           <Star className={cn("h-5 w-5", card.isFavorite && "fill-current")} />
           <span className="sr-only">Favorite</span>
         </Button>
@@ -109,9 +109,11 @@ export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, o
         {card.name && <CardDescription className="text-xs">{card.set} #{card.cardNumber}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-2 flex-grow pb-3">
-        <div
+        <button
+          type="button"
+          aria-label={`View full card details for ${card.name || card.cardNumber}`}
           className={cn(
-            "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner cursor-pointer group",
+            "relative aspect-[2.5/3.5] w-full rounded-md overflow-hidden mb-2 shadow-inner text-left border-0 p-0 block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group",
             isImageLoading && "animate-shimmer bg-muted/40",
             isHolo && "list-card-holo"
           )}
@@ -132,7 +134,7 @@ export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, o
           <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
             <Eye className="h-8 w-8 text-white" />
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-2 text-xs">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <strong>Rarity:</strong> <Badge variant="secondary" className="text-xs px-1.5 py-0.5">{card.rarity}</Badge>
@@ -163,20 +165,20 @@ export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, o
          <div className="w-full space-y-1">
             <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1"><DollarSign size={14}/>Added</span>
-                <span>${marketPriceData.valueAdded.toFixed(2)}</span>
+                <span className="font-mono">${marketPriceData.valueAdded.toFixed(2)}</span>
             </div>
             <div className="flex items-center justify-between text-sm font-semibold">
                 <span className="text-primary flex items-center gap-1"><DollarSign size={14}/>Current</span>
                 <div className="flex items-center gap-1">
-                    <span>${marketPriceData.currentValue > 0 ? marketPriceData.currentValue.toFixed(2) : marketPriceData.valueAdded.toFixed(2)}</span>
+                    <span className="font-mono">${marketPriceData.currentValue > 0 ? marketPriceData.currentValue.toFixed(2) : marketPriceData.valueAdded.toFixed(2)}</span>
                     {marketPriceData.currentValue > 0 && marketPriceData.valueDifference !== 0 && (
                         <span className={cn(
-                            "flex items-center text-xs",
-                            marketPriceData.valueDifference > 0 && "text-green-600",
-                            marketPriceData.valueDifference < 0 && "text-red-600"
+                            "flex items-center text-xs font-semibold",
+                            marketPriceData.valueDifference > 0 && "text-emerald-600 dark:text-emerald-400",
+                            marketPriceData.valueDifference < 0 && "text-rose-600 dark:text-rose-400"
                         )}>
                            {marketPriceData.valueDifference > 0 ? <ArrowUp size={12}/> : <ArrowDown size={12}/>}
-                           ${Math.abs(marketPriceData.valueDifference).toFixed(2)}
+                           <span className="font-mono">${Math.abs(marketPriceData.valueDifference).toFixed(2)}</span>
                         </span>
                     )}
                 </div>
@@ -188,25 +190,25 @@ export const CardItem = memo(({ card, cardIndex, masterCard, onEdit, onRemove, o
             href={tcgPlayerSearchUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-muted-foreground hover:text-primary hover:underline flex items-center gap-1"
+            className="text-xs text-muted-foreground hover:text-primary hover:underline flex items-center gap-1 min-h-[44px] py-2 w-full"
           >
             View on TCGPlayer <ExternalLink size={12} />
           </a>
         )}
         {card.language === 'Japanese' && (
-            <p className="text-xs text-muted-foreground italic">(TCGPlayer link N/A for Japanese cards)</p>
+            <p className="text-xs text-muted-foreground italic min-h-[44px] py-2 w-full flex items-center">(TCGPlayer link N/A for Japanese cards)</p>
         )}
         
         <div className="flex gap-2 w-full pt-2">
-          <Button variant="outline" size="sm" onClick={onEdit} className="flex-1">
-            <Edit3 className="mr-1.5 h-3.5 w-3.5" /> Edit
+          <Button variant="outline" onClick={onEdit} className="flex-1 h-11">
+            <Edit3 className="mr-1.5 h-4 w-4" /> Edit
           </Button>
-          <Button variant="destructive" size="sm" onClick={onRemove} className="flex-1">
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Remove
+          <Button variant="destructive" onClick={onRemove} className="flex-1 h-11">
+            <Trash2 className="mr-1.5 h-4 w-4" /> Remove
           </Button>
         </div>
-         <Button variant="secondary" size="sm" onClick={onAddToExchange} className="w-full">
-            <Replace className="mr-1.5 h-3.5 w-3.5" /> Add to Exchange
+         <Button variant="secondary" onClick={onAddToExchange} className="w-full h-11">
+            <Replace className="mr-1.5 h-4 w-4" /> Add to Exchange
           </Button>
       </CardFooter>
     </Card>

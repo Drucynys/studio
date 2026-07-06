@@ -47,7 +47,7 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="bg-card text-foreground border-b shadow-md fixed lg:sticky top-0 left-0 right-0 z-50">
+      <header className="bg-background/65 dark:bg-card/65 backdrop-blur-xl backdrop-saturate-150 text-foreground border-b border-border/40 shadow-sm fixed lg:sticky top-0 left-0 right-0 z-50">
       <div className="container mx-auto px-4 md:px-8 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <PokeballIcon className="h-8 w-8 md:h-10 md:w-10" />

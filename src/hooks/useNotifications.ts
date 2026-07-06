@@ -4,7 +4,7 @@
  * Real-time hooks for the authenticated user's notifications and following list.
  * Uses the same onSnapshot → queryClient.setQueryData pattern as useUserCollection.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { notificationService, followingService } from '@/services/notificationService';
@@ -18,7 +18,7 @@ export function useNotifications(uid: string | undefined) {
   const isGuest = useGuestStore((s) => s.isGuest);
   const guestNotifications = useGuestStore((s) => s.notifications);
 
-  const key = queryKeys.notifications(uid ?? '__none__');
+  const key = useMemo(() => queryKeys.notifications(uid ?? '__none__'), [uid]);
 
   const { data: notifications = EMPTY_NOTIFICATIONS } = useQuery<Notification[]>({
     queryKey: key,
@@ -65,7 +65,7 @@ export function useFollowing(uid: string | undefined) {
   const isGuest = useGuestStore((s) => s.isGuest);
   const guestFollowing = useGuestStore((s) => s.following);
 
-  const key = queryKeys.following(uid ?? '__none__');
+  const key = useMemo(() => queryKeys.following(uid ?? '__none__'), [uid]);
 
   const { data: following = EMPTY_FOLLOWING } = useQuery<string[]>({
     queryKey: key,

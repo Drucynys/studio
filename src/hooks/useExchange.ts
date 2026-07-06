@@ -4,7 +4,7 @@
  * Real-time hook for the authenticated user's exchange listings.
  * Uses the same onSnapshot → queryClient.setQueryData pattern as useUserCollection.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { exchangeService } from '@/services/exchangeService';
@@ -18,7 +18,7 @@ export function useExchange(uid: string | undefined) {
   const isGuest = useGuestStore((s) => s.isGuest);
   const guestExchangeItems = useGuestStore((s) => s.exchangeItems);
 
-  const key = queryKeys.exchange();
+  const key = useMemo(() => queryKeys.exchange(), []);
 
   const { data: myExchangeItems = EMPTY_ARRAY } = useQuery<ExchangeItem[]>({
     queryKey: key,

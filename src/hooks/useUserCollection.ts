@@ -11,7 +11,7 @@
  *  - The `queryFn` is set to `() => []` and `enabled: false` because
  *    all data arrives through the snapshot side-channel.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { collectionService } from '@/services/collectionService';
@@ -25,7 +25,7 @@ export function useUserCollection(uid: string | undefined) {
   const isGuest = useGuestStore((s) => s.isGuest);
   const guestCollection = useGuestStore((s) => s.collection);
 
-  const key = queryKeys.collection(uid ?? '__none__');
+  const key = useMemo(() => queryKeys.collection(uid ?? '__none__'), [uid]);
 
   // The query itself never fetches — data is injected by the snapshot listener below.
   const { data: collection = EMPTY_ARRAY, isLoading } = useQuery<PokemonCard[]>({
