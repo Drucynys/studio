@@ -1,29 +1,47 @@
 // src/app/browse-sets/page.tsx
-"use client";
+'use client';
 
-import type { NextPage } from "next";
-import { useEffect, useState, useCallback, Suspense, useMemo } from "react";
-import Link from "next/link";
+import type { NextPage } from 'next';
+import { useEffect, useState, useCallback, Suspense, useMemo } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Button } from "@/components/ui/button";
-import { AppHeader } from "@/components/AppHeader";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, ServerCrash, Search, CheckCircle, Package, Paintbrush, User, RefreshCcw, Filter, Grid, List } from "lucide-react";
-import Image from "next/image";
-import { Progress } from "@/components/ui/progress";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserCollection } from "@/hooks/useUserCollection";
-import type { PokemonCard as CollectionPokemonCard } from "@/types";
-import { cn } from "@/lib/utils";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { CircularProgress } from "@/components/ui/circular-progress";
-import { Badge } from "@/components/ui/badge";
+import { Button } from '@/components/ui/button';
+import { AppHeader } from '@/components/AppHeader';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Loader2,
+  ServerCrash,
+  Search,
+  CheckCircle,
+  Package,
+  Paintbrush,
+  User,
+  RefreshCcw,
+  Filter,
+  Grid,
+  List,
+} from 'lucide-react';
+import Image from 'next/image';
+import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserCollection } from '@/hooks/useUserCollection';
+import type { PokemonCard as CollectionPokemonCard } from '@/types';
+import { cn } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import { CircularProgress } from '@/components/ui/circular-progress';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -31,17 +49,17 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  SheetFooter
-} from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+  SheetFooter,
+} from '@/components/ui/sheet';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface ApiSet {
   id: string;
@@ -65,7 +83,7 @@ const BrowsePageContent: NextPage = () => {
   const searchParams = useSearchParams();
   const { loading: authLoading, user } = useAuth();
   const { collection } = useUserCollection(user?.uid);
-  
+
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
@@ -77,25 +95,25 @@ const BrowsePageContent: NextPage = () => {
   const [filteredSets, setFilteredSets] = useState<ApiSet[]>([]);
   const [loadingSets, setLoadingSets] = useState(true);
   const [setsError, setSetsError] = useState<string | null>(null);
-  
+
   const [allArtists, setAllArtists] = useState<Artist[]>([]);
   const [filteredArtists, setFilteredArtists] = useState<Artist[]>([]);
   const [loadingArtists, setLoadingArtists] = useState(false);
   const [artistsError, setArtistsError] = useState<string | null>(null);
 
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const { toast } = useToast();
-  
+
   const isLoading = loadingSets || loadingArtists || authLoading;
 
   useEffect(() => {
     const scrollHandler = () => {
       const currentScrollY = window.scrollY;
-      
-      setLastScrollY(prevLastScrollY => {
+
+      setLastScrollY((prevLastScrollY) => {
         if (Math.abs(currentScrollY - prevLastScrollY) < 10) return prevLastScrollY;
 
         if (currentScrollY > prevLastScrollY && currentScrollY > 100) {
@@ -103,13 +121,13 @@ const BrowsePageContent: NextPage = () => {
         } else {
           setIsHeaderVisible(true); // scrolling up
         }
-        
+
         return currentScrollY;
       });
     };
 
     window.addEventListener('scroll', scrollHandler, { passive: true });
-    
+
     return () => {
       window.removeEventListener('scroll', scrollHandler);
     };
@@ -121,24 +139,31 @@ const BrowsePageContent: NextPage = () => {
     try {
       const response = await fetch('/api/sets');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Failed to fetch sets. Status: ${response.statusText}` }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: `Failed to fetch sets. Status: ${response.statusText}` }));
         throw new Error(errorData.message);
       }
       const fetchedSets: ApiSet[] = await response.json();
       if (!fetchedSets || fetchedSets.length === 0) {
-        throw new Error("No sets found in the database. Please sync them in the Admin page first.");
+        throw new Error('No sets found in the database. Please sync them in the Admin page first.');
       }
       setAllSets(fetchedSets);
       setFilteredSets(fetchedSets);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "An unknown error occurred while fetching sets.";
+      const message =
+        err instanceof Error ? err.message : 'An unknown error occurred while fetching sets.';
       setSetsError(message);
       toast({
-        variant: "destructive",
-        title: "Could Not Load Sets",
+        variant: 'destructive',
+        title: 'Could Not Load Sets',
         description: message,
         duration: 10000,
-        action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
+        action: (
+          <ToastAction altText="Go to Admin" onClick={() => (window.location.href = '/admin/sync')}>
+            Go to Admin
+          </ToastAction>
+        ),
       });
     } finally {
       setLoadingSets(false);
@@ -151,30 +176,45 @@ const BrowsePageContent: NextPage = () => {
     try {
       const response = await fetch('/api/artists');
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Failed to fetch artists. Status: ${response.statusText}` }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: `Failed to fetch artists. Status: ${response.statusText}` }));
         throw new Error(errorData.message);
       }
       const fetchedArtists: Artist[] = await response.json();
-       if (!fetchedArtists || fetchedArtists.length === 0) {
+      if (!fetchedArtists || fetchedArtists.length === 0) {
         toast({
-            variant: "default",
-            title: "Artists Not Found",
-            description: "Please generate the artist database from the Admin page to enable artist browsing.",
-            duration: 10000,
-            action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
+          variant: 'default',
+          title: 'Artists Not Found',
+          description:
+            'Please generate the artist database from the Admin page to enable artist browsing.',
+          duration: 10000,
+          action: (
+            <ToastAction
+              altText="Go to Admin"
+              onClick={() => (window.location.href = '/admin/sync')}
+            >
+              Go to Admin
+            </ToastAction>
+          ),
         });
       }
       setAllArtists(fetchedArtists);
       setFilteredArtists(fetchedArtists);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "An unknown error occurred while fetching artists.";
+      const message =
+        err instanceof Error ? err.message : 'An unknown error occurred while fetching artists.';
       setArtistsError(message);
       toast({
-        variant: "destructive",
-        title: "Could Not Load Artists",
+        variant: 'destructive',
+        title: 'Could Not Load Artists',
         description: message,
         duration: 10000,
-        action: <ToastAction altText="Go to Admin" onClick={() => window.location.href = '/admin/sync'}>Go to Admin</ToastAction>,
+        action: (
+          <ToastAction altText="Go to Admin" onClick={() => (window.location.href = '/admin/sync')}>
+            Go to Admin
+          </ToastAction>
+        ),
       });
     } finally {
       setLoadingArtists(false);
@@ -196,14 +236,15 @@ const BrowsePageContent: NextPage = () => {
       let filteredData = allSets;
 
       if (selectedSeries.length > 0) {
-        filteredData = filteredData.filter(set => selectedSeries.includes(set.series));
+        filteredData = filteredData.filter((set) => selectedSeries.includes(set.series));
       }
 
       if (searchTerm) {
-          filteredData = filteredData.filter(item =>
+        filteredData = filteredData.filter(
+          (item) =>
             item.name.toLowerCase().includes(lowercasedFilter) ||
             item.id.toLowerCase().includes(lowercasedFilter)
-          );
+        );
       }
 
       filteredData.sort((a, b) => {
@@ -214,25 +255,27 @@ const BrowsePageContent: NextPage = () => {
 
       setFilteredSets(filteredData);
     } else {
-      const filteredData = allArtists.filter(artist =>
+      const filteredData = allArtists.filter((artist) =>
         artist.name.toLowerCase().includes(lowercasedFilter)
       );
       setFilteredArtists(filteredData);
     }
   }, [searchTerm, allSets, allArtists, activeTab, sortOrder, selectedSeries]);
-  
+
   const availableSeries = useMemo(() => {
-    const seriesSet = new Set(allSets.map(set => set.series));
-    return Array.from(seriesSet).sort((a,b) => b.localeCompare(a));
+    const seriesSet = new Set(allSets.map((set) => set.series));
+    return Array.from(seriesSet).sort((a, b) => b.localeCompare(a));
   }, [allSets]);
 
   const setCompletions = useMemo(() => {
     if (!user) return new Map();
     const map = new Map<string, { collected: number; total: number; percentage: number }>();
-    allSets.forEach(set => {
-      const collectedInSet = new Set(collection.filter(c => c.set === set.name).map(c => `${c.name}-${c.cardNumber}`));
+    allSets.forEach((set) => {
+      const collectedInSet = new Set(
+        collection.filter((c) => c.set === set.name).map((c) => `${c.name}-${c.cardNumber}`)
+      );
       const uniqueCollectedCount = collectedInSet.size;
-      const totalInSet = set.printedTotal > 0 ? set.printedTotal : 1; 
+      const totalInSet = set.printedTotal > 0 ? set.printedTotal : 1;
       const percentage = totalInSet > 0 ? (uniqueCollectedCount / totalInSet) * 100 : 0;
       map.set(set.id, { collected: uniqueCollectedCount, total: totalInSet, percentage });
     });
@@ -242,56 +285,67 @@ const BrowsePageContent: NextPage = () => {
   const artistCompletions = useMemo(() => {
     if (!user) return new Map();
     const map = new Map<string, { collected: number; total: number; percentage: number }>();
-    allArtists.forEach(artist => {
-      const collectedByArtist = new Set(collection.filter(c => c.artist === artist.name).map(c => `${c.name}-${c.cardNumber}-${c.set}`));
+    allArtists.forEach((artist) => {
+      const collectedByArtist = new Set(
+        collection
+          .filter((c) => c.artist === artist.name)
+          .map((c) => `${c.name}-${c.cardNumber}-${c.set}`)
+      );
       const uniqueCollectedCount = collectedByArtist.size;
       const totalForArtist = artist.cardCount > 0 ? artist.cardCount : 1;
       const percentage = totalForArtist > 0 ? (uniqueCollectedCount / totalForArtist) * 100 : 0;
-      map.set(artist.name, { collected: uniqueCollectedCount, total: artist.cardCount, percentage });
+      map.set(artist.name, {
+        collected: uniqueCollectedCount,
+        total: artist.cardCount,
+        percentage,
+      });
     });
     return map;
   }, [collection, allArtists, user]);
 
   const groupedSets = useMemo(() => {
-    return filteredSets.reduce((acc, set) => {
-        const series = set.series || "Uncategorized";
+    return filteredSets.reduce(
+      (acc, set) => {
+        const series = set.series || 'Uncategorized';
         if (!acc[series]) {
-            acc[series] = [];
+          acc[series] = [];
         }
         acc[series].push(set);
         return acc;
-    }, {} as Record<string, ApiSet[]>);
+      },
+      {} as Record<string, ApiSet[]>
+    );
   }, [filteredSets]);
 
   const sortedSeriesKeys = useMemo(() => {
-      return Object.keys(groupedSets).sort((a, b) => {
-          if (!groupedSets[a][0] || !groupedSets[b][0]) return 0;
-          const dateA = new Date(groupedSets[a][0].releaseDate).getTime();
-          const dateB = new Date(groupedSets[b][0].releaseDate).getTime();
-          return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
-      });
+    return Object.keys(groupedSets).sort((a, b) => {
+      if (!groupedSets[a][0] || !groupedSets[b][0]) return 0;
+      const dateA = new Date(groupedSets[a][0].releaseDate).getTime();
+      const dateB = new Date(groupedSets[b][0].releaseDate).getTime();
+      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    });
   }, [groupedSets, sortOrder]);
 
   if (isLoading) {
-     return (
+    return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
         <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-           <p className="ml-4 text-lg text-muted-foreground">Loading...</p>
+          <p className="ml-4 text-lg text-muted-foreground">Loading...</p>
         </main>
       </div>
     );
   }
-  
+
   const handleSeriesToggle = (series: string) => {
-    setSelectedSeries(prev => {
-        const isSelected = prev.includes(series);
-        if (isSelected) {
-            return prev.filter(s => s !== series);
-        } else {
-            return [...prev, series];
-        }
+    setSelectedSeries((prev) => {
+      const isSelected = prev.includes(series);
+      if (isSelected) {
+        return prev.filter((s) => s !== series);
+      } else {
+        return [...prev, series];
+      }
     });
   };
 
@@ -299,62 +353,74 @@ const BrowsePageContent: NextPage = () => {
     <>
       {activeTab === 'sets' && (
         <>
-          <div className={cn("space-y-2", !isSheet && "min-w-[140px]")}>
+          <div className={cn('space-y-2', !isSheet && 'min-w-[140px]')}>
             {isSheet && <Label>Sort Order</Label>}
-            <Select value={sortOrder} onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}>
-                <SelectTrigger className={cn(!isSheet && "h-10")}>
-                    <SelectValue placeholder="Sort by year" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="desc">Newest First</SelectItem>
-                    <SelectItem value="asc">Oldest First</SelectItem>
-                </SelectContent>
+            <Select
+              value={sortOrder}
+              onValueChange={(value) => setSortOrder(value as 'desc' | 'asc')}
+            >
+              <SelectTrigger className={cn(!isSheet && 'h-10')}>
+                <SelectValue placeholder="Sort by year" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="desc">Newest First</SelectItem>
+                <SelectItem value="asc">Oldest First</SelectItem>
+              </SelectContent>
             </Select>
           </div>
-          <div className={cn("space-y-2", !isSheet && "min-w-[160px]")}>
+          <div className={cn('space-y-2', !isSheet && 'min-w-[160px]')}>
             {isSheet && <Label>Filter by Series</Label>}
-             <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                   <Button variant="outline" className={cn("w-full justify-between", !isSheet && "h-10")}>
-                      <span>{selectedSeries.length === 0 ? "All Series" : `${selectedSeries.length} selected`}</span>
-                      {selectedSeries.length > 0 && (
-                        <Badge variant="secondary" className="ml-2">{selectedSeries.length}</Badge>
-                      )}
-                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-[300px] overflow-y-auto">
-                  <DropdownMenuLabel>Filter by Series</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                   <DropdownMenuCheckboxItem
-                      checked={selectedSeries.length === 0}
-                      onCheckedChange={() => setSelectedSeries([])}
-                   >
-                      All Series
-                   </DropdownMenuCheckboxItem>
-                  <DropdownMenuSeparator />
-                  {availableSeries.map(series => (
-                     <DropdownMenuCheckboxItem
-                        key={series}
-                        checked={selectedSeries.includes(series)}
-                        onCheckedChange={() => handleSeriesToggle(series)}
-                     >
-                        {series}
-                     </DropdownMenuCheckboxItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn('w-full justify-between', !isSheet && 'h-10')}
+                >
+                  <span>
+                    {selectedSeries.length === 0
+                      ? 'All Series'
+                      : `${selectedSeries.length} selected`}
+                  </span>
+                  {selectedSeries.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {selectedSeries.length}
+                    </Badge>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-[300px] overflow-y-auto">
+                <DropdownMenuLabel>Filter by Series</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={selectedSeries.length === 0}
+                  onCheckedChange={() => setSelectedSeries([])}
+                >
+                  All Series
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                {availableSeries.map((series) => (
+                  <DropdownMenuCheckboxItem
+                    key={series}
+                    checked={selectedSeries.includes(series)}
+                    onCheckedChange={() => handleSeriesToggle(series)}
+                  >
+                    {series}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </>
       )}
-      <div className={cn("space-y-2", !isSheet && "min-w-[100px]")}>
+      <div className={cn('space-y-2', !isSheet && 'min-w-[100px]')}>
         {isSheet && <Label className="block mb-1.5">View Mode</Label>}
         <div className="flex bg-muted p-1 rounded-lg border h-10 items-center shrink-0 w-fit">
           <Button
             variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
             size="sm"
             className={cn(
-              "h-8 w-8 p-0 transition-all rounded-md",
-              viewMode === 'grid' && "bg-background shadow-sm text-foreground hover:bg-background"
+              'h-8 w-8 p-0 transition-all rounded-md',
+              viewMode === 'grid' && 'bg-background shadow-sm text-foreground hover:bg-background'
             )}
             onClick={() => setViewMode('grid')}
             title="Grid View"
@@ -365,8 +431,8 @@ const BrowsePageContent: NextPage = () => {
             variant={viewMode === 'list' ? 'secondary' : 'ghost'}
             size="sm"
             className={cn(
-              "h-8 w-8 p-0 transition-all rounded-md",
-              viewMode === 'list' && "bg-background shadow-sm text-foreground hover:bg-background"
+              'h-8 w-8 p-0 transition-all rounded-md',
+              viewMode === 'list' && 'bg-background shadow-sm text-foreground hover:bg-background'
             )}
             onClick={() => setViewMode('list')}
             title="List View"
@@ -383,272 +449,411 @@ const BrowsePageContent: NextPage = () => {
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className={cn(
-              "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky z-40 transition-all duration-300 ease-in-out",
-              isHeaderVisible 
-                ? "top-[65px] md:top-[77px] opacity-100" 
-                : "top-[-300px] opacity-0 pointer-events-none shadow-none"
-              )}>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div className="space-y-1 hidden md:block">
-                      <h1 className="font-headline text-3xl text-foreground">Browse TCG Catalog</h1>
-                      <p className="text-muted-foreground">
-                        {activeTab === 'sets' 
-                          ? 'Explore different Pokémon TCG sets from throughout history.' 
-                          : 'Explore the entire catalog through the lens of its talented illustrators.'}
-                      </p>
-                    </div>
-                    <TabsList className="grid w-full sm:w-auto grid-cols-2">
-                        <TabsTrigger value="sets"><Package className="mr-2 h-4 w-4"/>By Set</TabsTrigger>
-                        <TabsTrigger value="artists"><Paintbrush className="mr-2 h-4 w-4"/>By Artist</TabsTrigger>
-                    </TabsList>
-                </div>
-                
-                <div className="flex flex-col md:flex-row gap-4 mt-4">
-                  <div className="relative flex-grow">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                        type="text"
-                        placeholder={activeTab === 'sets' ? "Search sets by name..." : "Search for an artist..."}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 w-full"
-                    />
-                  </div>
-                  {/* Desktop Filters */}
-                  <div className="hidden md:flex flex-shrink-0 gap-4">
-                     <FilterControls />
-                  </div>
-                  {/* Mobile Filter Button */}
-                  <div className="md:hidden">
-                     <Sheet>
-                         <SheetTrigger asChild>
-                           <Button variant="outline" className="w-full relative">
-                             <Filter className="mr-2 h-4 w-4" />
-                             Filter & View
-                             {activeTab === 'sets' && selectedSeries.length > 0 && (
-                                 <Badge variant="destructive" className="absolute -top-2 -right-2 px-2">{selectedSeries.length}</Badge>
-                             )}
-                           </Button>
-                         </SheetTrigger>
-                         <SheetContent side="bottom" className="rounded-t-lg">
-                           <SheetHeader>
-                             <SheetTitle>Filter & View Options</SheetTitle>
-                           </SheetHeader>
-                           <div className="grid gap-4 py-4">
-                             <FilterControls isSheet={true} />
-                           </div>
-                           <SheetFooter>
-                             <SheetTrigger asChild>
-                               <Button className="w-full">Done</Button>
-                             </SheetTrigger>
-                           </SheetFooter>
-                         </SheetContent>
-                     </Sheet>
-                  </div>
-                </div>
+          <div
+            className={cn(
+              'p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky z-40 transition-all duration-300 ease-in-out',
+              isHeaderVisible
+                ? 'top-[65px] md:top-[77px] opacity-100'
+                : 'top-[-300px] opacity-0 pointer-events-none shadow-none'
+            )}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1 hidden md:block">
+                <h1 className="font-headline text-3xl text-foreground">Browse TCG Catalog</h1>
+                <p className="text-muted-foreground">
+                  {activeTab === 'sets'
+                    ? 'Explore different Pokémon TCG sets from throughout history.'
+                    : 'Explore the entire catalog through the lens of its talented illustrators.'}
+                </p>
+              </div>
+              <TabsList className="grid w-full sm:w-auto grid-cols-2">
+                <TabsTrigger value="sets">
+                  <Package className="mr-2 h-4 w-4" />
+                  By Set
+                </TabsTrigger>
+                <TabsTrigger value="artists">
+                  <Paintbrush className="mr-2 h-4 w-4" />
+                  By Artist
+                </TabsTrigger>
+              </TabsList>
             </div>
 
-            <TabsContent value="sets">
-                {setsError ? (
-                <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
-                    <ServerCrash className="h-16 w-16 mx-auto mb-4" />
-                    <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                    <p className="mt-2 max-w-md">{setsError}</p>
-                     <Button onClick={fetchSets} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
-                </div>
-                ) : (
-                <div className="pb-8">
-                    {sortedSeriesKeys.length > 0 ? (
-                       sortedSeriesKeys.map(seriesName => (
-                           <div key={seriesName} className="mb-8">
-                               <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
-                                 {seriesName} Series
-                               </h2>
-                               <Separator className="mb-4 mx-4" />
-                               {viewMode === 'list' ? (
-                                 <div className="border rounded-lg overflow-hidden bg-card mt-4 divide-y divide-border mx-4 shadow-md">
-                                   {groupedSets[seriesName].map((set) => {
-                                     const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
-                                     const linkHref = `/sets/${set.id}`;
-                                     return (
-                                       <Link key={set.id} href={linkHref} className="block group">
-                                         <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                                           <div className="flex items-center gap-4 min-w-0">
-                                             {/* Symbol */}
-                                             <div className="relative h-8 w-8 shrink-0">
-                                               {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" />}
-                                             </div>
-                                             {/* Logo (small preview) */}
-                                             <div className="relative h-10 w-24 shrink-0 hidden sm:block bg-muted/10 rounded p-1 border">
-                                               {set.images.logo ? (
-                                                 <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" />
-                                               ) : (
-                                                 <span className="text-[10px] text-muted-foreground flex items-center justify-center h-full">No Logo</span>
-                                               )}
-                                             </div>
-                                             {/* Set details */}
-                                             <div className="min-w-0">
-                                               <p className="font-bold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors truncate">{set.name}</p>
-                                               <p className="text-xs text-muted-foreground">
-                                                 Released: {new Date(set.releaseDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
-                                               </p>
-                                             </div>
-                                           </div>
-                                           {/* Completion metrics */}
-                                           <div className="flex items-center gap-4 shrink-0">
-                                             {user && (
-                                               <div className="flex items-center gap-3">
-                                                 <div className="flex flex-col items-end hidden xs:flex">
-                                                   <span className="text-sm font-bold text-foreground">{completion.collected}/{completion.total}</span>
-                                                   <span className="text-[10px] text-muted-foreground">Collected</span>
-                                                 </div>
-                                                 <CircularProgress value={completion.percentage} size={36} strokeWidth={4.5} />
-                                               </div>
-                                             )}
-                                           </div>
-                                         </div>
-                                       </Link>
-                                     );
-                                   })}
-                                 </div>
-                               ) : (
-                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
-                                   {groupedSets[seriesName].map((set) => {
-                                     const completion = setCompletions.get(set.id) || { collected: 0, total: set.printedTotal, percentage: 0 };
-                                     const linkHref = `/sets/${set.id}`;
-                                     return (
-                                          <Link key={set.id} href={linkHref} className="block group">
-                                              <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
-                                                  <div className="flex justify-between items-start w-full">
-                                                      <div className="relative h-6 w-6">
-                                                          {set.images.symbol && <Image src={set.images.symbol} alt={`${set.name} symbol`} layout="fill" objectFit="contain" data-ai-hint="pokemon set symbol"/>}
-                                                      </div>
-                                                      {user && (
-                                                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                              <span>{completion.collected}/{completion.total}</span>
-                                                              <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
-                                                          </div>
-                                                      )}
-                                                  </div>
-                                                  <div className="flex-grow flex items-center justify-center w-full my-2">
-                                                    {set.images.logo ? (
-                                                        <div className="relative w-full h-full">
-                                                            <Image src={set.images.logo} alt={`${set.name} logo`} layout="fill" objectFit="contain" data-ai-hint="pokemon set logo"/>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-full h-full bg-muted rounded flex items-center justify-center" data-ai-hint="logo placeholder">
-                                                            <span className="text-xs text-muted-foreground">No Logo</span>
-                                                        </div>
-                                                    )}
-                                                  </div>
-                                                  <p className="font-semibold text-sm mt-auto truncate w-full">{set.name}</p>
-                                              </Card>
-                                         </Link>
-                                     );
-                                   })}
-                                 </div>
-                               )}
-                           </div>
-                       ))
-                    ) : ( 
-                        <div className="text-center py-10 text-muted-foreground">
-                            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p className="text-lg">No sets found matching your search criteria.</p>
-                        </div> 
-                    )}
-                </div>
-                )}
-            </TabsContent>
-            
-            <TabsContent value="artists">
-              {artistsError ? (
-                <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
-                    <ServerCrash className="h-16 w-16 mx-auto mb-4" />
-                    <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-                    <p className="mt-2 max-w-md">{artistsError}</p>
-                     <Button onClick={fetchArtists} className="mt-4"><RefreshCcw className="mr-2 h-4 w-4"/>Retry</Button>
-                </div>
-                ) : (
-                <div className="pb-8">
-                    {filteredArtists.length > 0 ? (
-                        viewMode === 'list' ? (
-                          <div className="border rounded-lg overflow-hidden bg-card mt-4 divide-y divide-border mx-4 shadow-md">
-                            {filteredArtists.map((artist) => {
-                              const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
-                              const artistInitial = artist.name.charAt(0).toUpperCase();
-                              return (
-                                <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
-                                  <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                                    <div className="flex items-center gap-4 min-w-0">
-                                      <Avatar className="w-10 h-10 border shrink-0">
-                                        <AvatarFallback className="text-sm">{artistInitial}</AvatarFallback>
-                                      </Avatar>
-                                      <div className="min-w-0">
-                                        <p className="font-bold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors truncate capitalize">{artist.name}</p>
-                                        <p className="text-xs text-muted-foreground">Illustrator</p>
-                                      </div>
-                                    </div>
-                                    {/* Completion */}
-                                    <div className="flex items-center gap-4 shrink-0">
-                                      {user && (
-                                        <div className="flex items-center gap-3">
-                                          <div className="flex flex-col items-end hidden xs:flex">
-                                            <span className="text-sm font-bold text-foreground">{completion.collected}/{completion.total}</span>
-                                            <span className="text-[10px] text-muted-foreground">Collected</span>
-                                          </div>
-                                          <CircularProgress value={completion.percentage} size={36} strokeWidth={4.5} />
-                                        </div>
+            <div className="flex flex-col md:flex-row gap-4 mt-4">
+              <div className="relative flex-grow">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder={
+                    activeTab === 'sets' ? 'Search sets by name...' : 'Search for an artist...'
+                  }
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full"
+                />
+              </div>
+              {/* Desktop Filters */}
+              <div className="hidden md:flex flex-shrink-0 gap-4">
+                <FilterControls />
+              </div>
+              {/* Mobile Filter Button */}
+              <div className="md:hidden">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" className="w-full relative">
+                      <Filter className="mr-2 h-4 w-4" />
+                      Filter & View
+                      {activeTab === 'sets' && selectedSeries.length > 0 && (
+                        <Badge variant="destructive" className="absolute -top-2 -right-2 px-2">
+                          {selectedSeries.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="bottom" className="rounded-t-lg">
+                    <SheetHeader>
+                      <SheetTitle>Filter & View Options</SheetTitle>
+                    </SheetHeader>
+                    <div className="grid gap-4 py-4">
+                      <FilterControls isSheet={true} />
+                    </div>
+                    <SheetFooter>
+                      <SheetTrigger asChild>
+                        <Button className="w-full">Done</Button>
+                      </SheetTrigger>
+                    </SheetFooter>
+                  </SheetContent>
+                </Sheet>
+              </div>
+            </div>
+          </div>
+
+          <TabsContent value="sets">
+            {setsError ? (
+              <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
+                <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                <p className="mt-2 max-w-md">{setsError}</p>
+                <Button onClick={fetchSets} className="mt-4">
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <div className="pb-8">
+                {sortedSeriesKeys.length > 0 ? (
+                  sortedSeriesKeys.map((seriesName) => (
+                    <div key={seriesName} className="mb-8">
+                      <h2 className="text-2xl font-bold tracking-tight mt-6 mb-2 flex items-center gap-2 px-4">
+                        {seriesName} Series
+                      </h2>
+                      <Separator className="mb-4 mx-4" />
+                      {viewMode === 'list' ? (
+                        <div className="border rounded-lg overflow-hidden bg-card mt-4 divide-y divide-border mx-4 shadow-md">
+                          {groupedSets[seriesName].map((set) => {
+                            const completion = setCompletions.get(set.id) || {
+                              collected: 0,
+                              total: set.printedTotal,
+                              percentage: 0,
+                            };
+                            const linkHref = `/sets/${set.id}`;
+                            return (
+                              <Link key={set.id} href={linkHref} className="block group">
+                                <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                                  <div className="flex items-center gap-4 min-w-0">
+                                    {/* Symbol */}
+                                    <div className="relative h-8 w-8 shrink-0">
+                                      {set.images.symbol && (
+                                        <Image
+                                          src={set.images.symbol}
+                                          alt={`${set.name} symbol`}
+                                          fill
+                                          sizes="32px"
+                                          className="object-contain"
+                                        />
                                       )}
+                                    </div>
+                                    {/* Logo (small preview) */}
+                                    <div className="relative h-10 w-24 shrink-0 hidden sm:block bg-muted/10 rounded p-1 border">
+                                      {set.images.logo ? (
+                                        <Image
+                                          src={set.images.logo}
+                                          alt={`${set.name} logo`}
+                                          fill
+                                          sizes="96px"
+                                          className="object-contain"
+                                        />
+                                      ) : (
+                                        <span className="text-[10px] text-muted-foreground flex items-center justify-center h-full">
+                                          No Logo
+                                        </span>
+                                      )}
+                                    </div>
+                                    {/* Set details */}
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors truncate">
+                                        {set.name}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        Released:{' '}
+                                        {new Date(set.releaseDate).toLocaleDateString(undefined, {
+                                          year: 'numeric',
+                                          month: 'short',
+                                          day: 'numeric',
+                                        })}
+                                      </p>
                                     </div>
                                   </div>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
-                          {filteredArtists.map((artist) => {
-                            const completion = artistCompletions.get(artist.name) || { collected: 0, total: artist.cardCount, percentage: 0 };
-                            const artistInitial = artist.name.charAt(0).toUpperCase();
-                            return (
-                              <Link key={artist.name} href={`/browse-artists/${encodeURIComponent(artist.name)}`} className="block group">
-                                <Card className={cn("bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square", "group-hover:z-10 relative")}>
-                                    <div className="flex justify-between items-start w-full">
-                                      <div className="relative h-6 w-6 bg-muted rounded-full flex items-center justify-center" data-ai-hint="artist initial">
-                                          <span className="font-bold text-muted-foreground">{artistInitial}</span>
-                                      </div>
-                                      {user && (
-                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                            <span>{completion.collected}/{completion.total}</span>
-                                            <CircularProgress value={completion.percentage} size={16} strokeWidth={3} />
+                                  {/* Completion metrics */}
+                                  <div className="flex items-center gap-4 shrink-0">
+                                    {user && (
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex flex-col items-end hidden xs:flex">
+                                          <span className="text-sm font-bold text-foreground">
+                                            {completion.collected}/{completion.total}
+                                          </span>
+                                          <span className="text-[10px] text-muted-foreground">
+                                            Collected
+                                          </span>
                                         </div>
+                                        <CircularProgress
+                                          value={completion.percentage}
+                                          size={36}
+                                          strokeWidth={4.5}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
+                          {groupedSets[seriesName].map((set) => {
+                            const completion = setCompletions.get(set.id) || {
+                              collected: 0,
+                              total: set.printedTotal,
+                              percentage: 0,
+                            };
+                            const linkHref = `/sets/${set.id}`;
+                            return (
+                              <Link key={set.id} href={linkHref} className="block group">
+                                <Card
+                                  className={cn(
+                                    'bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square',
+                                    'group-hover:z-10 relative'
+                                  )}
+                                >
+                                  <div className="flex justify-between items-start w-full">
+                                    <div className="relative h-6 w-6">
+                                      {set.images.symbol && (
+                                        <Image
+                                          src={set.images.symbol}
+                                          alt={`${set.name} symbol`}
+                                          fill
+                                          sizes="24px"
+                                          className="object-contain"
+                                          data-ai-hint="pokemon set symbol"
+                                        />
                                       )}
                                     </div>
-                                    <div className="flex-grow flex items-center justify-center w-full my-2">
-                                      <Avatar className="w-24 h-24" data-ai-hint="artist avatar large">
-                                          <AvatarFallback className="text-4xl">{artistInitial}</AvatarFallback>
-                                      </Avatar>
-                                    </div>
-                                    <p className="font-semibold text-sm mt-auto truncate w-full capitalize">{artist.name}</p>
+                                    {user && (
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <span>
+                                          {completion.collected}/{completion.total}
+                                        </span>
+                                        <CircularProgress
+                                          value={completion.percentage}
+                                          size={16}
+                                          strokeWidth={3}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-grow flex items-center justify-center w-full my-2">
+                                    {set.images.logo ? (
+                                      <div className="relative w-full h-full">
+                                        <Image
+                                          src={set.images.logo}
+                                          alt={`${set.name} logo`}
+                                          fill
+                                          sizes="(max-width: 640px) 50vw, 150px"
+                                          className="object-contain"
+                                          data-ai-hint="pokemon set logo"
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div
+                                        className="w-full h-full bg-muted rounded flex items-center justify-center"
+                                        data-ai-hint="logo placeholder"
+                                      >
+                                        <span className="text-xs text-muted-foreground">
+                                          No Logo
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="font-semibold text-sm mt-auto truncate w-full">
+                                    {set.name}
+                                  </p>
                                 </Card>
                               </Link>
                             );
                           })}
-                          </div>
-                        )
-                    ) : ( 
-                        <div className="text-center py-10 text-muted-foreground">
-                            <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                            <p className="text-lg">No artists found matching your search.</p>
-                        </div> 
-                    )}
-                </div>
-              )}
-            </TabsContent>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">No sets found matching your search criteria.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="artists">
+            {artistsError ? (
+              <div className="flex flex-col items-center justify-center py-10 text-destructive text-center bg-card rounded-lg shadow-xl">
+                <ServerCrash className="h-16 w-16 mx-auto mb-4" />
+                <p className="text-xl font-semibold">Oops! Something went wrong.</p>
+                <p className="mt-2 max-w-md">{artistsError}</p>
+                <Button onClick={fetchArtists} className="mt-4">
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <div className="pb-8">
+                {filteredArtists.length > 0 ? (
+                  viewMode === 'list' ? (
+                    <div className="border rounded-lg overflow-hidden bg-card mt-4 divide-y divide-border mx-4 shadow-md">
+                      {filteredArtists.map((artist) => {
+                        const completion = artistCompletions.get(artist.name) || {
+                          collected: 0,
+                          total: artist.cardCount,
+                          percentage: 0,
+                        };
+                        const artistInitial = artist.name.charAt(0).toUpperCase();
+                        return (
+                          <Link
+                            key={artist.name}
+                            href={`/browse-artists/${encodeURIComponent(artist.name)}`}
+                            className="block group"
+                          >
+                            <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                              <div className="flex items-center gap-4 min-w-0">
+                                <Avatar className="w-10 h-10 border shrink-0">
+                                  <AvatarFallback className="text-sm">
+                                    {artistInitial}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="font-bold text-sm sm:text-base text-foreground group-hover:text-primary transition-colors truncate capitalize">
+                                    {artist.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Illustrator</p>
+                                </div>
+                              </div>
+                              {/* Completion */}
+                              <div className="flex items-center gap-4 shrink-0">
+                                {user && (
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-end hidden xs:flex">
+                                      <span className="text-sm font-bold text-foreground">
+                                        {completion.collected}/{completion.total}
+                                      </span>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        Collected
+                                      </span>
+                                    </div>
+                                    <CircularProgress
+                                      value={completion.percentage}
+                                      size={36}
+                                      strokeWidth={4.5}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-6 pt-4 px-4">
+                      {filteredArtists.map((artist) => {
+                        const completion = artistCompletions.get(artist.name) || {
+                          collected: 0,
+                          total: artist.cardCount,
+                          percentage: 0,
+                        };
+                        const artistInitial = artist.name.charAt(0).toUpperCase();
+                        return (
+                          <Link
+                            key={artist.name}
+                            href={`/browse-artists/${encodeURIComponent(artist.name)}`}
+                            className="block group"
+                          >
+                            <Card
+                              className={cn(
+                                'bg-card hover:shadow-primary/20 hover:border-primary transition-all duration-300 ease-in-out transform hover:scale-105 flex flex-col justify-between p-3 text-center aspect-square',
+                                'group-hover:z-10 relative'
+                              )}
+                            >
+                              <div className="flex justify-between items-start w-full">
+                                <div
+                                  className="relative h-6 w-6 bg-muted rounded-full flex items-center justify-center"
+                                  data-ai-hint="artist initial"
+                                >
+                                  <span className="font-bold text-muted-foreground">
+                                    {artistInitial}
+                                  </span>
+                                </div>
+                                {user && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <span>
+                                      {completion.collected}/{completion.total}
+                                    </span>
+                                    <CircularProgress
+                                      value={completion.percentage}
+                                      size={16}
+                                      strokeWidth={3}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-grow flex items-center justify-center w-full my-2">
+                                <Avatar className="w-24 h-24" data-ai-hint="artist avatar large">
+                                  <AvatarFallback className="text-4xl">
+                                    {artistInitial}
+                                  </AvatarFallback>
+                                </Avatar>
+                              </div>
+                              <p className="font-semibold text-sm mt-auto truncate w-full capitalize">
+                                {artist.name}
+                              </p>
+                            </Card>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center py-10 text-muted-foreground">
+                    <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-lg">No artists found matching your search.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
       </main>
-       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
+      <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
         PokéTRKR &copy; {new Date().getFullYear()}
       </footer>
     </div>
@@ -656,15 +861,17 @@ const BrowsePageContent: NextPage = () => {
 };
 
 const BrowsePage: NextPage = () => (
-  <Suspense fallback={
-    <div className="flex flex-col min-h-screen bg-background">
-      <AppHeader />
-      <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-         <p className="ml-4 text-lg text-muted-foreground">Loading...</p>
-      </main>
-    </div>
-  }>
+  <Suspense
+    fallback={
+      <div className="flex flex-col min-h-screen bg-background">
+        <AppHeader />
+        <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="ml-4 text-lg text-muted-foreground">Loading...</p>
+        </main>
+      </div>
+    }
+  >
     <BrowsePageContent />
   </Suspense>
 );

@@ -1,14 +1,18 @@
 // File: src/components/ImprovedCardScanner.tsx
-"use client";
+'use client';
 
-import { useState, useRef, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, RotateCcw, Zap, Eye, Info } from "lucide-react";
-import { findCardByImageEnhanced, validateCardData, type FindCardOutput } from "@/ai/flows/find-card-by-image-flow";
-import { useToast } from "@/hooks/use-toast";
-import Image from "next/image";
+import { useState, useRef, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Camera, RotateCcw, Zap, Eye, Info } from 'lucide-react';
+import {
+  findCardByImageEnhanced,
+  validateCardData,
+  type FindCardOutput,
+} from '@/ai/flows/find-card-by-image-flow';
+import { useToast } from '@/hooks/use-toast';
+import Image from 'next/image';
 
 interface ImprovedCardScannerProps {
   onScanResult: (result: FindCardOutput) => void;
@@ -17,7 +21,7 @@ interface ImprovedCardScannerProps {
 export function ImprovedCardScanner({ onScanResult }: ImprovedCardScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [processingStep, setProcessingStep] = useState<string>("");
+  const [processingStep, setProcessingStep] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -30,47 +34,50 @@ export function ImprovedCardScanner({ onScanResult }: ImprovedCardScannerProps) 
     });
   }, []);
 
-  const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleImageUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-    setIsScanning(true);
-    setProcessingStep("Reading image...");
+      setIsScanning(true);
+      setProcessingStep('Reading image...');
 
-    try {
-      const imageDataUrl = await fileToDataUrl(file);
-      setImagePreview(imageDataUrl);
+      try {
+        const imageDataUrl = await fileToDataUrl(file);
+        setImagePreview(imageDataUrl);
 
-      setProcessingStep("AI is analyzing card...");
-      const result = await findCardByImageEnhanced({ imageDataUri: imageDataUrl });
-      
-      const cleanedResult = await validateCardData(result);
-      
-      if (cleanedResult.name) {
-        onScanResult(cleanedResult);
+        setProcessingStep('AI is analyzing card...');
+        const result = await findCardByImageEnhanced({ imageDataUri: imageDataUrl });
+
+        const cleanedResult = await validateCardData(result);
+
+        if (cleanedResult.name) {
+          onScanResult(cleanedResult);
+          toast({
+            title: 'Scan Successful',
+            description: `Identified: ${cleanedResult.name}`,
+          });
+        } else {
+          throw new Error('AI could not clearly identify this card.');
+        }
+      } catch (error) {
+        console.error('Error scanning card:', error);
+        const errorMessage =
+          error instanceof Error ? error.message : 'Could not analyze the card image.';
         toast({
-          title: "Scan Successful",
-          description: `Identified: ${cleanedResult.name}`,
+          variant: 'destructive',
+          title: 'Scan Failed',
+          description: `${errorMessage} Please try again with a clearer, well-lit photo.`,
         });
-      } else {
-        throw new Error("AI could not clearly identify this card.");
+      } finally {
+        setIsScanning(false);
+        setProcessingStep('');
+        // Reset input value so same file can be uploaded again if needed
+        if (fileInputRef.current) fileInputRef.current.value = '';
       }
-
-    } catch (error) {
-      console.error("Error scanning card:", error);
-      const errorMessage = error instanceof Error ? error.message : "Could not analyze the card image.";
-      toast({
-        variant: "destructive",
-        title: "Scan Failed",
-        description: `${errorMessage} Please try again with a clearer, well-lit photo.`,
-      });
-    } finally {
-      setIsScanning(false);
-      setProcessingStep("");
-      // Reset input value so same file can be uploaded again if needed
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }, [fileToDataUrl, onScanResult, toast]);
+    },
+    [fileToDataUrl, onScanResult, toast]
+  );
 
   return (
     <div className="space-y-6">
@@ -94,7 +101,7 @@ export function ImprovedCardScanner({ onScanResult }: ImprovedCardScannerProps) 
             className="hidden"
             id="card-camera-input"
           />
-          
+
           <div className="flex flex-col gap-4">
             <Button
               onClick={() => fileInputRef.current?.click()}
@@ -144,6 +151,7 @@ export function ImprovedCardScanner({ onScanResult }: ImprovedCardScannerProps) 
                 src={imagePreview}
                 alt="Captured card preview"
                 fill
+                sizes="(max-width: 640px) 100vw, 250px"
                 className="object-cover"
               />
               {isScanning && (

@@ -1,32 +1,32 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { AppHeader } from "@/components/AppHeader";
-import { ImprovedCardScanner } from "@/components/ImprovedCardScanner";
-import { ManualCardInputForm } from "@/components/ManualCardInputForm";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Camera, FileEdit, CheckCircle2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { collectionService } from "@/services/collectionService";
-import { useUIStore } from "@/store/useUIStore";
-import { useToast } from "@/hooks/use-toast";
-import type { PokemonCard } from "@/types";
-import type { FindCardOutput } from "@/ai/flows/find-card-by-image-flow";
+import { useState } from 'react';
+import { AppHeader } from '@/components/AppHeader';
+import { ImprovedCardScanner } from '@/components/ImprovedCardScanner';
+import { ManualCardInputForm } from '@/components/ManualCardInputForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Camera, FileEdit } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { collectionService } from '@/services/collectionService';
+import { useUIStore } from '@/store/useUIStore';
+import { useToast } from '@/hooks/use-toast';
+import type { PokemonCard } from '@/types';
+import type { FindCardOutput } from '@/ai/flows/find-card-by-image-flow';
 
 export default function AddCardPage() {
   const { user } = useAuth();
   const { openAuthModal } = useUIStore();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("scan");
+  const [activeTab, setActiveTab] = useState('scan');
   const [preFillData, setPreFillData] = useState<Partial<FindCardOutput> | null>(null);
 
   const handleScanResult = (result: FindCardOutput) => {
     setPreFillData(result);
     // Switch to manual tab to let user verify and add
-    setActiveTab("manual");
+    setActiveTab('manual');
     toast({
-      title: "Card Identified!",
+      title: 'Card Identified!',
       description: "We've pre-filled the form with the details we found. Please verify them.",
     });
   };
@@ -40,17 +40,17 @@ export default function AddCardPage() {
     try {
       await collectionService.addCard(user.uid, card);
       toast({
-        title: "Success!",
+        title: 'Success!',
         description: `${card.name} added to your collection.`,
-        variant: "default",
+        variant: 'default',
       });
       // Clear pre-fill data after successful add
       setPreFillData(null);
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to add card.",
-        variant: "destructive",
+        title: 'Error',
+        description: error.message || 'Failed to add card.',
+        variant: 'destructive',
       });
     }
   };
@@ -63,10 +63,12 @@ export default function AddCardPage() {
           <Card className="max-w-md text-center">
             <CardHeader>
               <CardTitle>Login Required</CardTitle>
-              <CardDescription>You need to be logged in to add cards to your collection.</CardDescription>
+              <CardDescription>
+                You need to be logged in to add cards to your collection.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <button 
+              <button
                 onClick={openAuthModal}
                 className="w-full bg-primary text-primary-foreground py-2 rounded-md hover:bg-primary/90 transition-colors"
               >

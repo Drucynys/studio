@@ -27,7 +27,6 @@ interface ApiPokemonCard {
   // Add other relevant card properties
 }
 
-
 const DB_NAME = 'pokedex-tracker-db';
 const DB_VERSION = 1;
 const SETS_STORE = 'sets';
@@ -46,7 +45,7 @@ const initDB = () => {
         // The key will be the set 'id' (e.g., "sv1", "base1")
         db.createObjectStore(SETS_STORE, { keyPath: 'id' });
       }
-      
+
       // Create 'cards' store if it doesn't exist
       if (!db.objectStoreNames.contains(CARDS_STORE)) {
         const store = db.createObjectStore(CARDS_STORE, { keyPath: 'id' });
@@ -57,7 +56,6 @@ const initDB = () => {
   });
   return dbPromise;
 };
-
 
 // --- Service Functions ---
 
@@ -71,7 +69,7 @@ export async function getCachedSets(): Promise<ApiSet[]> {
 export async function cacheSets(sets: ApiSet[]): Promise<void> {
   const db = await initDB();
   const tx = db.transaction(SETS_STORE, 'readwrite');
-  await Promise.all(sets.map(set => tx.store.put(set)));
+  await Promise.all(sets.map((set) => tx.store.put(set)));
   await tx.done;
 }
 
@@ -85,10 +83,9 @@ export async function getCachedCardsBySet(setId: string): Promise<ApiPokemonCard
 export async function cacheCards(cards: ApiPokemonCard[]): Promise<void> {
   const db = await initDB();
   const tx = db.transaction(CARDS_STORE, 'readwrite');
-  await Promise.all(cards.map(card => tx.store.put(card)));
+  await Promise.all(cards.map((card) => tx.store.put(card)));
   await tx.done;
 }
 
 // Initialize the database as soon as the app loads
 initDB();
-

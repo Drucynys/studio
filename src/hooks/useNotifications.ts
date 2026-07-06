@@ -54,7 +54,8 @@ export function useNotifications(uid: string | undefined) {
 
   return {
     notifications: isGuest ? guestNotifications : notifications,
-    loadingNotifications: !isGuest && !!uid && !hasReceivedFirstSnapshot.current && notifications.length === 0,
+    loadingNotifications:
+      !isGuest && !!uid && !hasReceivedFirstSnapshot.current && notifications.length === 0,
   };
 }
 
@@ -101,6 +102,7 @@ export function useFollowing(uid: string | undefined) {
 
   return {
     following: isGuest ? guestFollowing : following,
-    loadingFollowing: !isGuest && !!uid && !hasReceivedFirstSnapshot.current && following.length === 0,
+    loadingFollowing:
+      !isGuest && !!uid && !hasReceivedFirstSnapshot.current && following.length === 0,
   };
 }

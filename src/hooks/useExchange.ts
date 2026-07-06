@@ -54,6 +54,7 @@ export function useExchange(uid: string | undefined) {
 
   return {
     myExchangeItems: isGuest ? guestExchangeItems : myExchangeItems,
-    loadingMyExchangeItems: !isGuest && !!uid && !hasReceivedFirstSnapshot.current && myExchangeItems.length === 0,
+    loadingMyExchangeItems:
+      !isGuest && !!uid && !hasReceivedFirstSnapshot.current && myExchangeItems.length === 0,
   };
 }

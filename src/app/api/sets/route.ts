@@ -1,37 +1,26 @@
-
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-
+import { db } from '@/lib/firebase-admin';
 // Re-initialize Firebase Admin SDK if not already initialized
-if (!admin.apps.length) {
-    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-}
-const db = admin.firestore();
-
 export async function GET() {
-    try {
-        const setsCollection = db.collection('pokemon-tcg-sets');
-        const snapshot = await setsCollection.orderBy('releaseDate', 'desc').get();
+  try {
+    const setsCollection = db.collection('pokemon-tcg-sets');
+    const snapshot = await setsCollection.orderBy('releaseDate', 'desc').get();
 
-        if (snapshot.empty) {
-            return NextResponse.json([]);
-        }
-
-        const sets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        const response = NextResponse.json(sets);
-        // Cache for 1 hour, serve stale data for up to 24 hours while revalidating
-        response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-        return response;
-
-    } catch (error: any) {
-        console.error('Error fetching sets:', error);
-        return NextResponse.json(
-            { message: error.message || 'An unknown server error occurred while fetching sets.' },
-            { status: 500 }
-        );
+    if (snapshot.empty) {
+      return NextResponse.json([]);
     }
+
+    const sets = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+    const response = NextResponse.json(sets);
+    // Cache for 1 hour, serve stale data for up to 24 hours while revalidating
+    response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    return response;
+  } catch (error: any) {
+    console.error('Error fetching sets:', error);
+    return NextResponse.json(
+      { message: error.message || 'An unknown server error occurred while fetching sets.' },
+      { status: 500 }
+    );
+  }
 }

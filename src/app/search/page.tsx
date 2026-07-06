@@ -1,24 +1,24 @@
 // src/app/search/page.tsx
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import Image from "next/image";
-import { AppHeader } from "@/components/AppHeader";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
-import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
-import { Loader2, ServerCrash, Search as SearchIcon, Info } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserCollection } from "@/hooks/useUserCollection";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import Image from 'next/image';
+import { AppHeader } from '@/components/AppHeader';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { AddCardToCollectionDialog } from '@/components/AddCardToCollectionDialog';
+import type { ApiPokemonCard } from '@/app/sets/[setId]/page';
+import { Loader2, ServerCrash, Search as SearchIcon, Info } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserCollection } from '@/hooks/useUserCollection';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export default function SearchPage() {
   const { user } = useAuth();
   const { collection } = useUserCollection(user?.uid);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ApiPokemonCard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export default function SearchPage() {
 
   const currentCardIndex = useMemo(() => {
     if (!selectedApiCard) return -1;
-    return searchResults.findIndex(c => c.id === selectedApiCard.id);
+    return searchResults.findIndex((c) => c.id === selectedApiCard.id);
   }, [selectedApiCard, searchResults]);
 
   const handlePrevCard = useCallback(() => {
@@ -58,17 +58,16 @@ export default function SearchPage() {
     try {
       const params = new URLSearchParams({ q: currentQuery });
       const response = await fetch(`/api/search-cards?${params.toString()}`);
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || `An error occurred: ${response.statusText}`);
       }
-      
+
       const data: ApiPokemonCard[] = await response.json();
       setSearchResults(data);
-
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred.");
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -90,11 +89,19 @@ export default function SearchPage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex flex-col text-left hidden md:block">
               <h1 className="font-headline text-3xl md:text-4xl text-foreground flex items-center gap-2 capitalize leading-tight">
-                <SearchIcon className="h-8 w-8 text-primary"/>
+                <SearchIcon className="h-8 w-8 text-primary" />
                 Search for Cards
               </h1>
               <p className="text-sm md:text-base text-muted-foreground mt-1 leading-normal max-w-2xl">
-                Find specific Pokémon TCG cards by name, set, or number. For example: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground font-medium">Charizard base 4</code> or <code className="bg-muted px-1.5 py-0.5 rounded text-foreground font-medium">135/165</code>.
+                Find specific Pokémon TCG cards by name, set, or number. For example:{' '}
+                <code className="bg-muted px-1.5 py-0.5 rounded text-foreground font-medium">
+                  Charizard base 4
+                </code>{' '}
+                or{' '}
+                <code className="bg-muted px-1.5 py-0.5 rounded text-foreground font-medium">
+                  135/165
+                </code>
+                .
               </p>
             </div>
           </div>
@@ -118,7 +125,7 @@ export default function SearchPage() {
             <p>{error}</p>
           </div>
         )}
-        
+
         {!isLoading && hasSearched && searchResults.length === 0 && !error && query.length > 0 && (
           <div className="text-center py-10 text-muted-foreground bg-card rounded-lg shadow-md">
             <Info className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -126,22 +133,23 @@ export default function SearchPage() {
             <p>Try making your search less specific.</p>
           </div>
         )}
-        
+
         {searchResults.length > 0 && (
           <div className="mt-4">
             <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
               <p className="text-sm text-muted-foreground">
-                Found <span className="font-bold text-foreground">{searchResults.length}</span> card(s) matching your query. Click on a card to add it to your collection.
+                Found <span className="font-bold text-foreground">{searchResults.length}</span>{' '}
+                card(s) matching your query. Click on a card to add it to your collection.
               </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-2 pb-24">
-              {searchResults.map(card => {
+              {searchResults.map((card, index) => {
                 const isCollected = collection.some(
                   (collected) =>
                     collected.name === card.name &&
                     collected.set === card.set.name &&
                     collected.cardNumber === card.number &&
-                    collected.language === "English"
+                    collected.language === 'English'
                 );
                 return (
                   <div
@@ -152,23 +160,33 @@ export default function SearchPage() {
                     }}
                     className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-all duration-200 hover:scale-105"
                   >
-                    <div className={cn("absolute inset-0 rounded-lg overflow-hidden", isCollected && "ring-2 ring-green-500")}>
+                    <div
+                      className={cn(
+                        'absolute inset-0 rounded-lg overflow-hidden',
+                        isCollected && 'ring-2 ring-green-500'
+                      )}
+                    >
                       <Image
                         src={card.images.small}
                         alt={card.name}
-                        layout="fill"
-                        objectFit="contain"
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
+                        priority={index < 8}
                         className={cn(
-                          "bg-card shadow-md rounded-lg",
-                          isCollected ? "saturate-100" : "saturate-[.15] group-hover:saturate-100 transition-all duration-300"
+                          'bg-card shadow-md rounded-lg object-contain',
+                          isCollected
+                            ? 'saturate-100'
+                            : 'saturate-[.15] group-hover:saturate-100 transition-all duration-300'
                         )}
                         data-ai-hint="pokemon card front"
                       />
                     </div>
-                    <Badge className={cn(
-                      "absolute bottom-1.5 right-1.5 z-10 text-[10px] font-bold text-white border-transparent transition-opacity group-hover:opacity-0",
-                      isCollected ? "bg-green-600" : "bg-black/60"
-                    )}>
+                    <Badge
+                      className={cn(
+                        'absolute bottom-1.5 right-1.5 z-10 text-[10px] font-bold text-white border-transparent transition-opacity group-hover:opacity-0',
+                        isCollected ? 'bg-green-600' : 'bg-black/60'
+                      )}
+                    >
                       #{card.number}
                     </Badge>
                   </div>
@@ -185,7 +203,7 @@ export default function SearchPage() {
           </div>
         )}
       </main>
-       {selectedApiCard && (
+      {selectedApiCard && (
         <AddCardToCollectionDialog
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
@@ -196,11 +214,20 @@ export default function SearchPage() {
           onNextCard={currentCardIndex < searchResults.length - 1 ? handleNextCard : undefined}
           hasPrevCard={currentCardIndex > 0}
           hasNextCard={currentCardIndex < searchResults.length - 1}
-          prevCardImageUrl={currentCardIndex > 0 ? (searchResults[currentCardIndex - 1].images.large || searchResults[currentCardIndex - 1].images.small) : null}
-          nextCardImageUrl={currentCardIndex < searchResults.length - 1 ? (searchResults[currentCardIndex + 1].images.large || searchResults[currentCardIndex + 1].images.small) : null}
+          prevCardImageUrl={
+            currentCardIndex > 0
+              ? searchResults[currentCardIndex - 1].images.large ||
+                searchResults[currentCardIndex - 1].images.small
+              : null
+          }
+          nextCardImageUrl={
+            currentCardIndex < searchResults.length - 1
+              ? searchResults[currentCardIndex + 1].images.large ||
+                searchResults[currentCardIndex + 1].images.small
+              : null
+          }
         />
       )}
-
     </div>
   );
 }

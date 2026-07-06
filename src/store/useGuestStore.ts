@@ -6,49 +6,49 @@ const DEMO_UID = 'demo-guest-uid';
 
 const DEMO_CARDS: PokemonCard[] = [
   {
-    id: "demo-card-1",
+    id: 'demo-card-1',
     userId: DEMO_UID,
-    apiId: "base1-4",
-    name: "Charizard",
-    set: "Base",
-    cardNumber: "4",
-    rarity: "Rare Holo",
-    language: "English",
+    apiId: 'base1-4',
+    name: 'Charizard',
+    set: 'Base',
+    cardNumber: '4',
+    rarity: 'Rare Holo',
+    language: 'English',
     variant: null,
-    imageUrl: "https://images.pokemontcg.io/base1/4.png",
+    imageUrl: 'https://images.pokemontcg.io/base1/4.png',
     value: 350,
     quantity: 1,
-    artist: "Mitsuhiro Arita",
+    artist: 'Mitsuhiro Arita',
   },
   {
-    id: "demo-card-2",
+    id: 'demo-card-2',
     userId: DEMO_UID,
-    apiId: "base1-15",
-    name: "Venusaur",
-    set: "Base",
-    cardNumber: "15",
-    rarity: "Rare Holo",
-    language: "English",
+    apiId: 'base1-15',
+    name: 'Venusaur',
+    set: 'Base',
+    cardNumber: '15',
+    rarity: 'Rare Holo',
+    language: 'English',
     variant: null,
-    imageUrl: "https://images.pokemontcg.io/base1/15.png",
+    imageUrl: 'https://images.pokemontcg.io/base1/15.png',
     value: 120,
     quantity: 1,
-    artist: "Mitsuhiro Arita",
+    artist: 'Mitsuhiro Arita',
   },
   {
-    id: "demo-card-3",
+    id: 'demo-card-3',
     userId: DEMO_UID,
-    apiId: "ecard3-61",
-    name: "Pikachu",
-    set: "Skyridge",
-    cardNumber: "61",
-    rarity: "Common",
-    language: "English",
+    apiId: 'ecard3-61',
+    name: 'Pikachu',
+    set: 'Skyridge',
+    cardNumber: '61',
+    rarity: 'Common',
+    language: 'English',
     variant: null,
-    imageUrl: "https://images.pokemontcg.io/ecard3/61.png",
+    imageUrl: 'https://images.pokemontcg.io/ecard3/61.png',
     value: 45,
     quantity: 2,
-    artist: "Atsuko Nishida",
+    artist: 'Atsuko Nishida',
   },
 ];
 
@@ -80,10 +80,11 @@ interface GuestState {
   updateDisplayName: (name: string) => void;
 }
 
-const createMockTimestamp = () => ({
-  toMillis: () => Date.now(),
-  toDate: () => new Date(),
-} as any);
+const createMockTimestamp = () =>
+  ({
+    toMillis: () => Date.now(),
+    toDate: () => new Date(),
+  }) as any;
 
 export const useGuestStore = create<GuestState>((set, get) => ({
   isGuest: false,
@@ -175,9 +176,7 @@ export const useGuestStore = create<GuestState>((set, get) => ({
   markNotificationsAsRead: (ids) => {
     const idSet = new Set(ids);
     set((state) => ({
-      notifications: state.notifications.map((n) =>
-        idSet.has(n.id) ? { ...n, read: true } : n
-      ),
+      notifications: state.notifications.map((n) => (idSet.has(n.id) ? { ...n, read: true } : n)),
     }));
   },
 

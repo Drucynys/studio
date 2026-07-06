@@ -22,21 +22,21 @@ const POKEMON_TCG_API_KEY = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+    credential: admin.credential.cert(serviceAccount),
   });
 }
 
 const db = admin.firestore();
 const POKEMON_TCG_API_BASE = 'https://api.pokemontcg.io/v2';
 const CONCURRENCY_LIMIT = 2; // Conservative limit
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function fetchWithRetry(url, params = {}, retries = 5) {
   for (let i = 0; i < retries; i++) {
     try {
       const response = await axios.get(url, {
         params,
-        headers: { 'X-Api-Key': POKEMON_TCG_API_KEY }
+        headers: { 'X-Api-Key': POKEMON_TCG_API_KEY },
       });
       return response.data;
     } catch (error) {
@@ -52,8 +52,6 @@ async function fetchWithRetry(url, params = {}, retries = 5) {
   throw new Error('Max retries exceeded');
 }
 
-
-
 async function syncSetCards(setId) {
   console.log(`\n📦 Syncing cards for set: ${setId}`);
   let page = 1;
@@ -65,35 +63,39 @@ async function syncSetCards(setId) {
       q: `set.id:${setId}`,
       page,
       pageSize: 250,
-      orderBy: 'number'
+      orderBy: 'number',
     });
-    
+
     const cards = data.data;
     if (!cards || cards.length === 0) break;
 
     // --- FIRESTORE BATCH ---
     const batch = db.batch();
-    cards.forEach(card => {
+    cards.forEach((card) => {
       const docRef = db.collection('pokemon-tcg-cards').doc(card.id);
-        const numberAsInt = parseInt(card.number) || 999;
-      batch.set(docRef, {
-        ...card,
-        numberAsInt,
-        lastSynced: admin.firestore.FieldValue.serverTimestamp()
-      }, { merge: true });
+      const numberAsInt = parseInt(card.number) || 999;
+      batch.set(
+        docRef,
+        {
+          ...card,
+          numberAsInt,
+          lastSynced: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
     });
     await batch.commit();
 
-
-
     totalSaved += cards.length;
-    console.log(`  - Page ${page}: Saved ${cards.length} cards (Total: ${totalSaved}/${data.totalCount})`);
+    console.log(
+      `  - Page ${page}: Saved ${cards.length} cards (Total: ${totalSaved}/${data.totalCount})`
+    );
 
     if (totalSaved >= data.totalCount || cards.length < 250) {
       hasMore = false;
     } else {
       page++;
-      await sleep(500); 
+      await sleep(500);
     }
   }
   return totalSaved;
@@ -101,7 +103,7 @@ async function syncSetCards(setId) {
 
 async function syncAll() {
   console.log('🚀 Starting Global Pokémon TCG Sync (Firestore + SQL)...');
-  
+
   try {
     console.log('📋 Fetching all sets...');
     const setsData = await fetchWithRetry(`${POKEMON_TCG_API_BASE}/sets`);
@@ -113,7 +115,11 @@ async function syncAll() {
     const setsBatch = db.batch();
     for (const set of allSets) {
       const docRef = db.collection('pokemon-tcg-sets').doc(set.id);
-      setsBatch.set(docRef, { ...set, lastSynced: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      setsBatch.set(
+        docRef,
+        { ...set, lastSynced: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
     }
     await setsBatch.commit();
     console.log('✅ All sets metadata updated in Firestore & SQL.');
@@ -137,7 +143,9 @@ async function syncAll() {
       }
     };
 
-    const workers = Array(CONCURRENCY_LIMIT).fill(0).map(() => worker());
+    const workers = Array(CONCURRENCY_LIMIT)
+      .fill(0)
+      .map(() => worker());
     await Promise.all(workers);
 
     console.log(`\n🎉 FINISHED! Total sets: ${completedSets}, Total cards: ${totalCards}`);
@@ -148,6 +156,4 @@ async function syncAll() {
   }
 }
 
-
 syncAll();
-

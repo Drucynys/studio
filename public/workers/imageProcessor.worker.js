@@ -1,7 +1,7 @@
 // Image processing Web Worker
-self.onmessage = async function(e) {
+self.onmessage = async function (e) {
   const { imageDataUrl, options } = e.data;
-  
+
   try {
     const processedImage = await processImageInWorker(imageDataUrl, options);
     self.postMessage({ success: true, result: processedImage });
@@ -21,7 +21,7 @@ async function processImageInWorker(imageDataUrl, options = {}) {
 
   return new Promise((resolve, reject) => {
     const img = new Image();
-    
+
     img.onload = () => {
       try {
         // Create OffscreenCanvas for better performance
@@ -83,17 +83,16 @@ async function processImageInWorker(imageDataUrl, options = {}) {
         }
 
         // Convert to blob for better memory management
-        canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 }).then(blob => {
+        canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 }).then((blob) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
           reader.readAsDataURL(blob);
         });
-
       } catch (error) {
         reject(error);
       }
     };
-    
+
     img.onerror = () => reject(new Error('Failed to load image'));
     img.src = imageDataUrl;
   });
@@ -105,15 +104,12 @@ function applySharpenFilter(ctx, width, height) {
   const newData = new Uint8ClampedArray(data);
 
   // Sharpening kernel
-  const kernel = [
-    0, -1, 0,
-    -1, 5, -1,
-    0, -1, 0
-  ];
+  const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
 
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
-      for (let c = 0; c < 3; c++) { // RGB channels
+      for (let c = 0; c < 3; c++) {
+        // RGB channels
         let sum = 0;
         for (let ky = -1; ky <= 1; ky++) {
           for (let kx = -1; kx <= 1; kx++) {

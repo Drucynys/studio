@@ -1,19 +1,5 @@
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
-
-if (!admin.apps.length) {
-  const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  if (serviceAccountJson) {
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } else {
-    admin.initializeApp();
-  }
-}
-const db = admin.firestore();
-
+import { db } from '@/lib/firebase-admin';
 // In-memory catalog cache to avoid Firestore read costs and speed up page loads to <10ms
 let cachedCatalog: any[] | null = null;
 let lastCacheTime = 0;
@@ -21,22 +7,19 @@ const CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 
 async function getCardCatalog(): Promise<any[]> {
   const now = Date.now();
-  if (cachedCatalog && (now - lastCacheTime < CACHE_TTL_MS)) {
+  if (cachedCatalog && now - lastCacheTime < CACHE_TTL_MS) {
     return cachedCatalog;
   }
 
   console.log('🔄 Loading Pokedex card catalog from Firestore...');
   const snapshot = await db.collection('pokemon-tcg-cards').get();
-  cachedCatalog = snapshot.docs.map(doc => doc.data());
+  cachedCatalog = snapshot.docs.map((doc) => doc.data());
   lastCacheTime = now;
   console.log(`✅ Cached ${cachedCatalog.length} cards for fast Poke-specific fetches.`);
   return cachedCatalog;
 }
 
-export async function GET(
-  request: Request,
-  context: { params: Promise<{ pokemonName: string }> }
-) {
+export async function GET(request: Request, context: { params: Promise<{ pokemonName: string }> }) {
   try {
     const { pokemonName } = await context.params;
     if (!pokemonName) {
@@ -52,15 +35,17 @@ export async function GET(
 
     // Filter cards featuring this Pokémon.
     // e.g. "Charizard", "Charizard ex", "Dark Charizard", "Surfing Pikachu"
-    const results = catalog.filter(card => {
+    const results = catalog.filter((card) => {
       if (!card.name) return false;
       const cardNameLower = card.name.toLowerCase();
-      
+
       // Word boundary match: matches "Pikachu", "Pikachu ex", but not "Pikachuu"
-      return cardNameLower === nameLower ||
-             cardNameLower.split(' ').includes(nameLower) ||
-             cardNameLower.startsWith(nameLower + ' ') ||
-             cardNameLower.endsWith(' ' + nameLower);
+      return (
+        cardNameLower === nameLower ||
+        cardNameLower.split(' ').includes(nameLower) ||
+        cardNameLower.startsWith(nameLower + ' ') ||
+        cardNameLower.endsWith(' ' + nameLower)
+      );
     });
 
     // Sort: Exact name matches first, then sort by set release date (newest first), then card number
@@ -69,7 +54,7 @@ export async function GET(
       const bExact = b.name.toLowerCase() === nameLower ? 1 : 0;
       if (aExact !== bExact) return bExact - aExact;
 
-      return (b.set?.releaseDate || "").localeCompare(a.set?.releaseDate || "");
+      return (b.set?.releaseDate || '').localeCompare(a.set?.releaseDate || '');
     });
 
     // Pagination
@@ -81,17 +66,19 @@ export async function GET(
       data: paginatedResults,
       page,
       pageSize,
-      totalCount: results.length
+      totalCount: results.length,
     });
 
     // Cache for 2 hours on client browser, and revalidate in background on CDN
     response.headers.set('Cache-Control', 'public, s-maxage=7200, stale-while-revalidate=86400');
     return response;
-
   } catch (error) {
     console.error('Error fetching cards for Pokémon:', error);
     return NextResponse.json(
-      { message: 'Error fetching cards', error: (error instanceof Error ? error.message : String(error)) },
+      {
+        message: 'Error fetching cards',
+        error: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

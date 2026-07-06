@@ -26,9 +26,7 @@ export const collectionService = {
     const ref = collection(db, 'users', uid, 'cards');
     return onSnapshot(ref, (snap) => {
       const cards = snap.docs.map((d) => d.data() as PokemonCard);
-      cards.sort(
-        (a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0)
-      );
+      cards.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
       onData(cards);
     });
   },

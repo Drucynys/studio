@@ -27,7 +27,7 @@ export async function preprocessImageForOCR(
   } = options;
 
   let imageDataUrl: string;
-  
+
   if (typeof file === 'string') {
     imageDataUrl = file;
   } else {
@@ -106,15 +106,12 @@ function applySharpenFilter(ctx: CanvasRenderingContext2D, width: number, height
   const newData = new Uint8ClampedArray(data);
 
   // Sharpening kernel
-  const kernel = [
-    0, -1, 0,
-    -1, 5, -1,
-    0, -1, 0
-  ];
+  const kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
 
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
-      for (let c = 0; c < 3; c++) { // RGB channels
+      for (let c = 0; c < 3; c++) {
+        // RGB channels
         let sum = 0;
         for (let ky = -1; ky <= 1; ky++) {
           for (let kx = -1; kx <= 1; kx++) {
@@ -148,11 +145,11 @@ export function detectImageRotation(imageDataUrl: string): Promise<number> {
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
-      
+
       canvas.width = img.width;
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
-      
+
       // Simple heuristic: check if width > height (landscape)
       // Most Pokemon cards are portrait, so landscape might mean rotation needed
       if (img.width > img.height) {
@@ -172,23 +169,19 @@ export async function cropToCardArea(imageDataUrl: string): Promise<string> {
     img.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
-      
+
       // Assume card takes up central 80% of image
       const cropMargin = 0.1; // 10% margin on each side
       const cropX = img.width * cropMargin;
       const cropY = img.height * cropMargin;
       const cropWidth = img.width * (1 - 2 * cropMargin);
       const cropHeight = img.height * (1 - 2 * cropMargin);
-      
+
       canvas.width = cropWidth;
       canvas.height = cropHeight;
-      
-      ctx.drawImage(
-        img,
-        cropX, cropY, cropWidth, cropHeight,
-        0, 0, cropWidth, cropHeight
-      );
-      
+
+      ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
       resolve(canvas.toDataURL('image/jpeg', 0.9));
     };
     img.src = imageDataUrl;

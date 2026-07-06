@@ -1,20 +1,20 @@
 // File: src/components/OCRDiagnosticTool.tsx
-"use client";
+'use client';
 
-import { useState, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Camera, Bug, CheckCircle } from "lucide-react";
-import { findCardByImageEnhanced, testImageVisibility } from "@/ai/flows/find-card-by-image-flow";
-import Image from "next/image";
+import { useState, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, Camera, Bug, CheckCircle } from 'lucide-react';
+import { findCardByImageEnhanced, testImageVisibility } from '@/ai/flows/find-card-by-image-flow';
+import Image from 'next/image';
 
 export function OCRDiagnosticTool() {
   const [isLoading, setIsLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageDescription, setImageDescription] = useState<string>("");
+  const [imageDescription, setImageDescription] = useState<string>('');
   const [cardResult, setCardResult] = useState<any>(null);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,8 +22,8 @@ export function OCRDiagnosticTool() {
     if (!file) return;
 
     setIsLoading(true);
-    setError("");
-    setImageDescription("");
+    setError('');
+    setImageDescription('');
     setCardResult(null);
 
     try {
@@ -31,25 +31,24 @@ export function OCRDiagnosticTool() {
       const dataUrl = await fileToDataUrl(file);
       setImagePreview(dataUrl);
 
-      console.log("Image size:", file.size, "bytes");
-      console.log("Image type:", file.type);
-      console.log("Data URL length:", dataUrl.length);
+      console.log('Image size:', file.size, 'bytes');
+      console.log('Image type:', file.type);
+      console.log('Data URL length:', dataUrl.length);
 
       // Test 1: Can AI see the image at all?
-      console.log("Testing image visibility...");
+      console.log('Testing image visibility...');
       const description = await testImageVisibility(dataUrl);
       setImageDescription(description);
-      console.log("AI description:", description);
+      console.log('AI description:', description);
 
       // Test 2: Try to extract card data
-      console.log("Attempting card extraction...");
+      console.log('Attempting card extraction...');
       const result = await findCardByImageEnhanced({ imageDataUri: dataUrl });
       setCardResult(result);
-      console.log("Card result:", result);
-
+      console.log('Card result:', result);
     } catch (err: any) {
-      console.error("Error:", err);
-      setError(err.message || "Unknown error occurred");
+      console.error('Error:', err);
+      setError(err.message || 'Unknown error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +113,7 @@ export function OCRDiagnosticTool() {
                 src={imagePreview}
                 alt="Test image"
                 fill
+                sizes="(max-width: 640px) 100vw, 384px"
                 className="object-contain rounded-lg border"
               />
             </div>
@@ -143,14 +143,8 @@ export function OCRDiagnosticTool() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-2">
-              AI Description of what it sees:
-            </p>
-            <Textarea
-              value={imageDescription}
-              readOnly
-              className="min-h-[100px]"
-            />
+            <p className="text-sm text-muted-foreground mb-2">AI Description of what it sees:</p>
+            <Textarea value={imageDescription} readOnly className="min-h-[100px]" />
           </CardContent>
         </Card>
       )}
@@ -169,26 +163,26 @@ export function OCRDiagnosticTool() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium">Name:</label>
-                  <p className={cardResult.name ? "text-green-600" : "text-red-500"}>
-                    {cardResult.name || "❌ Not detected"}
+                  <p className={cardResult.name ? 'text-green-600' : 'text-red-500'}>
+                    {cardResult.name || '❌ Not detected'}
                   </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Set:</label>
-                  <p className={cardResult.set ? "text-green-600" : "text-red-500"}>
-                    {cardResult.set || "❌ Not detected"}
+                  <p className={cardResult.set ? 'text-green-600' : 'text-red-500'}>
+                    {cardResult.set || '❌ Not detected'}
                   </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Card Number:</label>
-                  <p className={cardResult.cardNumber ? "text-green-600" : "text-red-500"}>
-                    {cardResult.cardNumber || "❌ Not detected"}
+                  <p className={cardResult.cardNumber ? 'text-green-600' : 'text-red-500'}>
+                    {cardResult.cardNumber || '❌ Not detected'}
                   </p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">Rarity:</label>
-                  <p className={cardResult.rarity ? "text-green-600" : "text-red-500"}>
-                    {cardResult.rarity || "❌ Not detected"}
+                  <p className={cardResult.rarity ? 'text-green-600' : 'text-red-500'}>
+                    {cardResult.rarity || '❌ Not detected'}
                   </p>
                 </div>
               </div>
@@ -205,9 +199,7 @@ export function OCRDiagnosticTool() {
               )}
 
               <details className="mt-4">
-                <summary className="cursor-pointer text-sm font-medium">
-                  Raw JSON Response
-                </summary>
+                <summary className="cursor-pointer text-sm font-medium">Raw JSON Response</summary>
                 <pre className="mt-2 p-3 bg-muted rounded text-xs overflow-auto">
                   {JSON.stringify(cardResult, null, 2)}
                 </pre>

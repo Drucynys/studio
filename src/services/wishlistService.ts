@@ -25,10 +25,7 @@ export const wishlistService = {
    * Returns an unsubscribe function.
    */
   subscribe(uid: string, onData: (items: WishlistItem[]) => void): () => void {
-    const q = query(
-      collection(db, 'users', uid, 'wishlist'),
-      orderBy('timestamp', 'desc')
-    );
+    const q = query(collection(db, 'users', uid, 'wishlist'), orderBy('timestamp', 'desc'));
     return onSnapshot(q, (snap) => {
       onData(snap.docs.map((d) => d.data() as WishlistItem));
     });

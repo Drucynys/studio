@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../../tailwind.config.ts";
+@plugin "tailwindcss-animate";
 
 @layer base {
   :root {
@@ -236,4 +236,3 @@
   background-size: 200% 100%;
   animation: shimmer 1.6s infinite linear;
 }
-

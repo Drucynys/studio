@@ -1,29 +1,27 @@
 // src/app/my-collection/page.tsx
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import Image from "next/image";
-import { AppHeader } from "@/components/AppHeader";
-import { CardList } from "@/components/CardList";
-import type { PokemonCard, WishlistItem, ExchangeItem } from "@/types";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserCollection } from "@/hooks/useUserCollection";
-import { useWishlist } from "@/hooks/useWishlist";
-import { useExchange } from "@/hooks/useExchange";
-import { collectionService } from "@/services/collectionService";
-import { wishlistService } from "@/services/wishlistService";
-import { exchangeService } from "@/services/exchangeService";
-import { useUIStore } from "@/store/useUIStore";
-import { useDebounce } from "@/hooks/useDebounce";
-import { EditCardDialog } from "@/components/EditCardDialog";
-import { FullScreenCardView } from "@/components/FullScreenCardView";
-import { AlertCircle, PackageOpen, Search, ListRestart, Trash2, Loader2, User, TrendingUp, DollarSign, Layers, Library, Heart, Check, X, Replace } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { AppHeader } from '@/components/AppHeader';
+import { CardList } from '@/components/CardList';
+import type { PokemonCard, WishlistItem, ExchangeItem } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useMyCollectionState } from '@/hooks/useMyCollectionState';
+import { EditCardDialog } from '@/components/EditCardDialog';
+import { AddCardToCollectionDialog } from '@/components/AddCardToCollectionDialog';
+import { getVariantAbbreviation } from '@/utils/cardUtils';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,204 +31,237 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import type { ApiPokemonCard } from "@/app/sets/[setId]/page";
-import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
+} from '@/components/ui/alert-dialog';
+import {
+  TrendingUp,
+  DollarSign,
+  Layers,
+  Library,
+  Search,
+  PlusCircle,
+  Camera,
+  Trash2,
+  Check,
+  X,
+  PackageOpen,
+  ArrowRight,
+  Heart,
+  Replace,
+  Sparkles,
+  ArrowUpRight,
+  HelpCircle,
+  Loader2,
+  User,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const getMarketPrice = (apiCard: ApiPokemonCard | undefined, variant?: string | null): number => {
-  if (!apiCard || !apiCard.tcgplayer?.prices) return 0;
-  const prices = apiCard.tcgplayer.prices;
-  
-  if (variant && prices[variant]?.market) {
-    return prices[variant].market;
-  }
-  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
-  for (const v of variantPriority) {
-    if (prices[v]?.market) {
-      return prices[v].market;
-    }
-  }
-  return 0;
-};
+// --- WishlistCard Helper Component ---
+interface WishlistCardProps {
+  item: WishlistItem;
+  onRemove: () => void;
+  onMoveToCollection: () => void;
+}
 
-export default function MyCollectionPage() {
-  const { openAuthModal } = useUIStore();
-  const { user, loading } = useAuth();
-  const { collection, loadingCollection } = useUserCollection(user?.uid);
-  const { wishlist, loadingWishlist } = useWishlist(user?.uid);
-  const { myExchangeItems, loadingMyExchangeItems } = useExchange(user?.uid);
-  const { toast } = useToast();
+function WishlistCard({
+  item,
+  onRemove,
+  onMoveToCollection,
+}: WishlistCardProps): React.JSX.Element {
+  const [isImageLoading, setIsImageLoading] = useState(true);
 
-  const updateCardInCollection = async (card: PokemonCard) => {
-    if (!user) return;
-    await collectionService.updateCard(user.uid, card);
-  };
+  return (
+    <div className="group relative aspect-[2.5/3.5] w-full rounded-xl overflow-hidden border border-border/40 bg-card/45 backdrop-blur-xl shadow-md hover:shadow-primary/20 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
+      {/* Hover action overlay */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 flex flex-col justify-between p-3">
+        <div className="flex justify-end gap-2">
+          <Button
+            size="icon"
+            variant="destructive"
+            className="h-8 w-8 rounded-full shadow-lg active:scale-90 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            title="Remove from Wishlist"
+          >
+            <X size={15} />
+          </Button>
+          <Button
+            size="icon"
+            className="h-8 w-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg active:scale-90 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveToCollection();
+            }}
+            title="Move to Collection"
+          >
+            <Check size={15} />
+          </Button>
+        </div>
 
-  const removeCardFromCollection = async (cardId: string) => {
-    if (!user) return;
-    await collectionService.removeCard(user.uid, cardId);
-  };
+        <div className="bg-background/90 dark:bg-card/90 border border-border/40 p-2 rounded-lg backdrop-blur-md shadow-sm">
+          <p className="font-semibold text-xs text-foreground truncate">{item.name}</p>
+          <p className="text-[10px] text-muted-foreground truncate">
+            {item.set} • #{item.cardNumber}
+          </p>
+        </div>
+      </div>
 
-  const removeCardFromWishlist = async (itemId: string) => {
-    if (!user) return;
-    await wishlistService.removeItem(user.uid, itemId);
-  };
+      <Image
+        src={item.imageUrl || 'https://placehold.co/250x350.png'}
+        alt={item.name}
+        fill
+        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
+        className={cn(
+          'object-contain w-full h-full transition-all duration-500',
+          isImageLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+        )}
+        onLoad={() => setIsImageLoading(false)}
+      />
+    </div>
+  );
+}
 
-  const moveCardFromWishlistToCollection = async (item: WishlistItem) => {
-    if (!user) return;
-    await wishlistService.removeItem(user.uid, item.id);
-    await collectionService.addCard(user.uid, {
-      apiId: item.apiId,
-      name: item.name,
-      set: item.set,
-      cardNumber: item.cardNumber,
-      rarity: item.rarity || 'N/A',
-      imageUrl: item.imageUrl || null,
-      artist: item.artist || null,
-      language: 'English',
-      quantity: 1,
-      value: 0,
-      variant: null,
-    });
-    toast({ title: "Moved to Collection", description: `${item.name} moved to your collection.` });
-  };
+// --- ExchangeCard Helper Component ---
+interface ExchangeCardProps {
+  item: ExchangeItem;
+  onRemove: () => void;
+}
 
-  const addCardToExchange = async (card: PokemonCard) => {
-    if (!user) return;
-    await exchangeService.addItem(user.uid, user.displayName || "Anonymous", user.email, card);
-    toast({ title: "Added to Exchange", description: `${card.name} is now listed for trade.` });
-  };
+function ExchangeCard({ item, onRemove }: ExchangeCardProps): React.JSX.Element {
+  const [isImageLoading, setIsImageLoading] = useState(true);
 
-  const removeCardFromExchange = async (exchangeId: string) => {
-    await exchangeService.removeItem(exchangeId);
-  };
-  
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("dateAddedDesc");
-  const [cardToEdit, setCardToEdit] = useState<PokemonCard | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [cardToDelete, setCardToDelete] = useState<PokemonCard | null>(null);
-  const [itemToDeleteFromWishlist, setItemToDeleteFromWishlist] = useState<WishlistItem | null>(null);
-  const [itemToDeleteFromExchange, setItemToDeleteFromExchange] = useState<ExchangeItem | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  return (
+    <div className="group relative aspect-[2.5/3.5] w-full rounded-xl overflow-hidden border border-border/40 bg-card/45 backdrop-blur-xl shadow-md hover:shadow-primary/20 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
+      {/* Listed Badge */}
+      <span className="absolute top-2 left-2 z-10 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-primary/95 text-primary-foreground shadow-sm flex items-center gap-1 backdrop-blur-sm">
+        <Replace size={10} />
+        LISTED
+      </span>
 
-  const [isFullScreenViewOpen, setIsFullScreenViewOpen] = useState(false);
-  const [currentFullScreenCardIndex, setCurrentFullScreenCardIndex] = useState<number | null>(null);
-  
-  const [masterCardData, setMasterCardData] = useState<Map<string, ApiPokemonCard>>(new Map());
-  const [loadingMasterData, setLoadingMasterData] = useState(false);
+      {/* Hover action overlay */}
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 flex flex-col justify-between p-3">
+        <div className="flex justify-end gap-2">
+          <Button
+            size="icon"
+            variant="destructive"
+            className="h-8 w-8 rounded-full shadow-lg active:scale-90 transition-transform"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            title="Remove from Exchange"
+          >
+            <X size={15} />
+          </Button>
+        </div>
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+        <div className="bg-background/90 dark:bg-card/90 border border-border/40 p-2 rounded-lg backdrop-blur-md shadow-sm">
+          <p className="font-semibold text-xs text-foreground truncate">{item.name}</p>
+          <p className="text-[10px] text-muted-foreground truncate">
+            {item.set} • #{item.cardNumber}
+          </p>
+        </div>
+      </div>
 
-  const fetchMasterData = useCallback(async () => {
-    const allApiIds = [
-      ...new Set([
-        ...collection.map(c => c.apiId),
-        ...wishlist.map(w => w.apiId),
-        ...myExchangeItems.map(e => e.apiId)
-      ].filter(Boolean))
-    ];
+      <Image
+        src={item.imageUrl || 'https://placehold.co/250x350.png'}
+        alt={item.name}
+        fill
+        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
+        className={cn(
+          'object-contain w-full h-full transition-all duration-500',
+          isImageLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
+        )}
+        onLoad={() => setIsImageLoading(false)}
+      />
 
-    if (allApiIds.length === 0) {
-      setMasterCardData(new Map());
-      return;
-    }
+      {/* Variant badge */}
+      {(() => {
+        const abbrev = getVariantAbbreviation(item.variant);
+        if (!abbrev) return null;
 
-    setLoadingMasterData(true);
-    try {
-      const CHUNK_SIZE = 100;
-      const dataMap = new Map<string, ApiPokemonCard>();
-      
-      for (let i = 0; i < allApiIds.length; i += CHUNK_SIZE) {
-        const chunk = allApiIds.slice(i, i + CHUNK_SIZE);
-        const response = await fetch('/api/master-cards-batch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: chunk }),
-        });
-
-        if (response.ok) {
-          const fetchedCards: ApiPokemonCard[] = await response.json();
-          fetchedCards.forEach(card => dataMap.set(card.id, card));
+        let colorClasses = '';
+        if (abbrev === 'RR') {
+          colorClasses = 'bg-rose-500/85 border-rose-400/40 text-white shadow-rose-500/25';
+        } else if (abbrev === '1st') {
+          colorClasses = 'bg-amber-500/85 border-amber-400/40 text-white shadow-amber-500/25';
+        } else if (abbrev === 'H') {
+          colorClasses = 'bg-indigo-500/85 border-indigo-400/40 text-white shadow-indigo-500/25';
+        } else if (abbrev === 'UNL') {
+          colorClasses = 'bg-slate-500/85 border-slate-400/40 text-white shadow-slate-500/25';
+        } else {
+          colorClasses = 'bg-teal-500/85 border-teal-400/40 text-white shadow-teal-500/25';
         }
-      }
-      
-      setMasterCardData(dataMap);
-    } catch (error) {
-      console.error("Error fetching master card data:", error);
-    } finally {
-      setLoadingMasterData(false);
-    }
-  }, [collection, wishlist, myExchangeItems]);
 
-  useEffect(() => {
-    if (!loadingCollection && !loadingWishlist && !loadingMyExchangeItems && user) {
-      fetchMasterData();
-    }
-  }, [user?.uid, loadingCollection, loadingWishlist, loadingMyExchangeItems, fetchMasterData]);
+        return (
+          <span
+            className={cn(
+              'absolute bottom-2.5 left-2.5 z-10 px-1.5 py-0.5 rounded text-[9px] font-black uppercase border backdrop-blur-md shadow-sm transition-all duration-300 group-hover:scale-105',
+              colorClasses
+            )}
+          >
+            {abbrev}
+          </span>
+        );
+      })()}
+    </div>
+  );
+}
 
-  const collectionStats = useMemo(() => {
-    if (!collection || collection.length === 0) {
-      return { totalValueAdded: 0, totalCurrentValue: 0, totalCards: 0, uniqueCards: 0 };
-    }
-
-    let totalCurrentValue = 0;
-    const totalValueAdded = collection.reduce((acc, card) => {
-      const value = card.value || 0;
-      const quantity = card.quantity || 1;
-      const masterCard = masterCardData.get(card.apiId);
-      const currentValue = getMarketPrice(masterCard, card.variant);
-      totalCurrentValue += (currentValue > 0 ? currentValue : value) * quantity;
-      return acc + value * quantity;
-    }, 0);
-    
-    const totalCards = collection.reduce((acc, card) => acc + (card.quantity || 1), 0);
-    return { totalValueAdded, totalCurrentValue, totalCards, uniqueCards: collection.length };
-  }, [collection, masterCardData]);
-
-  const sortedCards = useMemo(() => {
-    const filtered = collection.filter(item => {
-      if (!debouncedSearchTerm) return true;
-      const lower = debouncedSearchTerm.toLowerCase();
-      return item.name?.toLowerCase().includes(lower) || 
-             item.set?.toLowerCase().includes(lower) || 
-             item.cardNumber?.toLowerCase().includes(lower);
-    });
-
-    return [...filtered].sort((a, b) => {
-      switch (sortOption) {
-        case "favorites": return (b.isFavorite ? 1 : 0) - (a.isFavorite ? 1 : 0);
-        case "nameAsc": return (a.name || "").localeCompare(b.name || "");
-        case "nameDesc": return (b.name || "").localeCompare(a.name || "");
-        case "valueDesc": 
-          const aV = getMarketPrice(masterCardData.get(a.apiId), a.variant) || a.value || 0;
-          const bV = getMarketPrice(masterCardData.get(b.apiId), b.variant) || b.value || 0;
-          return bV - aV;
-        default: return 0;
-      }
-    });
-  }, [collection, debouncedSearchTerm, sortOption, masterCardData]);
-
-  const filteredWishlist = useMemo(() => 
-    wishlist.filter(item => {
-      if (!debouncedSearchTerm) return true;
-      const lower = debouncedSearchTerm.toLowerCase();
-      return item.name?.toLowerCase().includes(lower) || item.set?.toLowerCase().includes(lower);
-    }), [wishlist, debouncedSearchTerm]);
-
-  const filteredExchangeItems = useMemo(() => 
-    myExchangeItems.filter(item => {
-      if (!debouncedSearchTerm) return true;
-      const lower = debouncedSearchTerm.toLowerCase();
-      return item.name?.toLowerCase().includes(lower) || item.set?.toLowerCase().includes(lower);
-    }), [myExchangeItems, debouncedSearchTerm]);
+// --- Main Page Component ---
+export default function MyCollectionPage(): React.JSX.Element {
+  const {
+    user,
+    loading,
+    collection,
+    loadingCollection,
+    wishlist,
+    myExchangeItems,
+    searchTerm,
+    setSearchTerm,
+    sortOption,
+    setSortOption,
+    cardToEdit,
+    setCardToEdit,
+    cardToDelete,
+    setCardToDelete,
+    itemToDeleteFromWishlist,
+    setItemToDeleteFromWishlist,
+    itemToDeleteFromExchange,
+    setItemToDeleteFromExchange,
+    isDeleteDialogOpen,
+    setIsDeleteDialogOpen,
+    isFullScreenViewOpen,
+    setIsFullScreenViewOpen,
+    currentFullScreenCardIndex,
+    setCurrentFullScreenCardIndex,
+    masterCardData,
+    loadingMasterData,
+    collectionStats,
+    sortedCards,
+    filteredWishlist,
+    filteredExchangeItems,
+    updateCardInCollection,
+    removeCardFromCollection,
+    removeCardFromWishlist,
+    moveCardFromWishlistToCollection,
+    addCardToExchange,
+    removeCardFromExchange,
+    openAuthModal,
+  } = useMyCollectionState();
 
   if (loading) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
         <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground animate-pulse">
+              Syncing with Card Vault...
+            </p>
+          </div>
         </main>
       </div>
     );
@@ -241,142 +272,427 @@ export default function MyCollectionPage() {
       <div className="flex flex-col min-h-screen bg-background">
         <AppHeader />
         <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
-          <div className="text-center">
-            <User className="mx-auto h-12 w-12 text-muted-foreground" />
-            <h2 className="mt-4 text-2xl font-semibold">Access Your Collection</h2>
-            <Button className="mt-6" onClick={openAuthModal}>Login / Sign Up</Button>
+          <div className="max-w-md w-full bg-card/45 backdrop-blur-xl border border-border/40 p-8 rounded-2xl shadow-2xl text-center space-y-6">
+            <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <User className="h-8 w-8 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold tracking-tight">Access Your Collection</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Log in or sign up for a free account to start tracking card values, managing your
+                collections, and exploring rare cards.
+              </p>
+            </div>
+            <Button
+              size="lg"
+              className="w-full bg-primary shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
+              onClick={openAuthModal}
+            >
+              Login / Sign Up
+            </Button>
           </div>
         </main>
       </div>
     );
   }
 
+  // Calculate net profit/difference in valuation
+  const valueDifference = collectionStats.totalCurrentValue - collectionStats.totalValueAdded;
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
-      <main className="flex-grow container mx-auto p-4 md:p-8 space-y-6">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-2xl font-headline font-semibold flex items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-primary" />
-              Collection Summary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-              <div className="bg-muted p-4 rounded-lg">
-                <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><DollarSign size={16}/>Total Value</h3>
-                <p className="text-3xl font-bold text-primary">${collectionStats.totalCurrentValue.toFixed(2)}</p>
-              </div>
-              <div className="bg-muted p-4 rounded-lg">
-                <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Layers size={16}/>Total Cards</h3>
-                <p className="text-3xl font-bold text-primary">{collectionStats.totalCards}</p>
-              </div>
-              <div className="bg-muted p-4 rounded-lg">
-                <h3 className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Library size={16}/>Unique</h3>
-                <p className="text-3xl font-bold text-primary">{collectionStats.uniqueCards}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Tabs defaultValue="collection" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="collection">Collection ({collection.length})</TabsTrigger>
-            <TabsTrigger value="wishlist">Wishlist ({wishlist.length})</TabsTrigger>
-            <TabsTrigger value="exchange">Exchange ({myExchangeItems.length})</TabsTrigger>
-          </TabsList>
-
-          <div className="bg-card p-4 rounded-lg shadow mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
-            </div>
-            <Select value={sortOption} onValueChange={setSortOption}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sort by..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dateAddedDesc">Date Added (Newest)</SelectItem>
-                <SelectItem value="favorites">Favorites First</SelectItem>
-                <SelectItem value="nameAsc">Name (A-Z)</SelectItem>
-                <SelectItem value="valueDesc">Value (High-Low)</SelectItem>
-              </SelectContent>
-            </Select>
+      <main className="flex-grow container mx-auto px-4 py-6 md:p-8 space-y-8">
+        {/* Page Title & Quick Links banner */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border/40 pb-6">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-headline font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent flex items-center gap-3">
+              <Library className="h-8 w-8 text-primary" />
+              My Collection Vault
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Curate, value, and track your rare Pokémon TCG collectibles.
+            </p>
           </div>
-          
-          <TabsContent value="collection" className="mt-6">
+
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <Link href="/search" className="flex-1 md:flex-initial">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5 h-10 border-border/40 bg-card/45 backdrop-blur-xl active:scale-[0.98] transition-transform"
+              >
+                <Search size={14} />
+                <span>Search Cards</span>
+              </Button>
+            </Link>
+            <Link href="/add-card" className="flex-1 md:flex-initial">
+              <Button
+                size="sm"
+                className="w-full gap-1.5 h-10 bg-primary shadow-lg shadow-primary/10 hover:bg-primary/95 active:scale-[0.98] transition-transform"
+              >
+                <Camera size={14} />
+                <span>AI Card Scanner</span>
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Bento Grid Collection Summary */}
+        <section aria-label="Collection Summary" className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Valuations Card */}
+          <div className="relative overflow-hidden bg-card/45 backdrop-blur-xl border border-border/40 p-6 rounded-2xl shadow-xl hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -z-10" />
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">Portfolio Value</span>
+              <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-xl">
+                <TrendingUp size={18} />
+              </div>
+            </div>
+            <div className="mt-4 space-y-1">
+              <p className="text-4xl font-extrabold tracking-tight text-foreground font-mono">
+                $
+                {collectionStats.totalCurrentValue.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+              <div className="flex items-center gap-1.5 text-xs">
+                {valueDifference !== 0 && (
+                  <span
+                    className={cn(
+                      'font-semibold flex items-center px-1.5 py-0.5 rounded',
+                      valueDifference > 0
+                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                    )}
+                  >
+                    {valueDifference > 0 ? '+' : '-'}$
+                    {Math.abs(valueDifference).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                )}
+                <span className="text-muted-foreground">
+                  vs cost base ($
+                  {collectionStats.totalValueAdded.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                  )
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Catalog Metrics Card */}
+          <div className="relative overflow-hidden bg-card/45 backdrop-blur-xl border border-border/40 p-6 rounded-2xl shadow-xl hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -z-10" />
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">Total Card Count</span>
+              <div className="p-2.5 bg-primary/10 text-primary rounded-xl">
+                <Layers size={18} />
+              </div>
+            </div>
+            <div className="mt-4 space-y-1">
+              <p className="text-4xl font-extrabold tracking-tight text-foreground font-mono">
+                {collectionStats.totalCards.toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Sparkles size={12} className="text-accent" />
+                <span>Across all items and expansion sets</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Completion Indices Card */}
+          <div className="relative overflow-hidden bg-card/45 backdrop-blur-xl border border-border/40 p-6 rounded-2xl shadow-xl hover:scale-[1.01] hover:shadow-2xl transition-all duration-300 flex flex-col justify-between">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl -z-10" />
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">
+                Unique Species Cataloged
+              </span>
+              <div className="p-2.5 bg-purple-500/10 text-purple-500 rounded-xl">
+                <Library size={18} />
+              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              <div className="flex items-baseline gap-2">
+                <p className="text-4xl font-extrabold tracking-tight text-foreground font-mono">
+                  {collectionStats.uniqueCards.toLocaleString()}
+                </p>
+                <span className="text-xs text-muted-foreground">species</span>
+              </div>
+
+              {/* Sleek inline completion progress bar */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] font-semibold text-muted-foreground">
+                  <span>Unique Completeness Ratio</span>
+                  <span>
+                    {collectionStats.totalCards > 0
+                      ? ((collectionStats.uniqueCards / collectionStats.totalCards) * 100).toFixed(
+                          0
+                        )
+                      : 0}
+                    %
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-muted dark:bg-muted/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${collectionStats.totalCards > 0 ? (collectionStats.uniqueCards / collectionStats.totalCards) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Filter and Tab Section */}
+        <Tabs defaultValue="collection" className="w-full space-y-6">
+          {/* Unified Liquid Glass navigation and filter panel */}
+          <div className="bg-card/45 backdrop-blur-xl border border-border/40 p-3 rounded-2xl shadow-lg flex flex-col md:flex-row gap-4 items-center justify-between">
+            <TabsList className="grid grid-cols-3 w-full md:w-auto min-w-[280px] md:min-w-[400px] bg-background/50 border border-border/30 rounded-xl p-1">
+              <TabsTrigger
+                value="collection"
+                className="text-xs font-semibold rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              >
+                Collection ({collection.length})
+              </TabsTrigger>
+              <TabsTrigger
+                value="wishlist"
+                className="text-xs font-semibold rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              >
+                Wishlist ({wishlist.length})
+              </TabsTrigger>
+              <TabsTrigger
+                value="exchange"
+                className="text-xs font-semibold rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              >
+                Exchange ({myExchangeItems.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full md:w-auto md:max-w-md flex-grow">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Filter by name or set..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 bg-background/40 focus:bg-background/80 border-border/30 h-10 w-full rounded-xl transition-all"
+                />
+              </div>
+              <Select value={sortOption} onValueChange={setSortOption}>
+                <SelectTrigger className="bg-background/40 focus:bg-background/80 border-border/30 h-10 rounded-xl text-left">
+                  <SelectValue placeholder="Sort cards..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border border-border/40">
+                  <SelectItem value="dateAddedDesc">Date Added (Newest)</SelectItem>
+                  <SelectItem value="favorites">Favorites First</SelectItem>
+                  <SelectItem value="nameAsc">Name (A-Z)</SelectItem>
+                  <SelectItem value="valueDesc">Market Value (High-Low)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* TAB 1: Collection Grid */}
+          <TabsContent value="collection" className="mt-0 focus-visible:ring-0">
             <CardList
               cards={sortedCards}
               masterCardData={masterCardData}
-              onEditCard={setCardToEdit}
-              onRemoveCard={(id) => { setCardToDelete(collection.find(c => c.id === id) || null); setIsDeleteDialogOpen(true); }}
-              onViewCard={(idx) => { setCurrentFullScreenCardIndex(idx); setIsFullScreenViewOpen(true); }}
-              onToggleFavorite={(c) => updateCardInCollection({ ...c, isFavorite: !c.isFavorite })}
-              onAddToExchange={addCardToExchange}
+              onViewCard={(idx) => {
+                setCurrentFullScreenCardIndex(idx);
+                setIsFullScreenViewOpen(true);
+              }}
               isLoadingMasterData={loadingMasterData}
             />
           </TabsContent>
-          
-          <TabsContent value="wishlist" className="mt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-              {filteredWishlist.map(item => (
-                <Card key={item.id} className="relative group overflow-hidden">
-                  <div className="absolute top-1 right-1 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button size="icon" variant="destructive" className="h-7 w-7" onClick={() => removeCardFromWishlist(item.id)}><X size={14}/></Button>
-                    <Button size="icon" className="h-7 w-7 bg-green-500" onClick={() => moveCardFromWishlistToCollection(item)}><Check size={14}/></Button>
-                  </div>
-                  <Image src={item.imageUrl || "https://placehold.co/250x350.png"} alt={item.name} width={250} height={350} className="object-contain w-full" />
-                </Card>
-              ))}
-            </div>
+
+          {/* TAB 2: Wishlist Grid */}
+          <TabsContent value="wishlist" className="mt-0 focus-visible:ring-0">
+            {filteredWishlist.length === 0 ? (
+              <div className="bg-card/45 backdrop-blur-xl border border-border/40 rounded-2xl p-12 text-center max-w-lg mx-auto space-y-5 shadow-xl">
+                <div className="mx-auto w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500">
+                  <Heart size={24} className="fill-current" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-foreground">Wishlist Empty</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {searchTerm
+                      ? 'No cards matching your filter were found in your wishlist.'
+                      : 'Add cards you desire to your wishlist from set lists or card detail sheets.'}
+                  </p>
+                </div>
+                {!searchTerm && (
+                  <Link href="/browse-sets" className="inline-block">
+                    <Button size="sm" className="gap-1.5 active:scale-[0.98] transition-transform">
+                      Browse Expansion Sets
+                      <ArrowRight size={14} />
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {filteredWishlist.map((item) => (
+                  <WishlistCard
+                    key={item.id}
+                    item={item}
+                    onRemove={() => {
+                      setItemToDeleteFromWishlist(item);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                    onMoveToCollection={() => moveCardFromWishlistToCollection(item)}
+                  />
+                ))}
+              </div>
+            )}
           </TabsContent>
 
-          <TabsContent value="exchange" className="mt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-              {filteredExchangeItems.map(item => (
-                <Card key={item.exchangeId} className="relative group overflow-hidden">
-                  <Button size="icon" variant="destructive" className="absolute top-1 right-1 z-10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => removeCardFromExchange(item.exchangeId)}><X size={14}/></Button>
-                  <Image src={item.imageUrl || "https://placehold.co/250x350.png"} alt={item.name} width={250} height={350} className="object-contain w-full" />
-                </Card>
-              ))}
-            </div>
+          {/* TAB 3: Exchange Grid */}
+          <TabsContent value="exchange" className="mt-0 focus-visible:ring-0">
+            {filteredExchangeItems.length === 0 ? (
+              <div className="bg-card/45 backdrop-blur-xl border border-border/40 rounded-2xl p-12 text-center max-w-lg mx-auto space-y-5 shadow-xl">
+                <div className="mx-auto w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <Replace size={24} />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-foreground">No Listings Active</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {searchTerm
+                      ? 'No listed cards match your filter criteria.'
+                      : "Share cards for trade by selecting 'Add to Exchange' inside your collection cards."}
+                  </p>
+                </div>
+                {!searchTerm && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 border-border/40 active:scale-[0.98] transition-transform"
+                    onClick={() => {
+                      const collectionTab = document.querySelector(
+                        '[value="collection"]'
+                      ) as HTMLButtonElement | null;
+                      if (collectionTab) collectionTab.click();
+                    }}
+                  >
+                    View Collection Cards
+                    <ArrowRight size={14} />
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {filteredExchangeItems.map((item) => (
+                  <ExchangeCard
+                    key={item.exchangeId}
+                    item={item}
+                    onRemove={() => {
+                      setItemToDeleteFromExchange(item);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </main>
 
+      {/* --- Fullscreen Card Modal --- */}
       {isFullScreenViewOpen && currentFullScreenCardIndex !== null && (
-        <FullScreenCardView
+        <AddCardToCollectionDialog
           isOpen={isFullScreenViewOpen}
           onClose={() => setIsFullScreenViewOpen(false)}
-          cards={sortedCards}
-          currentIndex={currentFullScreenCardIndex}
-          onNavigate={setCurrentFullScreenCardIndex}
-          masterCardData={masterCardData}
+          cardName={sortedCards[currentFullScreenCardIndex].name}
+          initialCardImageUrl={sortedCards[currentFullScreenCardIndex].imageUrl}
+          pokemonTcgApiCard={
+            masterCardData.get(sortedCards[currentFullScreenCardIndex].apiId) || null
+          }
+          onPrevCard={
+            currentFullScreenCardIndex > 0
+              ? () => setCurrentFullScreenCardIndex(currentFullScreenCardIndex - 1)
+              : undefined
+          }
+          onNextCard={
+            currentFullScreenCardIndex < sortedCards.length - 1
+              ? () => setCurrentFullScreenCardIndex(currentFullScreenCardIndex + 1)
+              : undefined
+          }
+          hasPrevCard={currentFullScreenCardIndex > 0}
+          hasNextCard={currentFullScreenCardIndex < sortedCards.length - 1}
+          prevCardImageUrl={
+            currentFullScreenCardIndex > 0
+              ? sortedCards[currentFullScreenCardIndex - 1].imageUrl
+              : null
+          }
+          nextCardImageUrl={
+            currentFullScreenCardIndex < sortedCards.length - 1
+              ? sortedCards[currentFullScreenCardIndex + 1].imageUrl
+              : null
+          }
+          initialVariant={sortedCards[currentFullScreenCardIndex].variant}
+          initialQuantity={sortedCards[currentFullScreenCardIndex].quantity}
         />
       )}
 
+      {/* --- Edit Card Value / Details Dialog --- */}
       {cardToEdit && (
         <EditCardDialog
           isOpen={!!cardToEdit}
           onClose={() => setCardToEdit(null)}
           card={cardToEdit}
-          onSave={(u) => { updateCardInCollection(u); setCardToEdit(null); }}
+          onSave={(updatedCard) => {
+            updateCardInCollection(updatedCard);
+            setCardToEdit(null);
+          }}
         />
       )}
 
+      {/* --- Universal Delete Confirmation Dialog --- */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl border border-border/40 bg-card/90 backdrop-blur-xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently remove the item.</AlertDialogDescription>
+            <AlertDialogTitle className="text-xl">Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-muted-foreground">
+              This action cannot be undone. It will permanently remove
+              <span className="font-semibold text-foreground">
+                {' '}
+                {cardToDelete?.name ||
+                  itemToDeleteFromWishlist?.name ||
+                  itemToDeleteFromExchange?.name ||
+                  'this item'}
+              </span>{' '}
+              from your list.
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (cardToDelete) removeCardFromCollection(cardToDelete.id);
-              setIsDeleteDialogOpen(false);
-            }}>Delete</AlertDialogAction>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl border border-border/40">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive hover:bg-destructive/95 text-white active:scale-95 transition-transform"
+              onClick={() => {
+                if (cardToDelete) {
+                  removeCardFromCollection(cardToDelete.id);
+                  setCardToDelete(null);
+                } else if (itemToDeleteFromWishlist) {
+                  removeCardFromWishlist(itemToDeleteFromWishlist.id);
+                  setItemToDeleteFromWishlist(null);
+                } else if (itemToDeleteFromExchange) {
+                  removeCardFromExchange(itemToDeleteFromExchange.exchangeId);
+                  setItemToDeleteFromExchange(null);
+                }
+                setIsDeleteDialogOpen(false);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

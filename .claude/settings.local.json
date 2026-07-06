@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(npm run dev:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(npm audit *)",
+      "Bash(npm outdated *)",
+      "Bash(npx eslint *)",
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(npm update *)",
+      "Bash(ANALYZE=true npm run *)",
+      "Bash(npx-eslint *)",
+      "Bash(npx next *)"
     ],
     "deny": [],
     "ask": []

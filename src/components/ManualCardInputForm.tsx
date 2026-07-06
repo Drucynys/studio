@@ -1,10 +1,9 @@
+'use client';
 
-"use client";
-
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -12,28 +11,28 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
+} from '@/components/ui/form';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import type { PokemonCard } from "@/types";
-import { FilePlus, Loader2, Layers, Languages } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState, useCallback } from "react";
-import Image from "next/image";
-import type { FindCardOutput } from "@/ai/flows/find-card-by-image-flow";
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import type { PokemonCard } from '@/types';
+import { FilePlus, Loader2, Layers, Languages } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useEffect, useState, useCallback } from 'react';
+import Image from 'next/image';
+import type { FindCardOutput } from '@/ai/flows/find-card-by-image-flow';
 
 const formSchema = z.object({
-  selectedSetId: z.string().min(1, "Set is required"),
-  selectedCardId: z.string().min(1, "Card is required"),
-  language: z.enum(["English", "Japanese"], { required_error: "Language is required" }),
-  quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
+  selectedSetId: z.string().min(1, 'Set is required'),
+  selectedCardId: z.string().min(1, 'Card is required'),
+  language: z.enum(['English', 'Japanese'], { required_error: 'Language is required' }),
+  quantity: z.coerce.number().min(1, 'Quantity must be at least 1'),
 });
 
 type ManualCardInputFormProps = {
@@ -41,7 +40,7 @@ type ManualCardInputFormProps = {
   initialScanData?: Partial<FindCardOutput> | null;
 };
 
-const languageOptions: Array<'English' | 'Japanese'> = ["English", "Japanese"];
+const languageOptions: Array<'English' | 'Japanese'> = ['English', 'Japanese'];
 
 interface ApiSet {
   id: string;
@@ -71,7 +70,7 @@ interface ApiPokemonCard {
   };
   tcgplayer?: {
     prices?: {
-      [key: string]: { 
+      [key: string]: {
         market?: number | null;
         low?: number | null;
         mid?: number | null;
@@ -96,35 +95,50 @@ interface TcgDexApiCard {
   number: string;
   rarity: string;
   artist?: string;
-  set: { id: string; name: string; logo?: string; };
+  set: { id: string; name: string; logo?: string };
 }
 
-
-const getDefaultMarketPrice = (apiCard: ApiPokemonCard | null): { value: number, variant?: string } => {
+const getDefaultMarketPrice = (
+  apiCard: ApiPokemonCard | null
+): { value: number; variant?: string } => {
   if (!apiCard || !apiCard.tcgplayer?.prices) return { value: 0 };
   const prices = apiCard.tcgplayer.prices;
-  const variantPriority = ['normal', 'holofoil', 'reverseHolofoil', '1stEditionNormal', '1stEditionHolofoil', 'unlimitedHolofoil', 'unlimitedNormal'];
+  const variantPriority = [
+    'normal',
+    'holofoil',
+    'reverseHolofoil',
+    '1stEditionNormal',
+    '1stEditionHolofoil',
+    'unlimitedHolofoil',
+    'unlimitedNormal',
+  ];
   for (const variant of variantPriority) {
     if (prices[variant]?.market && typeof prices[variant]!.market === 'number') {
       return { value: prices[variant]!.market!, variant: variant };
     }
   }
   for (const key in prices) {
-    if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market && typeof prices[key]!.market === 'number') {
+    if (
+      Object.prototype.hasOwnProperty.call(prices, key) &&
+      prices[key]?.market &&
+      typeof prices[key]!.market === 'number'
+    ) {
       return { value: prices[key]!.market!, variant: key };
     }
   }
   return { value: 0 };
 };
 
-const normalizeString = (str: string = ""): string => {
-  return str.toLowerCase().replace(/[^a-z0-9\s'-]/gi, '').trim();
+const normalizeString = (str: string = ''): string => {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'-]/gi, '')
+    .trim();
 };
-
 
 export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardInputFormProps) {
   const { toast } = useToast();
-  
+
   const [englishSets, setEnglishSets] = useState<ApiSet[]>([]);
   const [isLoadingEnglishSets, setIsLoadingEnglishSets] = useState(true);
   const [errorEnglishSets, setErrorEnglishSets] = useState<string | null>(null);
@@ -132,7 +146,9 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
   const [cardsInSelectedEnglishSet, setCardsInSelectedEnglishSet] = useState<ApiPokemonCard[]>([]);
   const [isLoadingEnglishCards, setIsLoadingEnglishCards] = useState(false);
   const [errorEnglishCards, setErrorEnglishCards] = useState<string | null>(null);
-  const [selectedEnglishCardData, setSelectedEnglishCardData] = useState<ApiPokemonCard | null>(null);
+  const [selectedEnglishCardData, setSelectedEnglishCardData] = useState<ApiPokemonCard | null>(
+    null
+  );
 
   const [japaneseSets, setJapaneseSets] = useState<TcgDexApiSet[]>([]);
   const [isLoadingJapaneseSets, setIsLoadingJapaneseSets] = useState(false);
@@ -141,121 +157,155 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
   const [cardsInSelectedJapaneseSet, setCardsInSelectedJapaneseSet] = useState<TcgDexApiCard[]>([]);
   const [isLoadingJapaneseCards, setIsLoadingJapaneseCards] = useState(false);
   const [errorJapaneseCards, setErrorJapaneseCards] = useState<string | null>(null);
-  const [selectedJapaneseCardData, setSelectedJapaneseCardData] = useState<TcgDexApiCard | null>(null);
-  
+  const [selectedJapaneseCardData, setSelectedJapaneseCardData] = useState<TcgDexApiCard | null>(
+    null
+  );
+
   const [isPreFilling, setIsPreFilling] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      selectedSetId: "",
-      selectedCardId: "",
-      language: "English",
+      selectedSetId: '',
+      selectedCardId: '',
+      language: 'English',
       quantity: 1,
     },
   });
 
-  const watchedSetId = form.watch("selectedSetId");
-  const watchedCardId = form.watch("selectedCardId");
-  const watchedLanguage = form.watch("language");
+  const watchedSetId = form.watch('selectedSetId');
+  const watchedCardId = form.watch('selectedCardId');
+  const watchedLanguage = form.watch('language');
 
   const fetchEnglishSets = useCallback(async () => {
     setIsLoadingEnglishSets(true);
     setErrorEnglishSets(null);
     try {
-      const response = await fetch("/api/sets");
+      const response = await fetch('/api/sets');
       if (!response.ok) throw new Error(`Failed to fetch English sets: ${response.statusText}`);
       const data = await response.json();
-      const setsArray = Array.isArray(data) ? data : (data.data || []);
-      const sortedSets = (setsArray as ApiSet[]).sort((a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
+      const setsArray = Array.isArray(data) ? data : data.data || [];
+      const sortedSets = (setsArray as ApiSet[]).sort(
+        (a, b) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
+      );
       setEnglishSets(sortedSets);
       return sortedSets;
     } catch (err) {
-      setErrorEnglishSets(err instanceof Error ? err.message : "An unknown error occurred");
-      toast({ variant: "destructive", title: "Error fetching English Sets", description: "Could not load English sets." });
+      setErrorEnglishSets(err instanceof Error ? err.message : 'An unknown error occurred');
+      toast({
+        variant: 'destructive',
+        title: 'Error fetching English Sets',
+        description: 'Could not load English sets.',
+      });
       return [];
     } finally {
       setIsLoadingEnglishSets(false);
     }
   }, [toast]);
 
-  const fetchCardsForEnglishSet = useCallback(async (setId: string) => {
-    if (!setId) return [];
-    setIsLoadingEnglishCards(true);
-    setErrorEnglishCards(null);
-    try {
-      const response = await fetch(`/api/cards/by-set/${encodeURIComponent(setId)}?limit=500`);
-      if (!response.ok) throw new Error(`Failed to fetch cards for set ${setId}: ${response.statusText}`);
-      const data = await response.json();
-      const allCards = (Array.isArray(data) ? data : (data.data || [])) as ApiPokemonCard[];
-      
-      allCards.sort((a, b) => {
+  const fetchCardsForEnglishSet = useCallback(
+    async (setId: string) => {
+      if (!setId) return [];
+      setIsLoadingEnglishCards(true);
+      setErrorEnglishCards(null);
+      try {
+        const response = await fetch(`/api/cards/by-set/${encodeURIComponent(setId)}?limit=500`);
+        if (!response.ok)
+          throw new Error(`Failed to fetch cards for set ${setId}: ${response.statusText}`);
+        const data = await response.json();
+        const allCards = (Array.isArray(data) ? data : data.data || []) as ApiPokemonCard[];
+
+        allCards.sort((a, b) => {
           const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
           const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
           const suffixA = a.number.replace(/\d/g, '');
           const suffixB = b.number.replace(/\d/g, '');
           if (numA === numB) return suffixA.localeCompare(suffixB);
           return numA - numB;
-      });
-      setCardsInSelectedEnglishSet(allCards);
-      return allCards;
-    } catch (err) {
-      setErrorEnglishCards(err instanceof Error ? err.message : "An unknown error occurred");
-      toast({ variant: "destructive", title: "Error fetching English cards", description: `Could not load cards for the selected set.` });
-      setCardsInSelectedEnglishSet([]);
-      return [];
-    } finally {
-      setIsLoadingEnglishCards(false);
-    }
-  }, [toast]);
+        });
+        setCardsInSelectedEnglishSet(allCards);
+        return allCards;
+      } catch (err) {
+        setErrorEnglishCards(err instanceof Error ? err.message : 'An unknown error occurred');
+        toast({
+          variant: 'destructive',
+          title: 'Error fetching English cards',
+          description: `Could not load cards for the selected set.`,
+        });
+        setCardsInSelectedEnglishSet([]);
+        return [];
+      } finally {
+        setIsLoadingEnglishCards(false);
+      }
+    },
+    [toast]
+  );
 
   const fetchJapaneseSets = useCallback(async () => {
     setIsLoadingJapaneseSets(true);
     setErrorJapaneseSets(null);
     try {
-      const response = await fetch("https://api.tcgdex.net/v2/jp/sets");
+      const response = await fetch('https://api.tcgdex.net/v2/jp/sets');
       if (!response.ok) throw new Error(`Failed to fetch Japanese sets: ${response.statusText}`);
       const data: TcgDexApiSet[] = await response.json();
-      const sortedData = data.sort((a,b) => (b.releaseDate && a.releaseDate) ? new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime() : a.name.localeCompare(b.name));
+      const sortedData = data.sort((a, b) =>
+        b.releaseDate && a.releaseDate
+          ? new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime()
+          : a.name.localeCompare(b.name)
+      );
       setJapaneseSets(sortedData);
       return sortedData;
     } catch (err) {
-      setErrorJapaneseSets(err instanceof Error ? err.message : "An unknown error occurred");
-      toast({ variant: "destructive", title: "Error fetching Japanese Sets", description: "Could not load Japanese sets." });
+      setErrorJapaneseSets(err instanceof Error ? err.message : 'An unknown error occurred');
+      toast({
+        variant: 'destructive',
+        title: 'Error fetching Japanese Sets',
+        description: 'Could not load Japanese sets.',
+      });
       return [];
     } finally {
       setIsLoadingJapaneseSets(false);
     }
   }, [toast]);
 
-  const fetchCardsForJapaneseSet = useCallback(async (setId: string) => {
-    if (!setId) return [];
-    setIsLoadingJapaneseCards(true);
-    setErrorJapaneseCards(null);
-    try {
-      const response = await fetch(`https://api.tcgdex.net/v2/jp/sets/${setId}/cards`);
-      if (!response.ok) throw new Error(`Failed to fetch Japanese cards for set ${setId}: ${response.statusText}`);
-      const data: TcgDexApiCard[] = await response.json();
-      const sortedData = data.sort((a,b) => {
-        const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
-        const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
-        if (numA !== numB) return numA - numB;
-        return a.number.localeCompare(b.number);
-      });
-      setCardsInSelectedJapaneseSet(sortedData);
-      return sortedData;
-    } catch (err) {
-      setErrorJapaneseCards(err instanceof Error ? err.message : "An unknown error occurred");
-      toast({ variant: "destructive", title: "Error fetching Japanese cards", description: `Could not load cards for the selected Japanese set.` });
-      setCardsInSelectedJapaneseSet([]);
-      return [];
-    } finally {
-      setIsLoadingJapaneseCards(false);
-    }
-  }, [toast]);
+  const fetchCardsForJapaneseSet = useCallback(
+    async (setId: string) => {
+      if (!setId) return [];
+      setIsLoadingJapaneseCards(true);
+      setErrorJapaneseCards(null);
+      try {
+        const response = await fetch(`https://api.tcgdex.net/v2/jp/sets/${setId}/cards`);
+        if (!response.ok)
+          throw new Error(
+            `Failed to fetch Japanese cards for set ${setId}: ${response.statusText}`
+          );
+        const data: TcgDexApiCard[] = await response.json();
+        const sortedData = data.sort((a, b) => {
+          const numA = parseInt(a.number.replace(/\D/g, ''), 10) || 0;
+          const numB = parseInt(b.number.replace(/\D/g, ''), 10) || 0;
+          if (numA !== numB) return numA - numB;
+          return a.number.localeCompare(b.number);
+        });
+        setCardsInSelectedJapaneseSet(sortedData);
+        return sortedData;
+      } catch (err) {
+        setErrorJapaneseCards(err instanceof Error ? err.message : 'An unknown error occurred');
+        toast({
+          variant: 'destructive',
+          title: 'Error fetching Japanese cards',
+          description: `Could not load cards for the selected Japanese set.`,
+        });
+        setCardsInSelectedJapaneseSet([]);
+        return [];
+      } finally {
+        setIsLoadingJapaneseCards(false);
+      }
+    },
+    [toast]
+  );
 
   useEffect(() => {
-    if (watchedLanguage === "English") {
+    if (watchedLanguage === 'English') {
       fetchEnglishSets();
     } else {
       fetchJapaneseSets();
@@ -265,27 +315,30 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
   useEffect(() => {
     const preFillForm = async () => {
       if (!initialScanData || isPreFilling) return;
-      
+
       setIsPreFilling(true);
-      form.resetField("selectedSetId", { defaultValue: "" });
-      form.resetField("selectedCardId", { defaultValue: "" });
+      form.resetField('selectedSetId', { defaultValue: '' });
+      form.resetField('selectedCardId', { defaultValue: '' });
       setSelectedEnglishCardData(null);
       setSelectedJapaneseCardData(null);
       setCardsInSelectedEnglishSet([]);
       setCardsInSelectedJapaneseSet([]);
-      
-      const scannedLang = "English";
-      form.setValue("language", scannedLang, { shouldValidate: true });
+
+      const scannedLang = 'English';
+      form.setValue('language', scannedLang, { shouldValidate: true });
 
       let currentSets: ApiSet[] | TcgDexApiSet[] = [];
-      if (scannedLang === "English") {
+      if (scannedLang === 'English') {
         currentSets = englishSets.length > 0 ? englishSets : await fetchEnglishSets();
       } else {
         currentSets = japaneseSets.length > 0 ? japaneseSets : await fetchJapaneseSets();
       }
-      
+
       if (currentSets.length === 0) {
-        toast({ title: "OCR Info", description: `Could not load ${scannedLang} sets to match OCR data. Please select manually.`});
+        toast({
+          title: 'OCR Info',
+          description: `Could not load ${scannedLang} sets to match OCR data. Please select manually.`,
+        });
         setIsPreFilling(false);
         return;
       }
@@ -293,118 +346,170 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
       let matchedSetId: string | undefined = undefined;
       if (initialScanData.set) {
         const normalizedScanSet = normalizeString(initialScanData.set);
-        const foundSet = currentSets.find(s => normalizeString(s.name).includes(normalizedScanSet));
+        const foundSet = currentSets.find((s) =>
+          normalizeString(s.name).includes(normalizedScanSet)
+        );
         if (foundSet) {
-          form.setValue("selectedSetId", foundSet.id, { shouldValidate: true });
+          form.setValue('selectedSetId', foundSet.id, { shouldValidate: true });
           matchedSetId = foundSet.id;
         } else {
-           toast({ title: "OCR Info", description: `Could not auto-match set "${initialScanData.set}" from OCR. Please select manually.`});
+          toast({
+            title: 'OCR Info',
+            description: `Could not auto-match set "${initialScanData.set}" from OCR. Please select manually.`,
+          });
         }
       }
-        
+
       if (matchedSetId && (initialScanData.name || initialScanData.cardNumber)) {
         let currentCardsInSet: ApiPokemonCard[] | TcgDexApiCard[] = [];
-        if (scannedLang === "English") {
+        if (scannedLang === 'English') {
           currentCardsInSet = await fetchCardsForEnglishSet(matchedSetId);
         } else {
           currentCardsInSet = await fetchCardsForJapaneseSet(matchedSetId);
         }
 
         if (currentCardsInSet.length > 0) {
-          const normalizedScanName = initialScanData.name ? normalizeString(initialScanData.name) : undefined;
-          const normalizedScanCardNumber = initialScanData.cardNumber ? normalizeString(initialScanData.cardNumber) : undefined;
-          
+          const normalizedScanName = initialScanData.name
+            ? normalizeString(initialScanData.name)
+            : undefined;
+          const normalizedScanCardNumber = initialScanData.cardNumber
+            ? normalizeString(initialScanData.cardNumber)
+            : undefined;
+
           let foundCard: ApiPokemonCard | TcgDexApiCard | undefined = undefined;
 
           if (normalizedScanName) {
-             foundCard = currentCardsInSet.find(c => normalizeString(c.name).includes(normalizedScanName));
+            foundCard = currentCardsInSet.find((c) =>
+              normalizeString(c.name).includes(normalizedScanName)
+            );
           }
           if (!foundCard && normalizedScanCardNumber) {
-             foundCard = currentCardsInSet.find(c => normalizeString(c.number) === normalizedScanCardNumber);
+            foundCard = currentCardsInSet.find(
+              (c) => normalizeString(c.number) === normalizedScanCardNumber
+            );
           }
-          
+
           if (foundCard) {
-            form.setValue("selectedCardId", foundCard.id, { shouldValidate: true });
+            form.setValue('selectedCardId', foundCard.id, { shouldValidate: true });
           } else {
-            toast({ title: "OCR Info", description: `Could not auto-match card "${initialScanData.name || initialScanData.cardNumber}" from OCR. Please select manually.`});
+            toast({
+              title: 'OCR Info',
+              description: `Could not auto-match card "${initialScanData.name || initialScanData.cardNumber}" from OCR. Please select manually.`,
+            });
           }
         }
       }
 
-
       setIsPreFilling(false);
     };
 
-    if (initialScanData && (initialScanData.name || initialScanData.cardNumber || initialScanData.set)) {
-        if ((watchedLanguage === "English" && (englishSets.length > 0 || !isLoadingEnglishSets)) ||
-            (watchedLanguage === "Japanese" && (japaneseSets.length > 0 || !isLoadingJapaneseSets))) {
-          preFillForm();
-        }
+    if (
+      initialScanData &&
+      (initialScanData.name || initialScanData.cardNumber || initialScanData.set)
+    ) {
+      if (
+        (watchedLanguage === 'English' && (englishSets.length > 0 || !isLoadingEnglishSets)) ||
+        (watchedLanguage === 'Japanese' && (japaneseSets.length > 0 || !isLoadingJapaneseSets))
+      ) {
+        preFillForm();
+      }
     }
-  }, [initialScanData, form, toast, fetchEnglishSets, fetchJapaneseSets, fetchCardsForEnglishSet, fetchCardsForJapaneseSet, englishSets, japaneseSets, isLoadingEnglishSets, isLoadingJapaneseSets, watchedLanguage]);
-
+  }, [
+    initialScanData,
+    form,
+    toast,
+    fetchEnglishSets,
+    fetchJapaneseSets,
+    fetchCardsForEnglishSet,
+    fetchCardsForJapaneseSet,
+    englishSets,
+    japaneseSets,
+    isLoadingEnglishSets,
+    isLoadingJapaneseSets,
+    watchedLanguage,
+  ]);
 
   useEffect(() => {
     if (!watchedSetId || isPreFilling) {
       if (!isPreFilling) {
-        if (watchedLanguage === "English") {
+        if (watchedLanguage === 'English') {
           setCardsInSelectedEnglishSet([]);
           setSelectedEnglishCardData(null);
         } else {
           setCardsInSelectedJapaneseSet([]);
           setSelectedJapaneseCardData(null);
         }
-        form.resetField("selectedCardId");
+        form.resetField('selectedCardId');
       }
       return;
     }
 
-    if (watchedLanguage === "English") {
+    if (watchedLanguage === 'English') {
       if (watchedSetId !== selectedEnglishCardData?.set.id) {
         fetchCardsForEnglishSet(watchedSetId);
       }
-    } else { 
-       if (watchedSetId !== selectedJapaneseCardData?.set.id) {
+    } else {
+      if (watchedSetId !== selectedJapaneseCardData?.set.id) {
         fetchCardsForJapaneseSet(watchedSetId);
       }
     }
-  }, [watchedSetId, watchedLanguage, form, fetchCardsForEnglishSet, fetchCardsForJapaneseSet, isPreFilling, selectedEnglishCardData, selectedJapaneseCardData]);
+  }, [
+    watchedSetId,
+    watchedLanguage,
+    form,
+    fetchCardsForEnglishSet,
+    fetchCardsForJapaneseSet,
+    isPreFilling,
+    selectedEnglishCardData,
+    selectedJapaneseCardData,
+  ]);
 
   useEffect(() => {
     if (!watchedCardId || isPreFilling) {
       if (!isPreFilling && !watchedSetId) {
-         setSelectedEnglishCardData(null);
-         setSelectedJapaneseCardData(null);
+        setSelectedEnglishCardData(null);
+        setSelectedJapaneseCardData(null);
       }
       return;
     }
-    if (watchedLanguage === "English") {
-      const card = cardsInSelectedEnglishSet.find(c => c.id === watchedCardId);
+    if (watchedLanguage === 'English') {
+      const card = cardsInSelectedEnglishSet.find((c) => c.id === watchedCardId);
       setSelectedEnglishCardData(card || null);
       setSelectedJapaneseCardData(null);
-    } else { 
-      const card = cardsInSelectedJapaneseSet.find(c => c.id === watchedCardId);
+    } else {
+      const card = cardsInSelectedJapaneseSet.find((c) => c.id === watchedCardId);
       setSelectedJapaneseCardData(card || null);
       setSelectedEnglishCardData(null);
     }
-  }, [watchedCardId, cardsInSelectedEnglishSet, cardsInSelectedJapaneseSet, watchedLanguage, isPreFilling, watchedSetId]);
-
+  }, [
+    watchedCardId,
+    cardsInSelectedEnglishSet,
+    cardsInSelectedJapaneseSet,
+    watchedLanguage,
+    isPreFilling,
+    watchedSetId,
+  ]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     let cardToSave: Omit<PokemonCard, 'id' | 'userId' | 'timestamp'>;
 
-    if (values.language === "English") {
-      const selectedSet = englishSets.find(s => s.id === values.selectedSetId);
+    if (values.language === 'English') {
+      const selectedSet = englishSets.find((s) => s.id === values.selectedSetId);
       if (!selectedSet || !selectedEnglishCardData) {
-        toast({ variant: "destructive", title: "Error", description: "Selected English set or card data is missing." });
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Selected English set or card data is missing.',
+        });
         return;
       }
-      const { value: cardValue, variant: cardVariant } = getDefaultMarketPrice(selectedEnglishCardData);
+      const { value: cardValue, variant: cardVariant } =
+        getDefaultMarketPrice(selectedEnglishCardData);
       cardToSave = {
         set: selectedSet.name,
         cardNumber: selectedEnglishCardData.number,
         name: selectedEnglishCardData.name,
-        rarity: selectedEnglishCardData.rarity || initialScanData?.rarity || "N/A",
+        rarity: selectedEnglishCardData.rarity || initialScanData?.rarity || 'N/A',
         language: values.language,
         variant: cardVariant || null,
         imageUrl: selectedEnglishCardData.images.large || null,
@@ -413,49 +518,60 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
         artist: selectedEnglishCardData.artist || null,
         apiId: selectedEnglishCardData.id,
       };
-    } else { 
-      const selectedSet = japaneseSets.find(s => s.id === values.selectedSetId);
+    } else {
+      const selectedSet = japaneseSets.find((s) => s.id === values.selectedSetId);
       if (!selectedSet || !selectedJapaneseCardData) {
-        toast({ variant: "destructive", title: "Error", description: "Selected Japanese set or card data is missing." });
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Selected Japanese set or card data is missing.',
+        });
         return;
       }
       cardToSave = {
-        set: selectedSet.name, 
+        set: selectedSet.name,
         cardNumber: selectedJapaneseCardData.number,
-        name: selectedJapaneseCardData.name, 
-        rarity: selectedJapaneseCardData.rarity || initialScanData?.rarity || "N/A",
+        name: selectedJapaneseCardData.name,
+        rarity: selectedJapaneseCardData.rarity || initialScanData?.rarity || 'N/A',
         language: values.language,
         variant: null,
-        imageUrl: selectedJapaneseCardData.image ? `${selectedJapaneseCardData.image}/high.webp` : null,
-        value: 0, 
+        imageUrl: selectedJapaneseCardData.image
+          ? `${selectedJapaneseCardData.image}/high.webp`
+          : null,
+        value: 0,
         quantity: values.quantity,
         artist: selectedJapaneseCardData.artist || null,
         apiId: selectedJapaneseCardData.id,
       };
     }
-    
+
     // Use the onAddCard prop to pass the card up to the parent component
     onAddCard({ ...cardToSave, id: '', userId: '', timestamp: null });
 
     form.reset({
-      selectedSetId: values.selectedSetId, 
-      selectedCardId: "",
-      language: values.language, 
+      selectedSetId: values.selectedSetId,
+      selectedCardId: '',
+      language: values.language,
       quantity: 1,
     });
-    setSelectedEnglishCardData(null); 
+    setSelectedEnglishCardData(null);
     setSelectedJapaneseCardData(null);
   }
-  
-  const currentCardDisplayData = watchedLanguage === 'English' ? selectedEnglishCardData : selectedJapaneseCardData;
+
+  const currentCardDisplayData =
+    watchedLanguage === 'English' ? selectedEnglishCardData : selectedJapaneseCardData;
   const currentSets = watchedLanguage === 'English' ? englishSets : japaneseSets;
-  const isLoadingCurrentSets = watchedLanguage === 'English' ? isLoadingEnglishSets : isLoadingJapaneseSets;
+  const isLoadingCurrentSets =
+    watchedLanguage === 'English' ? isLoadingEnglishSets : isLoadingJapaneseSets;
   const errorCurrentSets = watchedLanguage === 'English' ? errorEnglishSets : errorJapaneseSets;
-  const currentCardsInSet = watchedLanguage === 'English' ? cardsInSelectedEnglishSet : cardsInSelectedJapaneseSet;
-  const isLoadingCurrentCards = watchedLanguage === 'English' ? isLoadingEnglishCards : isLoadingJapaneseCards;
+  const currentCardsInSet =
+    watchedLanguage === 'English' ? cardsInSelectedEnglishSet : cardsInSelectedJapaneseSet;
+  const isLoadingCurrentCards =
+    watchedLanguage === 'English' ? isLoadingEnglishCards : isLoadingJapaneseCards;
   const errorCurrentCards = watchedLanguage === 'English' ? errorEnglishCards : errorJapaneseCards;
-  
-  const isUIDisabled = form.formState.isSubmitting || isLoadingCurrentSets || isLoadingCurrentCards || isPreFilling;
+
+  const isUIDisabled =
+    form.formState.isSubmitting || isLoadingCurrentSets || isLoadingCurrentCards || isPreFilling;
 
   return (
     <Card className="shadow-lg">
@@ -464,7 +580,9 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
           <FilePlus className="h-6 w-6 text-primary" />
           Manual Card Entry
         </CardTitle>
-        <CardDescription>Select Language, Set, Card, and Quantity. Scanner may pre-fill some fields.</CardDescription>
+        <CardDescription>
+          Select Language, Set, Card, and Quantity. Scanner may pre-fill some fields.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -474,18 +592,20 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
               name="language"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-1"><Languages className="h-4 w-4 text-blue-500"/> Language</FormLabel>
-                  <Select 
+                  <FormLabel className="flex items-center gap-1">
+                    <Languages className="h-4 w-4 text-blue-500" /> Language
+                  </FormLabel>
+                  <Select
                     onValueChange={(value: 'English' | 'Japanese') => {
                       field.onChange(value);
-                      form.resetField("selectedSetId", { defaultValue: "" });
-                      form.resetField("selectedCardId", { defaultValue: "" });
+                      form.resetField('selectedSetId', { defaultValue: '' });
+                      form.resetField('selectedCardId', { defaultValue: '' });
                       setSelectedEnglishCardData(null);
                       setSelectedJapaneseCardData(null);
                       setCardsInSelectedEnglishSet([]);
                       setCardsInSelectedJapaneseSet([]);
-                    }} 
-                    value={field.value} 
+                    }}
+                    value={field.value}
                     disabled={isPreFilling || form.formState.isSubmitting}
                   >
                     <FormControl>
@@ -494,8 +614,10 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {languageOptions.map(option => (
-                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      {languageOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -510,31 +632,48 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Set</FormLabel>
-                  <Select 
+                  <Select
                     onValueChange={(value) => {
                       field.onChange(value);
-                      form.resetField("selectedCardId", { defaultValue: "" }); 
+                      form.resetField('selectedCardId', { defaultValue: '' });
                       setSelectedEnglishCardData(null);
                       setSelectedJapaneseCardData(null);
-                      if (watchedLanguage === "English") setCardsInSelectedEnglishSet([]); else setCardsInSelectedJapaneseSet([]);
+                      if (watchedLanguage === 'English') setCardsInSelectedEnglishSet([]);
+                      else setCardsInSelectedJapaneseSet([]);
                     }}
                     value={field.value}
-                    disabled={isUIDisabled || isLoadingCurrentSets || !!errorCurrentSets || currentSets.length === 0}
+                    disabled={
+                      isUIDisabled ||
+                      isLoadingCurrentSets ||
+                      !!errorCurrentSets ||
+                      currentSets.length === 0
+                    }
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={
-                          isPreFilling ? `Pre-filling ${watchedLanguage} set...` :
-                          isLoadingCurrentSets ? `Loading ${watchedLanguage} sets...` : 
-                          errorCurrentSets ? `Error loading ${watchedLanguage} sets` : 
-                          currentSets.length === 0 ? `No ${watchedLanguage} sets available` : `Select ${watchedLanguage} set`
-                        } />
+                        <SelectValue
+                          placeholder={
+                            isPreFilling
+                              ? `Pre-filling ${watchedLanguage} set...`
+                              : isLoadingCurrentSets
+                                ? `Loading ${watchedLanguage} sets...`
+                                : errorCurrentSets
+                                  ? `Error loading ${watchedLanguage} sets`
+                                  : currentSets.length === 0
+                                    ? `No ${watchedLanguage} sets available`
+                                    : `Select ${watchedLanguage} set`
+                          }
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {!isLoadingCurrentSets && !errorCurrentSets && currentSets.map(set => (
-                        <SelectItem key={set.id} value={set.id}>{set.name} ({set.id.toUpperCase()})</SelectItem>
-                      ))}
+                      {!isLoadingCurrentSets &&
+                        !errorCurrentSets &&
+                        currentSets.map((set) => (
+                          <SelectItem key={set.id} value={set.id}>
+                            {set.name} ({set.id.toUpperCase()})
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -548,54 +687,108 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Card</FormLabel>
-                  <Select 
+                  <Select
                     onValueChange={field.onChange}
                     value={field.value}
-                    disabled={isUIDisabled || !watchedSetId || isLoadingCurrentCards || !!errorCurrentCards || currentCardsInSet.length === 0}
+                    disabled={
+                      isUIDisabled ||
+                      !watchedSetId ||
+                      isLoadingCurrentCards ||
+                      !!errorCurrentCards ||
+                      currentCardsInSet.length === 0
+                    }
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={
-                          isPreFilling && watchedSetId ? `Pre-filling ${watchedLanguage} card...` :
-                          isLoadingCurrentCards ? `Loading ${watchedLanguage} cards...` :
-                          !watchedSetId ? "Select a set first" :
-                          errorCurrentCards ? `Error loading ${watchedLanguage} cards` :
-                          currentCardsInSet.length === 0 && watchedSetId && !isLoadingCurrentCards ? `No ${watchedLanguage} cards in set` : `Select ${watchedLanguage} card`
-                        } />
+                        <SelectValue
+                          placeholder={
+                            isPreFilling && watchedSetId
+                              ? `Pre-filling ${watchedLanguage} card...`
+                              : isLoadingCurrentCards
+                                ? `Loading ${watchedLanguage} cards...`
+                                : !watchedSetId
+                                  ? 'Select a set first'
+                                  : errorCurrentCards
+                                    ? `Error loading ${watchedLanguage} cards`
+                                    : currentCardsInSet.length === 0 &&
+                                        watchedSetId &&
+                                        !isLoadingCurrentCards
+                                      ? `No ${watchedLanguage} cards in set`
+                                      : `Select ${watchedLanguage} card`
+                          }
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent className="max-h-72">
-                      {!isLoadingCurrentCards && !errorCurrentCards && currentCardsInSet.map(card => (
-                        <SelectItem key={card.id} value={card.id}>{card.name} - #{card.number}</SelectItem>
-                      ))}
+                      {!isLoadingCurrentCards &&
+                        !errorCurrentCards &&
+                        currentCardsInSet.map((card) => (
+                          <SelectItem key={card.id} value={card.id}>
+                            {card.name} - #{card.number}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             {currentCardDisplayData && (
               <Card className="p-4 bg-muted/50">
-                <CardTitle className="text-lg mb-2">{currentCardDisplayData.name} #{currentCardDisplayData.number}</CardTitle>
+                <CardTitle className="text-lg mb-2">
+                  {currentCardDisplayData.name} #{currentCardDisplayData.number}
+                </CardTitle>
                 <div className="flex gap-4 items-start">
-                  {( (watchedLanguage === 'English' && (currentCardDisplayData as ApiPokemonCard).images?.small) || (watchedLanguage === 'Japanese' && (currentCardDisplayData as TcgDexApiCard).image) ) && (
-                    <div className="relative w-24 h-32 flex-shrink-0" data-ai-hint="pokemon card front">
-                      <Image 
-                        src={watchedLanguage === 'English' ? (currentCardDisplayData as ApiPokemonCard).images.small : `${(currentCardDisplayData as TcgDexApiCard).image}/low.webp`} 
-                        alt={currentCardDisplayData.name} 
-                        layout="fill" objectFit="contain" className="rounded-sm"/>
+                  {((watchedLanguage === 'English' &&
+                    (currentCardDisplayData as ApiPokemonCard).images?.small) ||
+                    (watchedLanguage === 'Japanese' &&
+                      (currentCardDisplayData as TcgDexApiCard).image)) && (
+                    <div
+                      className="relative w-24 h-32 flex-shrink-0"
+                      data-ai-hint="pokemon card front"
+                    >
+                      <Image
+                        src={
+                          watchedLanguage === 'English'
+                            ? (currentCardDisplayData as ApiPokemonCard).images.small
+                            : `${(currentCardDisplayData as TcgDexApiCard).image}/low.webp`
+                        }
+                        alt={currentCardDisplayData.name}
+                        fill
+                        sizes="96px"
+                        className="rounded-sm object-contain"
+                      />
                     </div>
                   )}
                   <div className="text-sm space-y-1">
-                    <p><strong>Set:</strong> {watchedLanguage === 'English' ? (currentCardDisplayData as ApiPokemonCard).set.name : (currentCardDisplayData as TcgDexApiCard).set.name}</p>
-                    <p><strong>Rarity:</strong> {currentCardDisplayData.rarity || "N/A"}</p>
-                    {currentCardDisplayData.artist && <p><strong>Artist:</strong> {currentCardDisplayData.artist}</p>}
-                    {watchedLanguage === 'English' && (currentCardDisplayData as ApiPokemonCard).tcgplayer?.prices && (
-                        <p><strong>Est. Value (English):</strong> ${getDefaultMarketPrice(currentCardDisplayData as ApiPokemonCard).value.toFixed(2)}</p>
+                    <p>
+                      <strong>Set:</strong>{' '}
+                      {watchedLanguage === 'English'
+                        ? (currentCardDisplayData as ApiPokemonCard).set.name
+                        : (currentCardDisplayData as TcgDexApiCard).set.name}
+                    </p>
+                    <p>
+                      <strong>Rarity:</strong> {currentCardDisplayData.rarity || 'N/A'}
+                    </p>
+                    {currentCardDisplayData.artist && (
+                      <p>
+                        <strong>Artist:</strong> {currentCardDisplayData.artist}
+                      </p>
                     )}
-                     {watchedLanguage === 'Japanese' && (
-                        <p className="text-xs italic">Market value for Japanese cards from TCGdex not available via API.</p>
+                    {watchedLanguage === 'English' &&
+                      (currentCardDisplayData as ApiPokemonCard).tcgplayer?.prices && (
+                        <p>
+                          <strong>Est. Value (English):</strong> $
+                          {getDefaultMarketPrice(
+                            currentCardDisplayData as ApiPokemonCard
+                          ).value.toFixed(2)}
+                        </p>
+                      )}
+                    {watchedLanguage === 'Japanese' && (
+                      <p className="text-xs italic">
+                        Market value for Japanese cards from TCGdex not available via API.
+                      </p>
                     )}
                   </div>
                 </div>
@@ -607,23 +800,26 @@ export function ManualCardInputForm({ onAddCard, initialScanData }: ManualCardIn
               name="quantity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-1"><Layers className="h-4 w-4 text-purple-500"/>Quantity</FormLabel>
+                  <FormLabel className="flex items-center gap-1">
+                    <Layers className="h-4 w-4 text-purple-500" />
+                    Quantity
+                  </FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      min="1" 
-                      {...field} 
+                    <Input
+                      type="number"
+                      min="1"
+                      {...field}
                       disabled={isUIDisabled || !currentCardDisplayData}
-                      onChange={event => field.onChange(parseInt(event.target.value, 10) || 1)}
+                      onChange={(event) => field.onChange(parseInt(event.target.value, 10) || 1)}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
-            <Button 
-              type="submit" 
+
+            <Button
+              type="submit"
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
               disabled={isUIDisabled || !form.formState.isValid}
             >

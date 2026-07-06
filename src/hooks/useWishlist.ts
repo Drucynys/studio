@@ -54,6 +54,7 @@ export function useWishlist(uid: string | undefined) {
 
   return {
     wishlist: isGuest ? guestWishlist : wishlist,
-    loadingWishlist: !isGuest && !!uid && !hasReceivedFirstSnapshot.current && wishlist.length === 0,
+    loadingWishlist:
+      !isGuest && !!uid && !hasReceivedFirstSnapshot.current && wishlist.length === 0,
   };
 }

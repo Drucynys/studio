@@ -68,6 +68,7 @@ export function useUserCollection(uid: string | undefined) {
 
   return {
     collection: isGuest ? guestCollection : collection,
-    loadingCollection: !isGuest && !!uid && !hasReceivedFirstSnapshot.current && collection.length === 0,
+    loadingCollection:
+      !isGuest && !!uid && !hasReceivedFirstSnapshot.current && collection.length === 0,
   };
 }

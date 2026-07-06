@@ -1,24 +1,34 @@
 // src/app/sets/[setId]/page.tsx
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import Image from "next/image";
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
-import { AppHeader } from "@/components/AppHeader";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { AddCardToCollectionDialog } from "@/components/AddCardToCollectionDialog";
-import { useAuth } from "@/hooks/useAuth";
-import { useUserCollection } from "@/hooks/useUserCollection";
-import { Loader2, ServerCrash, ArrowLeft, Images, Search, CalendarDays, Hash, Grid, List } from "lucide-react";
-import { CardSkeleton } from "@/components/CardSkeleton";
-import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
+import { AppHeader } from '@/components/AppHeader';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { AddCardToCollectionDialog } from '@/components/AddCardToCollectionDialog';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserCollection } from '@/hooks/useUserCollection';
+import {
+  Loader2,
+  ServerCrash,
+  ArrowLeft,
+  Images,
+  Search,
+  CalendarDays,
+  Hash,
+  Grid,
+  List,
+} from 'lucide-react';
+import { CardSkeleton } from '@/components/CardSkeleton';
+import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { Badge } from "@/components/ui/badge";
+import { Badge } from '@/components/ui/badge';
 
 export interface ApiPokemonCard {
   id: string;
@@ -28,16 +38,16 @@ export interface ApiPokemonCard {
     name: string;
     series: string;
     logo?: string;
-    releaseDate: string; 
-    printedTotal: number; 
-    total: number; 
+    releaseDate: string;
+    printedTotal: number;
+    total: number;
   };
   number: string;
   rarity?: string;
   artist?: string;
   images: {
     small: string;
-    large:string;
+    large: string;
   };
   tcgplayer?: {
     prices?: {
@@ -59,46 +69,59 @@ interface SetDetails {
   name: string;
   logoUrl?: string;
   releaseDate: string;
-  totalCards: number; 
+  totalCards: number;
   series: string;
 }
 
 const CARDS_PER_PAGE = 60;
 
-const GalleryCard = ({ card, isCollected, onClick }: { card: ApiPokemonCard, isCollected: boolean, onClick: () => void }) => {
+const GalleryCard = ({
+  card,
+  isCollected,
+  onClick,
+  priority,
+}: {
+  card: ApiPokemonCard;
+  isCollected: boolean;
+  onClick: () => void;
+  priority?: boolean;
+}) => {
   const [isImageLoading, setIsImageLoading] = useState(true);
-  
+
   return (
     <div
       onClick={onClick}
       className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
     >
-      <div 
+      <div
         className={cn(
-          "absolute inset-0 rounded-lg overflow-hidden transition-all duration-300", 
-          isImageLoading && "animate-shimmer bg-muted/40",
-          isCollected && "ring-2 ring-green-500"
+          'absolute inset-0 rounded-lg overflow-hidden transition-all duration-300',
+          isImageLoading && 'animate-shimmer bg-muted/40',
+          isCollected && 'ring-2 ring-green-500'
         )}
       >
-        <Image 
-          src={card.images.small} 
-          alt={card.name} 
-          layout="fill" 
-          objectFit="contain" 
+        <Image
+          src={card.images.small}
+          alt={card.name}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
+          priority={priority}
           className={cn(
-            "bg-card shadow-md rounded-lg transition-all duration-300",
-            isImageLoading ? "opacity-0 scale-95" : "opacity-100 scale-100",
-            isCollected ? "saturate-100" : "saturate-[.1] group-hover:saturate-100"
+            'bg-card shadow-md rounded-lg transition-all duration-300 object-contain',
+            isImageLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100',
+            isCollected ? 'saturate-100' : 'saturate-[.1] group-hover:saturate-100'
           )}
           onLoad={() => setIsImageLoading(false)}
           data-ai-hint="pokemon card front"
         />
       </div>
 
-      <Badge className={cn(
-        "absolute bottom-1 right-1 z-10 text-white border-transparent transition-opacity group-hover:opacity-0",
-         isCollected ? "bg-green-600" : "bg-black/60"
-       )}>
+      <Badge
+        className={cn(
+          'absolute bottom-1 right-1 z-10 text-white border-transparent transition-opacity group-hover:opacity-0',
+          isCollected ? 'bg-green-600' : 'bg-black/60'
+        )}
+      >
         #{card.number}
       </Badge>
     </div>
@@ -111,11 +134,11 @@ const SetDetailsPage = () => {
   const setId = params.setId as string;
   const { user } = useAuth();
   const { collection } = useUserCollection(user?.uid);
-  
+
   const [setDetails, setSetDetails] = useState<SetDetails | null>(null);
   const [cardsInSet, setCardsInSet] = useState<ApiPokemonCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -124,17 +147,17 @@ const SetDetailsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [ownershipFilter, setOwnershipFilter] = useState<'all' | 'owned' | 'missing'>('all');
   const [densityMode, setDensityMode] = useState<'gallery' | 'list'>('gallery');
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  
+
   const { toast } = useToast();
 
   const currentCardIndex = useMemo(() => {
     if (!selectedApiCard) return -1;
-    return filteredCards.findIndex(c => c.id === selectedApiCard.id);
+    return filteredCards.findIndex((c) => c.id === selectedApiCard.id);
   }, [selectedApiCard, filteredCards]);
 
   const handlePrevCard = useCallback(() => {
@@ -150,118 +173,120 @@ const SetDetailsPage = () => {
   }, [currentCardIndex, filteredCards]);
 
   const safeFormatDate = (dateString?: string) => {
-    if (!dateString) return "Unknown Release Date";
+    if (!dateString) return 'Unknown Release Date';
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString;
-      return format(date, "MMM d, yyyy");
+      return format(date, 'MMM d, yyyy');
     } catch {
       return dateString;
     }
   };
 
   const fetchSetDetails = useCallback(async () => {
-      try {
-        const setResponse = await fetch(`/api/sets/${setId}`);
-        if (!setResponse.ok) {
-            const errorData = await setResponse.json().catch(() => ({}));
-            throw new Error(errorData.message || `Set with ID "${setId}" not found in database.`);
-        }
-        const setInfo = await setResponse.json();
-        setSetDetails({
-            id: setInfo.id,
-            name: setInfo.name,
-            logoUrl: setInfo.images?.logo,
-            releaseDate: setInfo.releaseDate,
-            totalCards: setInfo.printedTotal || setInfo.total || 0,
-            series: setInfo.series,
-        });
-      } catch (err: any) {
-        setError(err.message);
+    try {
+      const setResponse = await fetch(`/api/sets/${setId}`);
+      if (!setResponse.ok) {
+        const errorData = await setResponse.json().catch(() => ({}));
+        throw new Error(errorData.message || `Set with ID "${setId}" not found in database.`);
       }
+      const setInfo = await setResponse.json();
+      setSetDetails({
+        id: setInfo.id,
+        name: setInfo.name,
+        logoUrl: setInfo.images?.logo,
+        releaseDate: setInfo.releaseDate,
+        totalCards: setInfo.printedTotal || setInfo.total || 0,
+        series: setInfo.series,
+      });
+    } catch (err: any) {
+      setError(err.message);
+    }
   }, [setId]);
 
-  const fetchCards = useCallback(async (loadMore = false, cursorOverride?: string | null) => {
-    if (!setId) return;
+  const fetchCards = useCallback(
+    async (loadMore = false, cursorOverride?: string | null) => {
+      if (!setId) return;
 
-    const cursor = loadMore ? (cursorOverride ?? lastLoadedNumber) : null;
+      const cursor = loadMore ? (cursorOverride ?? lastLoadedNumber) : null;
 
-    if (loadMore) {
+      if (loadMore) {
         setIsLoadingMore(true);
-    } else {
+      } else {
         setIsLoading(true);
         setCardsInSet([]);
         setLastLoadedNumber(null);
-    }
-    setError(null);
+      }
+      setError(null);
 
-    try {
+      try {
         const queryParams = new URLSearchParams({ limit: String(CARDS_PER_PAGE) });
         if (cursor) {
-            queryParams.set('startAfterNumber', cursor);
+          queryParams.set('startAfterNumber', cursor);
         }
 
         const cardsResponse = await fetch(`/api/cards/by-set/${setId}?${queryParams.toString()}`);
         if (!cardsResponse.ok) {
-            const errorData = await cardsResponse.json().catch(() => ({}));
-            throw new Error(errorData.message || `Failed to fetch cards for set ${setId}`);
+          const errorData = await cardsResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || `Failed to fetch cards for set ${setId}`);
         }
-        
+
         let newCards: ApiPokemonCard[] = await cardsResponse.json();
 
-        setCardsInSet(prev => {
-            if (!loadMore) return newCards;
-            const existingIds = new Set(prev.map(c => c.id));
-            const uniqueNewCards = newCards.filter(c => !existingIds.has(c.id));
-            return [...prev, ...uniqueNewCards];
+        setCardsInSet((prev) => {
+          if (!loadMore) return newCards;
+          const existingIds = new Set(prev.map((c) => c.id));
+          const uniqueNewCards = newCards.filter((c) => !existingIds.has(c.id));
+          return [...prev, ...uniqueNewCards];
         });
         setHasMore(newCards.length === CARDS_PER_PAGE);
 
         if (newCards.length > 0) {
-            setLastLoadedNumber(newCards[newCards.length - 1].number);
+          setLastLoadedNumber(newCards[newCards.length - 1].number);
         }
-
-    } catch (err: any) {
+      } catch (err: any) {
         setError(err.message);
-    } finally {
+      } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
-    }
-  }, [setId, lastLoadedNumber]); // Still depends on lastLoadedNumber for the cursor
+      }
+    },
+    [setId, lastLoadedNumber]
+  ); // Still depends on lastLoadedNumber for the cursor
 
   // Initial load effect - only run once when setId changes
   useEffect(() => {
     fetchSetDetails();
-    // We call fetchCards(false) here. 
+    // We call fetchCards(false) here.
     // To avoid the loop, we use a separate effect for initial load.
     const loadInitial = async () => {
-        if (setId) {
-            // We pass null to ensure it's an initial load
-            const params = new URLSearchParams({ limit: String(CARDS_PER_PAGE) });
-            setIsLoading(true);
-            try {
-                const res = await fetch(`/api/cards/by-set/${setId}?${params.toString()}`);
-                const data = await res.json();
-                setCardsInSet(data);
-                setHasMore(data.length === CARDS_PER_PAGE);
-                if (data.length > 0) {
-                    setLastLoadedNumber(data[data.length - 1].number);
-                }
-            } catch (err: any) {
-                setError(err.message);
-            } finally {
-                setIsLoading(false);
-            }
+      if (setId) {
+        // We pass null to ensure it's an initial load
+        const params = new URLSearchParams({ limit: String(CARDS_PER_PAGE) });
+        setIsLoading(true);
+        try {
+          const res = await fetch(`/api/cards/by-set/${setId}?${params.toString()}`);
+          const data = await res.json();
+          setCardsInSet(data);
+          setHasMore(data.length === CARDS_PER_PAGE);
+          if (data.length > 0) {
+            setLastLoadedNumber(data[data.length - 1].number);
+          }
+        } catch (err: any) {
+          setError(err.message);
+        } finally {
+          setIsLoading(false);
         }
+      }
     };
     loadInitial();
-  }, [setId, fetchSetDetails]); 
+  }, [setId, fetchSetDetails]);
 
   useEffect(() => {
     const scrollHandler = () => {
       const currentScrollY = window.scrollY;
-      
-      setLastScrollY(prevLastScrollY => {
+
+      setLastScrollY((prevLastScrollY) => {
         if (Math.abs(currentScrollY - prevLastScrollY) < 10) return prevLastScrollY;
 
         if (currentScrollY > prevLastScrollY && currentScrollY > 100) {
@@ -269,34 +294,33 @@ const SetDetailsPage = () => {
         } else {
           setIsHeaderVisible(true); // scrolling up
         }
-        
+
         return currentScrollY;
       });
     };
 
     window.addEventListener('scroll', scrollHandler, { passive: true });
-    
+
     return () => {
       window.removeEventListener('scroll', scrollHandler);
     };
-  }, []); 
-
-
+  }, []);
 
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
-    let filteredData = cardsInSet.filter(card =>
-      card.name.toLowerCase().includes(lowercasedFilter) ||
-      card.number.toLowerCase().includes(lowercasedFilter) ||
-      (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter))
+    let filteredData = cardsInSet.filter(
+      (card) =>
+        card.name.toLowerCase().includes(lowercasedFilter) ||
+        card.number.toLowerCase().includes(lowercasedFilter) ||
+        (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter))
     );
 
     if (user) {
-      const ownedCardApiIds = new Set(collection.map(c => c.apiId));
+      const ownedCardApiIds = new Set(collection.map((c) => c.apiId));
       if (ownershipFilter === 'owned') {
-        filteredData = filteredData.filter(card => ownedCardApiIds.has(card.id));
+        filteredData = filteredData.filter((card) => ownedCardApiIds.has(card.id));
       } else if (ownershipFilter === 'missing') {
-        filteredData = filteredData.filter(card => !ownedCardApiIds.has(card.id));
+        filteredData = filteredData.filter((card) => !ownedCardApiIds.has(card.id));
       }
     }
 
@@ -309,16 +333,20 @@ const SetDetailsPage = () => {
   };
 
   const setCompletion = useMemo(() => {
-    if (!setDetails?.name || cardsInSet.length === 0) return { collected: 0, total: 0, percentage: 0 };
+    if (!setDetails?.name || cardsInSet.length === 0)
+      return { collected: 0, total: 0, percentage: 0 };
     const collectedCardIdentifiersInSet = new Set<string>();
-    collection.forEach(card => {
-        if (card.set === setDetails.name && card.language === "English") { 
-            collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
-        }
+    collection.forEach((card) => {
+      if (card.set === setDetails.name && card.language === 'English') {
+        collectedCardIdentifiersInSet.add(`${card.name}-${card.cardNumber}`);
+      }
     });
     const uniqueCollectedCount = collectedCardIdentifiersInSet.size;
-    const totalInThisSet = cardsInSet.length; 
-    const percentage = totalInThisSet > 0 ? parseFloat(((uniqueCollectedCount / totalInThisSet) * 100).toFixed(1)) : 0;
+    const totalInThisSet = cardsInSet.length;
+    const percentage =
+      totalInThisSet > 0
+        ? parseFloat(((uniqueCollectedCount / totalInThisSet) * 100).toFixed(1))
+        : 0;
     return { collected: uniqueCollectedCount, total: totalInThisSet, percentage };
   }, [setDetails, cardsInSet, collection]);
 
@@ -328,181 +356,197 @@ const SetDetailsPage = () => {
         <AppHeader />
         <main className="flex-grow container mx-auto p-4 md:p-8 flex items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-           <p className="ml-4 text-lg text-muted-foreground">Loading set details...</p>
+          <p className="ml-4 text-lg text-muted-foreground">Loading set details...</p>
         </main>
       </div>
     );
   }
-  
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <AppHeader />
       <main className="flex-grow container mx-auto p-4 md:p-8">
         {setDetails && (
-          <div className={cn(
-            "p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky z-40 transition-all duration-300 ease-in-out",
-            isHeaderVisible 
-              ? "top-[65px] md:top-[77px] opacity-100" 
-              : "top-[-300px] opacity-0 pointer-events-none shadow-none"
-          )}>
-             <CardHeader className="p-0">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex items-center justify-between w-full md:w-auto gap-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                            {setDetails.logoUrl && (
-                                <div className="relative w-16 h-12 flex-shrink-0">
-                                  <Image 
-                                    src={setDetails.logoUrl} 
-                                    alt={`${setDetails.name} logo`} 
-                                    layout="fill"
-                                    objectFit="contain" 
-                                    className="self-start" 
-                                    data-ai-hint="pokemon set logo"
-                                  />
-                                </div>
-                            )}
-                            <div className="min-w-0">
-                                <CardTitle className="font-headline text-xl md:text-3xl text-foreground truncate">{setDetails.name}</CardTitle>
-                                <CardDescription className="text-xs md:text-md text-muted-foreground truncate">{setDetails.series} Series</CardDescription>
-                            </div>
-                        </div>
-
-                        {/* Standalone Circular Completion badge for consistency */}
-                        <div className="shrink-0 flex items-center bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200/50 dark:border-zinc-800/50 p-1.5 rounded-2xl shadow-sm hover:scale-[1.02] transition-transform duration-200">
-                           <div className="relative flex items-center justify-center h-12 w-12 flex-shrink-0">
-                             <svg className="h-12 w-12 transform -rotate-90">
-                               {/* Track Circle */}
-                               <circle
-                                 className="text-zinc-200 dark:text-zinc-800"
-                                 strokeWidth="3"
-                                 stroke="currentColor"
-                                 fill="transparent"
-                                 r="20"
-                                 cx="24"
-                                 cy="24"
-                               />
-                               {/* Progress Circle */}
-                               <circle
-                                 className="text-primary transition-all duration-500 ease-out"
-                                 strokeWidth="3"
-                                 strokeDasharray={2 * Math.PI * 20}
-                                 strokeDashoffset={2 * Math.PI * 20 - (setCompletion.percentage / 100) * (2 * Math.PI * 20)}
-                                 strokeLinecap="round"
-                                 stroke="currentColor"
-                                 fill="transparent"
-                                 r="20"
-                                 cx="24"
-                                 cy="24"
-                               />
-                             </svg>
-                             {/* Inner text */}
-                             <span className="absolute text-[9px] font-black text-foreground">
-                               {setCompletion.collected}/{setCompletion.total}
-                             </span>
-                           </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0">
-                       <div className="relative flex-grow md:w-[240px] lg:w-[280px]">
-                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                           <Input
-                               type="text"
-                               placeholder="Search cards in set..."
-                               value={searchTerm}
-                               onChange={(e) => setSearchTerm(e.target.value)}
-                               className="pl-10 w-full"
-                           />
-                       </div>
-                       <div className="flex bg-muted p-1 rounded-lg border shrink-0">
-                         <Button
-                           variant={densityMode === 'gallery' ? 'secondary' : 'ghost'}
-                           size="sm"
-                           className={cn(
-                             "h-8 w-8 p-0 transition-all rounded-md",
-                             densityMode === 'gallery' && "bg-background shadow-sm text-foreground hover:bg-background"
-                           )}
-                           onClick={() => setDensityMode('gallery')}
-                           title="Gallery View"
-                         >
-                           <Grid className="h-4 w-4" />
-                         </Button>
-                         <Button
-                           variant={densityMode === 'list' ? 'secondary' : 'ghost'}
-                           size="sm"
-                           className={cn(
-                             "h-8 w-8 p-0 transition-all rounded-md",
-                             densityMode === 'list' && "bg-background shadow-sm text-foreground hover:bg-background"
-                           )}
-                           onClick={() => setDensityMode('list')}
-                           title="List View"
-                         >
-                           <List className="h-4 w-4" />
-                         </Button>
-                       </div>
-                    </div>
-                </div>
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-y-4 gap-x-8 pt-3 border-t border-border/40 mt-3">
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                            <CalendarDays className="h-3.5 w-3.5 text-primary"/>
-                            {safeFormatDate(setDetails.releaseDate)}
-                        </span>
-                       <span className="text-border/60 hidden sm:inline">•</span>
-                       <span className="flex items-center gap-1">
-                           <Hash className="h-3.5 w-3.5 text-primary"/>
-                           <span>
-                             {filteredCards.length} of {setDetails.totalCards} cards shown
-                           </span>
-                       </span>
-                     </div>
-                    {user && (
-                      <div className="flex bg-muted p-1 rounded-lg border w-full md:w-auto">
-                        <Button
-                          variant={ownershipFilter === 'all' ? 'secondary' : 'ghost'}
-                          size="sm"
-                          className={cn(
-                            "h-8 text-xs font-semibold flex-1 md:flex-initial transition-all rounded-md",
-                            ownershipFilter === 'all' && "bg-background shadow-sm text-foreground hover:bg-background"
-                          )}
-                          onClick={() => setOwnershipFilter('all')}
-                        >
-                          All
-                        </Button>
-                        <Button
-                          variant={ownershipFilter === 'owned' ? 'secondary' : 'ghost'}
-                          size="sm"
-                          className={cn(
-                            "h-8 text-xs font-semibold flex-1 md:flex-initial transition-all rounded-md",
-                            ownershipFilter === 'owned' && "bg-green-500/10 text-green-600 hover:bg-green-500/15"
-                          )}
-                          onClick={() => setOwnershipFilter('owned')}
-                        >
-                          Owned
-                        </Button>
-                        <Button
-                          variant={ownershipFilter === 'missing' ? 'secondary' : 'ghost'}
-                          size="sm"
-                          className={cn(
-                            "h-8 text-xs font-semibold flex-1 md:flex-initial transition-all rounded-md",
-                            ownershipFilter === 'missing' && "bg-destructive/10 text-destructive hover:bg-destructive/15"
-                          )}
-                          onClick={() => setOwnershipFilter('missing')}
-                        >
-                          Missing
-                        </Button>
+          <div
+            className={cn(
+              'p-4 md:p-6 bg-card rounded-lg shadow-xl mb-6 sticky z-40 transition-all duration-300 ease-in-out',
+              isHeaderVisible
+                ? 'top-[65px] md:top-[77px] opacity-100'
+                : 'top-[-300px] opacity-0 pointer-events-none shadow-none'
+            )}
+          >
+            <CardHeader className="p-0">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-center justify-between w-full md:w-auto gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {setDetails.logoUrl && (
+                      <div className="relative w-16 h-12 flex-shrink-0">
+                        <Image
+                          src={setDetails.logoUrl}
+                          alt={`${setDetails.name} logo`}
+                          fill
+                          sizes="64px"
+                          className="self-start object-contain"
+                          data-ai-hint="pokemon set logo"
+                        />
                       </div>
                     )}
-                 </div>
-             </CardHeader>
+                    <div className="min-w-0">
+                      <CardTitle className="font-headline text-xl md:text-3xl text-foreground truncate">
+                        {setDetails.name}
+                      </CardTitle>
+                      <CardDescription className="text-xs md:text-md text-muted-foreground truncate">
+                        {setDetails.series} Series
+                      </CardDescription>
+                    </div>
+                  </div>
+
+                  {/* Standalone Circular Completion badge for consistency */}
+                  <div className="shrink-0 flex items-center bg-zinc-50 dark:bg-zinc-900/40 border border-zinc-200/50 dark:border-zinc-800/50 p-1.5 rounded-2xl shadow-sm hover:scale-[1.02] transition-transform duration-200">
+                    <div className="relative flex items-center justify-center h-12 w-12 flex-shrink-0">
+                      <svg className="h-12 w-12 transform -rotate-90">
+                        {/* Track Circle */}
+                        <circle
+                          className="text-zinc-200 dark:text-zinc-800"
+                          strokeWidth="3"
+                          stroke="currentColor"
+                          fill="transparent"
+                          r="20"
+                          cx="24"
+                          cy="24"
+                        />
+                        {/* Progress Circle */}
+                        <circle
+                          className="text-primary transition-all duration-500 ease-out"
+                          strokeWidth="3"
+                          strokeDasharray={2 * Math.PI * 20}
+                          strokeDashoffset={
+                            2 * Math.PI * 20 - (setCompletion.percentage / 100) * (2 * Math.PI * 20)
+                          }
+                          strokeLinecap="round"
+                          stroke="currentColor"
+                          fill="transparent"
+                          r="20"
+                          cx="24"
+                          cy="24"
+                        />
+                      </svg>
+                      {/* Inner text */}
+                      <span className="absolute text-[9px] font-black text-foreground">
+                        {setCompletion.collected}/{setCompletion.total}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-full md:w-auto mt-4 md:mt-0">
+                  <div className="relative flex-grow md:w-[240px] lg:w-[280px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search cards in set..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-full"
+                    />
+                  </div>
+                  <div className="flex bg-muted p-1 rounded-lg border shrink-0">
+                    <Button
+                      variant={densityMode === 'gallery' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={cn(
+                        'h-8 w-8 p-0 transition-all rounded-md',
+                        densityMode === 'gallery' &&
+                          'bg-background shadow-sm text-foreground hover:bg-background'
+                      )}
+                      onClick={() => setDensityMode('gallery')}
+                      title="Gallery View"
+                    >
+                      <Grid className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={densityMode === 'list' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={cn(
+                        'h-8 w-8 p-0 transition-all rounded-md',
+                        densityMode === 'list' &&
+                          'bg-background shadow-sm text-foreground hover:bg-background'
+                      )}
+                      onClick={() => setDensityMode('list')}
+                      title="List View"
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-y-4 gap-x-8 pt-3 border-t border-border/40 mt-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                    {safeFormatDate(setDetails.releaseDate)}
+                  </span>
+                  <span className="text-border/60 hidden sm:inline">•</span>
+                  <span className="flex items-center gap-1">
+                    <Hash className="h-3.5 w-3.5 text-primary" />
+                    <span>
+                      {filteredCards.length} of {setDetails.totalCards} cards shown
+                    </span>
+                  </span>
+                </div>
+                {user && (
+                  <div className="flex bg-muted p-1 rounded-lg border w-full md:w-auto">
+                    <Button
+                      variant={ownershipFilter === 'all' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={cn(
+                        'h-8 text-xs font-semibold flex-1 md:flex-initial transition-all rounded-md',
+                        ownershipFilter === 'all' &&
+                          'bg-background shadow-sm text-foreground hover:bg-background'
+                      )}
+                      onClick={() => setOwnershipFilter('all')}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={ownershipFilter === 'owned' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={cn(
+                        'h-8 text-xs font-semibold flex-1 md:flex-initial transition-all rounded-md',
+                        ownershipFilter === 'owned' &&
+                          'bg-green-500/10 text-green-600 hover:bg-green-500/15'
+                      )}
+                      onClick={() => setOwnershipFilter('owned')}
+                    >
+                      Owned
+                    </Button>
+                    <Button
+                      variant={ownershipFilter === 'missing' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className={cn(
+                        'h-8 text-xs font-semibold flex-1 md:flex-initial transition-all rounded-md',
+                        ownershipFilter === 'missing' &&
+                          'bg-destructive/10 text-destructive hover:bg-destructive/15'
+                      )}
+                      onClick={() => setOwnershipFilter('missing')}
+                    >
+                      Missing
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
           </div>
         )}
-        
+
         {error && (
-            <div className="flex flex-col items-center justify-center py-10 text-destructive">
+          <div className="flex flex-col items-center justify-center py-10 text-destructive">
             <ServerCrash className="h-16 w-16 mb-4" />
             <p className="text-xl font-semibold">Oops! Something went wrong.</p>
-            <p className="text-center">Could not load cards for this set: {error}.<br />Please try again later or check the set ID.</p>
-            </div>
+            <p className="text-center">
+              Could not load cards for this set: {error}.<br />
+              Please try again later or check the set ID.
+            </p>
+          </div>
         )}
         {isLoading && (
           <div className="pb-8">
@@ -510,20 +554,20 @@ const SetDetailsPage = () => {
           </div>
         )}
         {!isLoading && !error && (
-            <div className="pb-8">
+          <div className="pb-8">
             {densityMode === 'list' ? (
               <div className="border rounded-lg overflow-hidden bg-card mt-4 px-4 divide-y divide-border">
                 {filteredCards.map((card) => {
                   const isCollected = collection.some(
                     (collected) =>
-                    collected.name === card.name &&
-                    collected.set === card.set.name &&
-                    collected.cardNumber === card.number &&
-                    collected.language === "English"
+                      collected.name === card.name &&
+                      collected.set === card.set.name &&
+                      collected.cardNumber === card.number &&
+                      collected.language === 'English'
                   );
 
                   return (
-                    <div 
+                    <div
                       key={card.id}
                       onClick={() => openDialogForCard(card)}
                       className="flex items-center justify-between py-3 hover:bg-muted/30 cursor-pointer transition-colors"
@@ -531,16 +575,19 @@ const SetDetailsPage = () => {
                       <div className="flex items-center gap-3 min-w-0">
                         {/* Mini artwork thumbnail sprite */}
                         <div className="relative w-10 h-14 bg-muted/20 rounded border border-border/30 overflow-hidden flex-shrink-0">
-                          <Image 
-                            src={card.images.small} 
-                            alt={card.name} 
-                            layout="fill"
-                            objectFit="cover"
+                          <Image
+                            src={card.images.small}
+                            alt={card.name}
+                            fill
+                            sizes="40px"
+                            className="object-cover"
                             unoptimized
                           />
                         </div>
                         <div className="min-w-0">
-                          <p className="font-semibold text-sm text-foreground truncate">{card.name}</p>
+                          <p className="font-semibold text-sm text-foreground truncate">
+                            {card.name}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             #{card.number} {card.rarity && `• ${card.rarity}`}
                           </p>
@@ -553,7 +600,10 @@ const SetDetailsPage = () => {
                             Owned
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-muted-foreground border-border bg-transparent">
+                          <Badge
+                            variant="outline"
+                            className="text-muted-foreground border-border bg-transparent"
+                          >
                             Missing
                           </Badge>
                         )}
@@ -564,44 +614,52 @@ const SetDetailsPage = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-4 px-4">
-                  {filteredCards.map((card) => {
-                      const isCollected = collection.some(
-                          (collected) =>
-                          collected.name === card.name &&
-                          collected.set === card.set.name &&
-                          collected.cardNumber === card.number &&
-                          collected.language === "English" 
-                      );
-                      return (
-                        <GalleryCard
-                          key={card.id}
-                          card={card}
-                          isCollected={isCollected}
-                          onClick={() => openDialogForCard(card)}
-                        />
-                      );
-                  })}
+                {filteredCards.map((card, index) => {
+                  const isCollected = collection.some(
+                    (collected) =>
+                      collected.name === card.name &&
+                      collected.set === card.set.name &&
+                      collected.cardNumber === card.number &&
+                      collected.language === 'English'
+                  );
+                  return (
+                    <GalleryCard
+                      key={card.id}
+                      card={card}
+                      isCollected={isCollected}
+                      priority={index < 8}
+                      onClick={() => openDialogForCard(card)}
+                    />
+                  );
+                })}
               </div>
             )}
-            {(!isLoading && !error && filteredCards.length === 0) && (
-                <div className="text-center py-10 text-muted-foreground">
-                    <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg">{searchTerm ? "No cards found matching your search." : "No cards found in this set, or the database returned no data."}</p>
-                </div>
+            {!isLoading && !error && filteredCards.length === 0 && (
+              <div className="text-center py-10 text-muted-foreground">
+                <Images className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg">
+                  {searchTerm
+                    ? 'No cards found matching your search.'
+                    : 'No cards found in this set, or the database returned no data.'}
+                </p>
+              </div>
             )}
-            
+
             {/* Infinite Scroll Sentinel */}
             {hasMore && !searchTerm && ownershipFilter === 'all' && (
-              <div 
+              <div
                 id="infinite-scroll-sentinel"
                 className="flex justify-center p-10"
                 ref={(el) => {
                   if (el) {
-                    const observer = new IntersectionObserver((entries) => {
-                      if (entries[0].isIntersecting && !isLoadingMore) {
-                        fetchCards(true);
-                      }
-                    }, { threshold: 0.1 });
+                    const observer = new IntersectionObserver(
+                      (entries) => {
+                        if (entries[0].isIntersecting && !isLoadingMore) {
+                          fetchCards(true);
+                        }
+                      },
+                      { threshold: 0.1 }
+                    );
                     observer.observe(el);
                   }
                 }}
@@ -611,22 +669,28 @@ const SetDetailsPage = () => {
                     <CardSkeleton count={6} />
                     <div className="flex flex-col items-center gap-2 mt-4">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground italic">Summoning more cards...</p>
+                      <p className="text-sm text-muted-foreground italic">
+                        Summoning more cards...
+                      </p>
                     </div>
                   </div>
                 )}
               </div>
             )}
-            </div>
+          </div>
         )}
-        
       </main>
-      
-      <Button variant="secondary" size="icon" className="hidden lg:flex fixed bottom-6 left-6 rounded-full h-14 w-14 shadow-lg border transition-colors hover:bg-primary hover:text-primary-foreground z-50 items-center justify-center" onClick={() => router.back()}>
+
+      <Button
+        variant="secondary"
+        size="icon"
+        className="hidden lg:flex fixed bottom-6 left-6 rounded-full h-14 w-14 shadow-lg border transition-colors hover:bg-primary hover:text-primary-foreground z-50 items-center justify-center"
+        onClick={() => router.back()}
+      >
         <ArrowLeft className="h-6 w-6" />
         <span className="sr-only">Back to Sets</span>
       </Button>
-      
+
       {selectedApiCard && (
         <AddCardToCollectionDialog
           isOpen={isDialogOpen}
@@ -641,11 +705,21 @@ const SetDetailsPage = () => {
           onNextCard={currentCardIndex < filteredCards.length - 1 ? handleNextCard : undefined}
           hasPrevCard={currentCardIndex > 0}
           hasNextCard={currentCardIndex < filteredCards.length - 1}
-          prevCardImageUrl={currentCardIndex > 0 ? (filteredCards[currentCardIndex - 1].images.large || filteredCards[currentCardIndex - 1].images.small) : null}
-          nextCardImageUrl={currentCardIndex < filteredCards.length - 1 ? (filteredCards[currentCardIndex + 1].images.large || filteredCards[currentCardIndex + 1].images.small) : null}
+          prevCardImageUrl={
+            currentCardIndex > 0
+              ? filteredCards[currentCardIndex - 1].images.large ||
+                filteredCards[currentCardIndex - 1].images.small
+              : null
+          }
+          nextCardImageUrl={
+            currentCardIndex < filteredCards.length - 1
+              ? filteredCards[currentCardIndex + 1].images.large ||
+                filteredCards[currentCardIndex + 1].images.small
+              : null
+          }
         />
       )}
-       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
+      <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
         PokéTRKR &copy; {new Date().getFullYear()}
       </footer>
     </div>

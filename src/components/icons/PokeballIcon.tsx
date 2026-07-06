@@ -13,7 +13,11 @@ export function PokeballIcon(props: SVGProps<SVGSVGElement>) {
       {...props}
     >
       <circle cx="12" cy="12" r="10" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" />
-      <path d="M12 2a10 10 0 0 0-10 10h20A10 10 0 0 0 12 2Z" fill="hsl(var(--destructive))" stroke="hsl(var(--foreground))" />
+      <path
+        d="M12 2a10 10 0 0 0-10 10h20A10 10 0 0 0 12 2Z"
+        fill="hsl(var(--destructive))"
+        stroke="hsl(var(--foreground))"
+      />
       <path d="M12 12H2a10 10 0 0 0 10 10Z" fill="hsl(var(--card))" />
       <path d="M12 12h10a10 10 0 0 1-10 10Z" fill="hsl(var(--card))" />
       <circle cx="12" cy="12" r="3" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" />

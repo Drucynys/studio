@@ -22,7 +22,7 @@ export function useImageProcessor() {
         const imageWorker = new Worker('/workers/imageProcessor.worker.js');
         setWorker(imageWorker);
         workerRef.current = imageWorker;
-        
+
         return () => {
           imageWorker.terminate();
           workerRef.current = null;
@@ -34,75 +34,78 @@ export function useImageProcessor() {
     }
   }, []);
 
-  const processImage = useCallback((
-    imageDataUrl: string, 
-    options: ProcessingOptions = {}
-  ): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (!worker || !workerRef.current) {
-        reject(new Error('Worker not available'));
-        return;
-      }
-
-      setIsProcessing(true);
-      setError(null);
-
-      const handleMessage = (e: MessageEvent) => {
-        const { success, result, error } = e.data;
-        
-        if (success) {
-          resolve(result);
-        } else {
-          setError(error);
-          reject(new Error(error));
+  const processImage = useCallback(
+    (imageDataUrl: string, options: ProcessingOptions = {}): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        if (!worker || !workerRef.current) {
+          reject(new Error('Worker not available'));
+          return;
         }
-        
-        setIsProcessing(false);
-        worker.removeEventListener('message', handleMessage);
-      };
 
-      const handleError = (err: ErrorEvent) => {
-        setError('Worker processing failed');
-        setIsProcessing(false);
-        reject(new Error('Worker processing failed'));
-        worker.removeEventListener('error', handleError);
-      };
+        setIsProcessing(true);
+        setError(null);
 
-      worker.addEventListener('message', handleMessage);
-      worker.addEventListener('error', handleError);
-      
-      worker.postMessage({ imageDataUrl, options });
-    });
-  }, [worker]);
+        const handleMessage = (e: MessageEvent) => {
+          const { success, result, error } = e.data;
 
-  const processImageWithProgress = useCallback(async (
-    imageDataUrl: string,
-    options: ProcessingOptions = {},
-    onProgress?: (step: string) => void
-  ): Promise<string> => {
-    const steps = [
-      'Initializing processing...',
-      'Resizing image...',
-      'Enhancing contrast...',
-      'Applying sharpening...',
-      'Finalizing...'
-    ];
+          if (success) {
+            resolve(result);
+          } else {
+            setError(error);
+            reject(new Error(error));
+          }
 
-    if (onProgress) {
-      for (let i = 0; i < steps.length; i++) {
-        onProgress(steps[i]);
-        await new Promise(resolve => setTimeout(resolve, 100));
+          setIsProcessing(false);
+          worker.removeEventListener('message', handleMessage);
+        };
+
+        const handleError = (err: ErrorEvent) => {
+          setError('Worker processing failed');
+          setIsProcessing(false);
+          reject(new Error('Worker processing failed'));
+          worker.removeEventListener('error', handleError);
+        };
+
+        worker.addEventListener('message', handleMessage);
+        worker.addEventListener('error', handleError);
+
+        worker.postMessage({ imageDataUrl, options });
+      });
+    },
+    [worker]
+  );
+
+  const processImageWithProgress = useCallback(
+    async (
+      imageDataUrl: string,
+      options: ProcessingOptions = {},
+      onProgress?: (step: string) => void
+    ): Promise<string> => {
+      const steps = [
+        'Initializing processing...',
+        'Resizing image...',
+        'Enhancing contrast...',
+        'Applying sharpening...',
+        'Finalizing...',
+      ];
+
+      if (onProgress) {
+        for (let i = 0; i < steps.length; i++) {
+          onProgress(steps[i]);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
       }
-    }
 
-    return processImage(imageDataUrl, options);
-  }, [processImage]);
+      return processImage(imageDataUrl, options);
+    },
+    [processImage]
+  );
 
   return {
     processImage,
     processImageWithProgress,
     isProcessing,
     error,
-    isAvailable: !!worker
+    isAvailable: !!worker,
   };
 }

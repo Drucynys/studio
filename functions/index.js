@@ -1,4 +1,3 @@
-
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const sharp = require('sharp'); // Import sharp for image processing
@@ -38,8 +37,8 @@ exports.processCardUpload = europeFunctions.storage.object().onFinalize(async (o
   // Check if the file is in the correct path (card_uploads/{uid}/{filename})
   const filePathParts = filePath.split('/');
   if (filePathParts.length !== 3 || filePathParts[0] !== 'card_uploads') {
-      console.log('File not in card_uploads directory, skipping:', filePath);
-      return null;
+    console.log('File not in card_uploads directory, skipping:', filePath);
+    return null;
   }
   const uid = filePathParts[1];
   const filename = filePathParts[2];
@@ -72,7 +71,7 @@ exports.processCardUpload = europeFunctions.storage.object().onFinalize(async (o
       .toBuffer(); // Generate the processed buffer
 
     console.log('Image preprocessed (grayscale, cropped).');
-    
+
     // --- OCR with Tesseract.js v5 ---
     console.log('Initializing Tesseract worker...');
     const { createWorker } = await import('tesseract.js');
@@ -80,7 +79,9 @@ exports.processCardUpload = europeFunctions.storage.object().onFinalize(async (o
     console.log('Tesseract worker initialized.');
 
     // Perform OCR on the processed image buffer
-    const { data: { text } } = await worker.recognize(processedImageBuffer);
+    const {
+      data: { text },
+    } = await worker.recognize(processedImageBuffer);
     extractedText = text;
     console.log('OCR complete. Extracted text:', extractedText);
 
@@ -90,17 +91,15 @@ exports.processCardUpload = europeFunctions.storage.object().onFinalize(async (o
     cardNumber = details.cardNumber;
     console.log(`Extracted details - Pokémon Name: ${pokemonName}, Card Number: ${cardNumber}`);
     // --- End Extraction ---
-
   } catch (error) {
     console.error('Error during image processing or OCR:', error);
     extractedText = `OCR Failed: ${error.message}`;
-
   } finally {
-      // Terminate the worker to free up resources
-      if (worker) {
-          await worker.terminate();
-          console.log('Tesseract worker terminated.');
-      }
+    // Terminate the worker to free up resources
+    if (worker) {
+      await worker.terminate();
+      console.log('Tesseract worker terminated.');
+    }
   }
 
   // Save the extracted text to Firestore
@@ -116,7 +115,6 @@ exports.processCardUpload = europeFunctions.storage.object().onFinalize(async (o
 
     await db.collection('users').doc(uid).collection('cards').add(cardData);
     console.log(`Extracted text saved to Firestore for user ${uid}.`);
-
   } catch (error) {
     console.error('Error saving to Firestore:', error);
     // Handle Firestore saving error
@@ -170,12 +168,12 @@ exports.notifyOnNewFollower = europeFunctions.firestore
       // Get the follower's display name
       console.log(`🔍 Looking up follower: ${followerUid}`);
       const followerDoc = await db.collection('users').doc(followerUid).get();
-      
+
       if (!followerDoc.exists) {
         console.error(`❌ Follower user document ${followerUid} not found.`);
         return null;
       }
-      
+
       const followerData = followerDoc.data();
       const followerDisplayName = followerData.displayName || 'A new user';
       console.log(`👤 Follower display name: ${followerDisplayName}`);
@@ -190,20 +188,22 @@ exports.notifyOnNewFollower = europeFunctions.firestore
       };
 
       console.log(`📝 Creating notification:`, notification);
-      
+
       // Add the notification to the 'notifications' subcollection
-      const notificationRef = await db.collection('users').doc(followedUid).collection('notifications').add(notification);
-      
+      const notificationRef = await db
+        .collection('users')
+        .doc(followedUid)
+        .collection('notifications')
+        .add(notification);
+
       console.log(`✅ Notification created with ID: ${notificationRef.id} for user ${followedUid}`);
       return null;
-
     } catch (error) {
       console.error('❌ Error creating new follower notification:', error);
       console.error('Error details:', error.code, error.message);
       return null;
     }
   });
-
 
 /**
  * A scheduled function that runs daily to downsample the priceHistory collection
@@ -213,23 +213,26 @@ exports.notifyOnNewFollower = europeFunctions.firestore
  * - Keeps weekly data for 91-365 days old.
  * - Deletes data older than 365 days.
  */
-exports.downsamplePriceHistory = europeFunctions.pubsub.schedule('every day 03:00').timeZone('UTC').onRun(async (context) => {
-  console.log('📈 Starting price history downsampling job.');
-  const db = admin.firestore();
-  const batchSize = 200; // Process 200 documents at a time to stay within limits.
+exports.downsamplePriceHistory = europeFunctions.pubsub
+  .schedule('every day 03:00')
+  .timeZone('UTC')
+  .onRun(async (context) => {
+    console.log('📈 Starting price history downsampling job.');
+    const db = admin.firestore();
+    const batchSize = 200; // Process 200 documents at a time to stay within limits.
 
-  // Helper function to process a query in batches and delete documents based on a condition.
-  async function processQuery(query, shouldDelete) {
-    let snapshot = await query.limit(batchSize).get();
-    let docsDeleted = 0;
+    // Helper function to process a query in batches and delete documents based on a condition.
+    async function processQuery(query, shouldDelete) {
+      let snapshot = await query.limit(batchSize).get();
+      let docsDeleted = 0;
 
-    while (snapshot.size > 0) {
+      while (snapshot.size > 0) {
         const batch = db.batch();
-        snapshot.docs.forEach(doc => {
-            if (shouldDelete(doc)) {
-                batch.delete(doc.ref);
-                docsDeleted++;
-            }
+        snapshot.docs.forEach((doc) => {
+          if (shouldDelete(doc)) {
+            batch.delete(doc.ref);
+            docsDeleted++;
+          }
         });
         await batch.commit();
 
@@ -239,46 +242,48 @@ exports.downsamplePriceHistory = europeFunctions.pubsub.schedule('every day 03:0
 
         const lastVisible = snapshot.docs[snapshot.docs.length - 1];
         snapshot = await query.startAfter(lastVisible).limit(batchSize).get();
+      }
+      console.log(`Deleted ${docsDeleted} documents for the current query.`);
     }
-    console.log(`Deleted ${docsDeleted} documents for the current query.`);
-  }
 
-  const now = new Date();
-  const daysAgo = (days) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const daysAgo = (days) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
-  const thirtyDaysAgo = admin.firestore.Timestamp.fromDate(daysAgo(30));
-  const ninetyDaysAgo = admin.firestore.Timestamp.fromDate(daysAgo(90));
-  const oneYearAgo = admin.firestore.Timestamp.fromDate(daysAgo(365));
+    const thirtyDaysAgo = admin.firestore.Timestamp.fromDate(daysAgo(30));
+    const ninetyDaysAgo = admin.firestore.Timestamp.fromDate(daysAgo(90));
+    const oneYearAgo = admin.firestore.Timestamp.fromDate(daysAgo(365));
 
-  // --- Logic for data 31-90 days old (keep 1 every 3 days) ---
-  console.log('Processing data between 31 and 90 days old to sample every 3 days...');
-  const ninetyDayQuery = db.collection('priceHistory')
+    // --- Logic for data 31-90 days old (keep 1 every 3 days) ---
+    console.log('Processing data between 31 and 90 days old to sample every 3 days...');
+    const ninetyDayQuery = db
+      .collection('priceHistory')
       .where('date', '<=', thirtyDaysAgo)
       .where('date', '>', ninetyDaysAgo);
 
-  await processQuery(ninetyDayQuery, (doc) => {
+    await processQuery(ninetyDayQuery, (doc) => {
       const date = doc.data().date.toDate();
       // A simple sampling strategy: keep if day of the month is a multiple of 3 (e.g., 1st, 4th, 7th...)
       return date.getDate() % 3 !== 1;
-  });
+    });
 
-  // --- Logic for data 91-365 days old (keep 1 every 7 days) ---
-  console.log('Processing data between 91 and 365 days old to sample weekly...');
-  const oneYearQuery = db.collection('priceHistory')
+    // --- Logic for data 91-365 days old (keep 1 every 7 days) ---
+    console.log('Processing data between 91 and 365 days old to sample weekly...');
+    const oneYearQuery = db
+      .collection('priceHistory')
       .where('date', '<=', ninetyDaysAgo)
       .where('date', '>', oneYearAgo);
 
-  await processQuery(oneYearQuery, (doc) => {
+    await processQuery(oneYearQuery, (doc) => {
       const date = doc.data().date.toDate();
       // Keep if it's the first day of the week (Sunday).
       return date.getDay() !== 0; // 0 = Sunday
+    });
+
+    // --- Logic for data older than 365 days (delete all) ---
+    console.log('Deleting data older than 1 year...');
+    const deleteQuery = db.collection('priceHistory').where('date', '<=', oneYearAgo);
+    await processQuery(deleteQuery, (doc) => true); // Delete all matched documents
+
+    console.log('✅ Price history downsampling job finished.');
+    return null;
   });
-
-  // --- Logic for data older than 365 days (delete all) ---
-  console.log('Deleting data older than 1 year...');
-  const deleteQuery = db.collection('priceHistory').where('date', '<=', oneYearAgo);
-  await processQuery(deleteQuery, (doc) => true); // Delete all matched documents
-
-  console.log('✅ Price history downsampling job finished.');
-  return null;
-});

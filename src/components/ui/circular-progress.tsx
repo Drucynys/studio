@@ -1,8 +1,8 @@
 // src/components/ui/circular-progress.tsx
-"use client";
+'use client';
 
-import * as React from "react";
-import { cn } from "@/lib/utils";
+import * as React from 'react';
+import { cn } from '@/lib/utils';
 
 interface CircularProgressProps extends React.SVGProps<SVGSVGElement> {
   value?: number;
@@ -13,7 +13,10 @@ interface CircularProgressProps extends React.SVGProps<SVGSVGElement> {
 }
 
 const CircularProgress = React.forwardRef<SVGSVGElement, CircularProgressProps>(
-  ({ className, value = 0, size = 100, strokeWidth = 8, text, textSize = "text-xl", ...props }, ref) => {
+  (
+    { className, value = 0, size = 100, strokeWidth = 8, text, textSize = 'text-xl', ...props },
+    ref
+  ) => {
     const r = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * r;
     // Ensure offset doesn't go beyond circumference
@@ -26,7 +29,7 @@ const CircularProgress = React.forwardRef<SVGSVGElement, CircularProgressProps>(
           width={size}
           height={size}
           viewBox={`0 0 ${size} ${size}`}
-          className={cn("transform -rotate-90", className)}
+          className={cn('transform -rotate-90', className)}
           {...props}
         >
           {/* Background Circle */}
@@ -52,22 +55,19 @@ const CircularProgress = React.forwardRef<SVGSVGElement, CircularProgressProps>(
             style={{
               strokeDasharray: circumference,
               strokeDashoffset: offset,
-              transition: 'stroke-dashoffset 0.5s ease-out'
+              transition: 'stroke-dashoffset 0.5s ease-out',
             }}
           />
         </svg>
         {text && (
-            <div className="absolute inset-0 flex items-center justify-center">
-                <span className={cn(
-                    "font-bold text-primary",
-                    textSize
-                )}>{text}</span>
-            </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className={cn('font-bold text-primary', textSize)}>{text}</span>
+          </div>
         )}
       </div>
     );
   }
 );
-CircularProgress.displayName = "CircularProgress";
+CircularProgress.displayName = 'CircularProgress';
 
 export { CircularProgress };

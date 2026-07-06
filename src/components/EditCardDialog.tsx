@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import {
   Dialog,
   DialogContent,
@@ -9,19 +9,19 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import type { PokemonCard } from "@/types";
-import { Gem, DollarSign, Layers, Languages } from "lucide-react";
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import type { PokemonCard } from '@/types';
+import { Gem, DollarSign, Layers, Languages } from 'lucide-react';
 
 type EditCardDialogProps = {
   isOpen: boolean;
@@ -30,41 +30,40 @@ type EditCardDialogProps = {
   onSave: (updatedCard: PokemonCard) => void;
 };
 
-const languageOptions: Array<'English' | 'Japanese'> = ["English", "Japanese"];
+const languageOptions: Array<'English' | 'Japanese'> = ['English', 'Japanese'];
 
 const formatDisplayVariant = (variantKey?: string): string | null => {
   if (!variantKey) return null;
   return variantKey
-    .replace(/([A-Z0-9])/g, " $1")
+    .replace(/([A-Z0-9])/g, ' $1')
     .replace(/^./, (str) => str.toUpperCase())
     .trim();
 };
 
-export function EditCardDialog({
-  isOpen,
-  onClose,
-  card,
-  onSave,
-}: EditCardDialogProps) {
+export function EditCardDialog({ isOpen, onClose, card, onSave }: EditCardDialogProps) {
   const [editableCard, setEditableCard] = useState<PokemonCard | null>(null);
   const [quantityInput, setQuantityInput] = useState<number>(1);
-  const [valueInput, setValueInput] = useState<string>("0.00");
+  const [valueInput, setValueInput] = useState<string>('0.00');
   const [selectedLanguage, setSelectedLanguage] = useState<'English' | 'Japanese'>('English');
 
   useEffect(() => {
     if (card && isOpen) {
       setEditableCard({ ...card });
-      setQuantityInput(typeof card.quantity === 'number' && !isNaN(card.quantity) ? card.quantity : 1);
-      setValueInput(typeof card.value === 'number' && !isNaN(card.value) ? card.value.toFixed(2) : "0.00");
+      setQuantityInput(
+        typeof card.quantity === 'number' && !isNaN(card.quantity) ? card.quantity : 1
+      );
+      setValueInput(
+        typeof card.value === 'number' && !isNaN(card.value) ? card.value.toFixed(2) : '0.00'
+      );
       setSelectedLanguage(card.language || 'English');
     } else {
       setEditableCard(null);
       setQuantityInput(1);
-      setValueInput("0.00");
+      setValueInput('0.00');
       setSelectedLanguage('English');
     }
   }, [card, isOpen]);
-  
+
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const num = parseInt(e.target.value, 10);
     setQuantityInput(isNaN(num) || num < 1 ? 1 : num);
@@ -77,25 +76,30 @@ export function EditCardDialog({
   const handleLanguageChange = (value: 'English' | 'Japanese') => {
     setSelectedLanguage(value);
     if (editableCard) {
-        setEditableCard({...editableCard, language: value });
+      setEditableCard({ ...editableCard, language: value });
     }
-  }
+  };
 
   const handleSave = () => {
     if (editableCard) {
       const parsedValue = parseFloat(valueInput);
       const finalValue = isNaN(parsedValue) ? 0 : parsedValue;
-      onSave({ ...editableCard, language: selectedLanguage, quantity: quantityInput, value: finalValue });
+      onSave({
+        ...editableCard,
+        language: selectedLanguage,
+        quantity: quantityInput,
+        value: finalValue,
+      });
       onClose();
     }
   };
-  
+
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     if (editableCard?.imageUrl) {
-        // No fallback needed here as image is already loaded or placeholder is inherent
+      // No fallback needed here as image is already loaded or placeholder is inherent
     }
   };
-  
+
   if (!editableCard && !isOpen) return null;
   if (!isOpen) return null;
 
@@ -103,22 +107,34 @@ export function EditCardDialog({
   const displayVariant = formatDisplayVariant(currentCardToDisplay?.variant as string | undefined);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Card: {currentCardToDisplay?.name || currentCardToDisplay?.cardNumber}</DialogTitle>
+          <DialogTitle>
+            Edit Card: {currentCardToDisplay?.name || currentCardToDisplay?.cardNumber}
+          </DialogTitle>
           <DialogDescription>
-            {currentCardToDisplay?.set} - #{currentCardToDisplay?.cardNumber} {displayVariant ? `(${displayVariant})` : ""}
+            {currentCardToDisplay?.set} - #{currentCardToDisplay?.cardNumber}{' '}
+            {displayVariant ? `(${displayVariant})` : ''}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="flex justify-center mb-4">
-            <div className="relative w-40 h-56 rounded-md overflow-hidden shadow-md" data-ai-hint="pokemon card front">
+            <div
+              className="relative w-40 h-56 rounded-md overflow-hidden shadow-md"
+              data-ai-hint="pokemon card front"
+            >
               <Image
-                src={currentCardToDisplay?.imageUrl || "https://placehold.co/200x280.png"}
-                alt={currentCardToDisplay?.name || "Card image"}
-                layout="fill"
-                objectFit="contain"
+                src={currentCardToDisplay?.imageUrl || 'https://placehold.co/200x280.png'}
+                alt={currentCardToDisplay?.name || 'Card image'}
+                fill
+                sizes="160px"
+                className="object-contain"
                 onError={handleImageError}
                 key={currentCardToDisplay?.imageUrl || 'placeholder'}
               />
@@ -127,12 +143,10 @@ export function EditCardDialog({
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="language" className="text-right col-span-1">
-              <Languages className="inline-block mr-1 h-4 w-4 text-blue-500"/>Language
+              <Languages className="inline-block mr-1 h-4 w-4 text-blue-500" />
+              Language
             </Label>
-            <Select
-              value={selectedLanguage}
-              onValueChange={handleLanguageChange}
-            >
+            <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
               <SelectTrigger id="language" className="col-span-3">
                 <SelectValue placeholder="Select language" />
               </SelectTrigger>
@@ -148,7 +162,8 @@ export function EditCardDialog({
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="quantity" className="text-right col-span-1">
-              <Layers className="inline-block mr-1 h-4 w-4 text-purple-500"/>Quantity
+              <Layers className="inline-block mr-1 h-4 w-4 text-purple-500" />
+              Quantity
             </Label>
             <Input
               id="quantity"
@@ -159,24 +174,31 @@ export function EditCardDialog({
               min="1"
             />
           </div>
-          
+
           {displayVariant && (
-             <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="variant" className="text-right col-span-1">
-                 <Gem className="inline-block mr-1 h-4 w-4 text-blue-500"/>Variant
-                </Label>
-                <Input id="variant" value={displayVariant} readOnly className="col-span-3 bg-muted/50"/>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="variant" className="text-right col-span-1">
+                <Gem className="inline-block mr-1 h-4 w-4 text-blue-500" />
+                Variant
+              </Label>
+              <Input
+                id="variant"
+                value={displayVariant}
+                readOnly
+                className="col-span-3 bg-muted/50"
+              />
             </div>
           )}
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="value" className="text-right col-span-1">
-              <DollarSign className="inline-block mr-1 h-4 w-4 text-primary"/>Value (Added)
+              <DollarSign className="inline-block mr-1 h-4 w-4 text-primary" />
+              Value (Added)
             </Label>
             <div className="col-span-3 flex items-center gap-2">
               <Input
                 id="value"
-                type="text" 
+                type="text"
                 value={valueInput}
                 onChange={handleValueChange}
                 className="flex-grow"
@@ -186,8 +208,16 @@ export function EditCardDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!editableCard} className="bg-accent hover:bg-accent/90 text-accent-foreground">Save Changes</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={!editableCard}
+            className="bg-accent hover:bg-accent/90 text-accent-foreground"
+          >
+            Save Changes
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

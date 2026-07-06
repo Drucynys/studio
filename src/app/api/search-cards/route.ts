@@ -1,39 +1,40 @@
 import { NextResponse, NextRequest } from 'next/server';
-import admin from 'firebase-admin';
+import { db } from '@/lib/firebase-admin';
+import type { ApiPokemonCard } from '@/app/sets/[setId]/page';
 
-if (!admin.apps.length) {
-  const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  if (serviceAccountJson) {
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-  } else {
-    admin.initializeApp();
-  }
-}
-const db = admin.firestore();
-
-// In-memory server cache for instant 0ms search & $0 read costs
-let cachedCatalog: any[] | null = null;
+// In-memory server cache Promise for instant 0ms search & $0 read costs
+let catalogPromise: Promise<ApiPokemonCard[]> | null = null;
 let lastCacheTime = 0;
 const CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 
-async function getCardCatalog(): Promise<any[]> {
+function getCardCatalog(): Promise<ApiPokemonCard[]> {
   const now = Date.now();
-  if (cachedCatalog && (now - lastCacheTime < CACHE_TTL_MS)) {
-    return cachedCatalog;
+  if (catalogPromise && now - lastCacheTime < CACHE_TTL_MS) {
+    return catalogPromise;
   }
 
   console.log('🔄 Loading search catalog from Firestore NoSQL...');
-  const snapshot = await db.collection('pokemon-tcg-cards').get();
-  cachedCatalog = snapshot.docs.map(doc => doc.data());
   lastCacheTime = now;
-  console.log(`✅ Cached ${cachedCatalog.length} cards in server memory for instant search.`);
-  return cachedCatalog;
+
+  catalogPromise = db
+    .collection('pokemon-tcg-cards')
+    .get()
+    .then((snapshot) => {
+      const cards = snapshot.docs.map((doc) => doc.data() as ApiPokemonCard);
+      console.log(`✅ Cached ${cards.length} cards in server memory for instant search.`);
+      return cards;
+    })
+    .catch((err: unknown) => {
+      // Reset the cache promise on error so the next request attempts reload
+      catalogPromise = null;
+      lastCacheTime = 0;
+      throw err;
+    });
+
+  return catalogPromise;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const qRaw = searchParams.get('q');
@@ -48,12 +49,14 @@ export async function GET(request: NextRequest) {
     // Check for "number/total" exact format (e.g. "4/102" or "135/165")
     const numMatch = q.match(/^(\d+)\s*\/\s*(\d+)$/);
 
-    let results = catalog.filter(card => {
+    const results = catalog.filter((card) => {
       if (numMatch) {
         const targetNum = numMatch[1];
         const targetTotal = parseInt(numMatch[2]);
-        return (card.number === targetNum) && 
-               (card.set?.printedTotal === targetTotal || card.set?.total === targetTotal);
+        return (
+          card.number === targetNum &&
+          (card.set?.printedTotal === targetTotal || card.set?.total === targetTotal)
+        );
       }
 
       const nameMatch = card.name?.toLowerCase().includes(q);
@@ -79,7 +82,7 @@ export async function GET(request: NextRequest) {
       if (aNameStarts !== bNameStarts) return bNameStarts - aNameStarts;
 
       // Fallback sort by release date newer first or card number
-      return (b.set?.releaseDate || "").localeCompare(a.set?.releaseDate || "");
+      return (b.set?.releaseDate || '').localeCompare(a.set?.releaseDate || '');
     });
 
     // Return top 48 most relevant cards to keep payload snappy
@@ -88,11 +91,13 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.json(paginated);
     response.headers.set('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
     return response;
-
   } catch (error) {
     console.error('Error in search-cards NoSQL route:', error);
     return NextResponse.json(
-      { message: 'Error searching for cards', error: (error instanceof Error ? error.message : String(error)) },
+      {
+        message: 'Error searching for cards',
+        error: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

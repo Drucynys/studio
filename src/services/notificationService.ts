@@ -24,12 +24,9 @@ export const notificationService = {
    * Returns an unsubscribe function.
    */
   subscribe(uid: string, onData: (notifications: Notification[]) => void): () => void {
-    const q = query(
-      collection(db, 'users', uid, 'notifications'),
-      orderBy('timestamp', 'desc')
-    );
+    const q = query(collection(db, 'users', uid, 'notifications'), orderBy('timestamp', 'desc'));
     return onSnapshot(q, (snap) => {
-      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Notification));
+      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Notification);
       onData(all.filter((n) => !n.read));
     });
   },
@@ -37,7 +34,7 @@ export const notificationService = {
   /** Mark a batch of notifications as read. */
   async markAsRead(uid: string, notifications: Notification[]): Promise<void> {
     if (uid === 'demo-guest-uid' || useGuestStore.getState().isGuest) {
-      useGuestStore.getState().markNotificationsAsRead(notifications.map(n => n.id));
+      useGuestStore.getState().markNotificationsAsRead(notifications.map((n) => n.id));
       return;
     }
     if (!uid) throw new Error('uid is required');
