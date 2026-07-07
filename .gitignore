@@ -45,3 +45,5 @@ Thumbs.db
 workspace/
 workspace/.env
 workspace/.env.*
+
+certificates

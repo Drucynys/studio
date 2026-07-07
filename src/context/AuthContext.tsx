@@ -188,21 +188,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    const isLocalhost =
-      typeof window !== 'undefined' &&
-      (window.location.hostname === 'localhost' ||
-        window.location.hostname === '127.0.0.1' ||
-        window.location.hostname.includes('localhost'));
-
     try {
-      if (isLocalhost) {
-        await signInWithRedirect(auth, provider);
-        return null;
-      } else {
-        const userCredential = await signInWithPopup(auth, provider);
-        await handleAuthSuccess(userCredential);
-        return userCredential;
-      }
+      const userCredential = await signInWithPopup(auth, provider);
+      await handleAuthSuccess(userCredential);
+      return userCredential;
     } catch (error: any) {
       if (
         error.code === 'auth/popup-blocked' ||

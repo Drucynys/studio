@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUIStore } from '@/store/useUIStore';
 import { useUserCollection } from '@/hooks/useUserCollection';
 import { PokedexIcon } from '@/components/icons/PokedexIcon';
+import { DashboardStats } from '@/components/DashboardStats';
 
 export default function Home() {
   const { user, loginAsDemoGuest } = useAuth();
@@ -128,6 +129,8 @@ export default function Home() {
             )}
           </div>
         </section>
+
+        <DashboardStats />
 
         {/* Feature Dashboard Section */}
         <section className="space-y-6">

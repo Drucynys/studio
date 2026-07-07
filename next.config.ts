@@ -33,6 +33,8 @@ const nextConfig: NextConfig = {
     '3000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
     '3001-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
     '6000-firebase-studio-1749140756123.cluster-ombtxv25tbd6yrjpp3lukp6zhc.cloudworkstations.dev',
+    'chubby-dancers-crash.loca.lt',
+    '*.loca.lt',
   ],
 
   // If you plan to use external images

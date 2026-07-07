@@ -1,7 +1,7 @@
 // src/app/search/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { AppHeader } from '@/components/AppHeader';
 import { Input } from '@/components/ui/input';
@@ -20,9 +20,14 @@ export default function SearchPage() {
   const { collection } = useUserCollection(user?.uid);
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ApiPokemonCard[]>([]);
+  const [totalResults, setTotalResults] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [limit] = useState(48); // Results per page
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [selectedApiCard, setSelectedApiCard] = useState<ApiPokemonCard | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -44,10 +49,18 @@ export default function SearchPage() {
     }
   }, [currentCardIndex, searchResults]);
 
-  const handleSearch = useCallback(async (currentQuery: string) => {
+  // Fetch results with pagination
+  const fetchSearchResults = useCallback(async (currentQuery: string, currentOffset: number) => {
+    // Reset total results when fetching first page (new search)
+    if (currentOffset === 0) {
+      setTotalResults(0);
+    }
+
     if (currentQuery.trim().length < 1) {
       setSearchResults([]);
       setHasSearched(false);
+      setHasMore(false);
+      setTotalResults(0);
       return;
     }
 
@@ -56,7 +69,11 @@ export default function SearchPage() {
     setHasSearched(true);
 
     try {
-      const params = new URLSearchParams({ q: currentQuery });
+      const params = new URLSearchParams({
+        q: currentQuery,
+        offset: String(currentOffset),
+        limit: String(limit)
+      });
       const response = await fetch(`/api/search-cards?${params.toString()}`);
 
       if (!response.ok) {
@@ -64,22 +81,57 @@ export default function SearchPage() {
         throw new Error(errorData.message || `An error occurred: ${response.statusText}`);
       }
 
-      const data: ApiPokemonCard[] = await response.json();
-      setSearchResults(data);
+      const data = await response.json();
+
+      // Assuming response format: { results: [], total: number, offset: number, limit: number }
+      if (currentOffset === 0) {
+        // First page, replace results
+        setSearchResults(data.results);
+      } else {
+        // Additional page, append results
+        setSearchResults(prev => [...prev, ...data.results]);
+      }
+      setTotalResults(data.total);
+      setHasMore(data.results.length === limit); // More if we got a full page
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      setHasMore(false);
+      setTotalResults(0);
     } finally {
       setIsLoading(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [limit]);
 
+  // Debounced search
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      handleSearch(query);
+      fetchSearchResults(query, 0); // Reset offset to 0 on new query
     }, 150);
 
     return () => clearTimeout(debounceTimer);
-  }, [query, handleSearch]);
+  }, [query, fetchSearchResults]);
+
+  // Load more when scrolling near bottom
+  useEffect(() => {
+    if (!hasMore || loadingMore) return;
+
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const bodyHeight = document.body.offsetHeight;
+      const buffer = 200; // Start loading 200px before bottom
+
+      if (scrollTop + windowHeight >= bodyHeight - buffer) {
+        // Load more
+        setLoadingMore(true);
+        fetchSearchResults(query, offset + limit);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMore, loadingMore, offset, limit, query, fetchSearchResults]);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -135,65 +187,75 @@ export default function SearchPage() {
         )}
 
         {searchResults.length > 0 && (
-          <div className="mt-4">
-            <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
-              <p className="text-sm text-muted-foreground">
-                Found <span className="font-bold text-foreground">{searchResults.length}</span>{' '}
-                card(s) matching your query. Click on a card to add it to your collection.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-2 pb-24">
-              {searchResults.map((card, index) => {
-                const isCollected = collection.some(
-                  (collected) =>
-                    collected.name === card.name &&
-                    collected.set === card.set.name &&
-                    collected.cardNumber === card.number &&
-                    collected.language === 'English'
-                );
-                return (
-                  <div
-                    key={card.id}
-                    onClick={() => {
-                      setSelectedApiCard(card);
-                      setIsDialogOpen(true);
-                    }}
-                    className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-all duration-200 hover:scale-105"
-                  >
+          <>
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-2">
+                <p className="text-sm text-muted-foreground">
+                  Showing {Math.min(offset + searchResults.length, totalResults)} of {totalResults}
+                  card(s) matching your query. Click on a card to add it to your collection.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 pt-2 pb-24">
+                {searchResults.map((card, index) => {
+                  const isCollected = collection.some(
+                    (collected) =>
+                      collected.name === card.name &&
+                      collected.set === card.set.name &&
+                      collected.cardNumber === card.number &&
+                      collected.language === 'English'
+                  );
+                  return (
                     <div
-                      className={cn(
-                        'absolute inset-0 rounded-lg overflow-hidden',
-                        isCollected && 'ring-2 ring-green-500'
-                      )}
+                      key={card.id}
+                      onClick={() => {
+                        setSelectedApiCard(card);
+                        setIsDialogOpen(true);
+                      }}
+                      className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-all duration-200 hover:scale-105"
                     >
-                      <Image
-                        src={card.images.small}
-                        alt={card.name}
-                        fill
-                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
-                        priority={index < 8}
+                      <div
                         className={cn(
-                          'bg-card shadow-md rounded-lg object-contain',
-                          isCollected
-                            ? 'saturate-100'
-                            : 'saturate-[.15] group-hover:saturate-100 transition-all duration-300'
+                          'absolute inset-0 rounded-lg overflow-hidden',
+                          isCollected && 'ring-2 ring-green-500'
                         )}
-                        data-ai-hint="pokemon card front"
-                      />
+                      >
+                        <Image
+                          src={card.images.small}
+                          alt={card.name}
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
+                          priority={index < 8}
+                          className={cn(
+                            'bg-card shadow-md rounded-lg object-contain',
+                            isCollected
+                              ? 'saturate-100'
+                              : 'saturate-[.15] group-hover:saturate-100 transition-all duration-300'
+                          )}
+                          data-ai-hint="pokemon card front"
+                        />
+                      </div>
+                      <Badge
+                        className={cn(
+                          'absolute bottom-1.5 right-1.5 z-10 text-[10px] font-bold text-white border-transparent transition-opacity group-hover:opacity-0',
+                          isCollected ? 'bg-green-600' : 'bg-black/60'
+                        )}
+                      >
+                        #{card.number}
+                      </Badge>
                     </div>
-                    <Badge
-                      className={cn(
-                        'absolute bottom-1.5 right-1.5 z-10 text-[10px] font-bold text-white border-transparent transition-opacity group-hover:opacity-0',
-                        isCollected ? 'bg-green-600' : 'bg-black/60'
-                      )}
-                    >
-                      #{card.number}
-                    </Badge>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+
+            {/* Load more indicator */}
+            {loadingMore && (
+              <div className="flex justify-center items-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="ml-2 text-sm text-muted-foreground">Loading more...</p>
+              </div>
+            )}
+          </>
         )}
 
         {isLoading && (

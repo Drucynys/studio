@@ -10,6 +10,10 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/ca
 import { AddCardToCollectionDialog } from '@/components/AddCardToCollectionDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserCollection } from '@/hooks/useUserCollection';
+import { useBulkAdd } from '@/hooks/useBulkAdd';
+import { BulkAddDialog } from '@/components/BulkAddDialog';
+import { formatVariantKey } from '@/utils/cardUtils';
+import { useUIStore } from '@/store/useUIStore';
 import {
   Loader2,
   ServerCrash,
@@ -20,6 +24,9 @@ import {
   Hash,
   Grid,
   List,
+  Check,
+  Layers,
+  X,
 } from 'lucide-react';
 import { CardSkeleton } from '@/components/CardSkeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -80,12 +87,16 @@ const GalleryCard = ({
   isCollected,
   onClick,
   priority,
+  isBulkMode = false,
+  isSelected = false,
 }: {
   card: ApiPokemonCard;
   isCollected: boolean;
   onClick: () => void;
   priority?: boolean;
-}) => {
+  isBulkMode?: boolean;
+  isSelected?: boolean;
+}): React.JSX.Element => {
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   return (
@@ -97,7 +108,11 @@ const GalleryCard = ({
         className={cn(
           'absolute inset-0 rounded-lg overflow-hidden transition-all duration-300',
           isImageLoading && 'animate-shimmer bg-muted/40',
-          isCollected && 'ring-2 ring-green-500'
+          isBulkMode
+            ? isSelected
+              ? 'ring-2 ring-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]'
+              : 'opacity-60'
+            : isCollected && 'ring-2 ring-green-500'
         )}
       >
         <Image
@@ -109,12 +124,31 @@ const GalleryCard = ({
           className={cn(
             'bg-card shadow-md rounded-lg transition-all duration-300 object-contain',
             isImageLoading ? 'opacity-0 scale-95' : 'opacity-100 scale-100',
-            isCollected ? 'saturate-100' : 'saturate-[.1] group-hover:saturate-100'
+            isBulkMode
+              ? isSelected
+                ? 'saturate-100'
+                : 'saturate-[.3] group-hover:saturate-100'
+              : isCollected
+              ? 'saturate-100'
+              : 'saturate-[.1] group-hover:saturate-100'
           )}
           onLoad={() => setIsImageLoading(false)}
           data-ai-hint="pokemon card front"
         />
       </div>
+
+      {isBulkMode && (
+        <div
+          className={cn(
+            'absolute top-1.5 left-1.5 z-10 h-6 w-6 rounded-full flex items-center justify-center border shadow-sm transition-all duration-200',
+            isSelected
+              ? 'bg-blue-600 border-blue-400 text-white scale-110'
+              : 'bg-black/40 border-white/20 text-transparent group-hover:bg-black/60 group-hover:border-white/40'
+          )}
+        >
+          <Check className={cn('h-3.5 w-3.5 stroke-[3px]', isSelected ? 'opacity-100' : 'opacity-0')} />
+        </div>
+      )}
 
       <Badge
         className={cn(
@@ -128,12 +162,32 @@ const GalleryCard = ({
   );
 };
 
-const SetDetailsPage = () => {
+const SetDetailsPage = (): React.JSX.Element => {
   const params = useParams();
   const router = useRouter();
   const setId = params.setId as string;
   const { user } = useAuth();
+  const { openAuthModal } = useUIStore();
   const { collection } = useUserCollection(user?.uid);
+
+  const {
+    isBulkMode,
+    selectedCards,
+    isDialogOpen: isBulkDialogOpen,
+    isAdding: isAddingBulk,
+    quantities: bulkQuantities,
+    toggleBulkMode,
+    toggleCardSelection,
+    isSelected: isSelectedFn,
+    clearSelection,
+    selectAllCards,
+    openBulkDialog,
+    closeBulkDialog,
+    setQuantity,
+    incrementQuantity,
+    decrementQuantity,
+    submitBulkAdd,
+  } = useBulkAdd(collection);
 
   const [setDetails, setSetDetails] = useState<SetDetails | null>(null);
   const [cardsInSet, setCardsInSet] = useState<ApiPokemonCard[]>([]);
@@ -449,6 +503,35 @@ const SetDetailsPage = () => {
                       className="pl-10 w-full"
                     />
                   </div>
+                  <Button
+                    variant={isBulkMode ? 'destructive' : 'outline'}
+                    size="sm"
+                    className={cn(
+                      'h-9 font-bold px-3 transition-all rounded-lg shrink-0 flex items-center gap-1.5 shadow-sm select-none',
+                      isBulkMode
+                        ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 hover:text-red-700 border-red-500/30 dark:border-red-500/20'
+                        : 'bg-white/40 dark:bg-zinc-800/10 hover:bg-white/60 dark:hover:bg-zinc-800/20 border-white/50 dark:border-white/10'
+                    )}
+                    onClick={() => {
+                      if (!user) {
+                        openAuthModal();
+                      } else {
+                        toggleBulkMode();
+                      }
+                    }}
+                  >
+                    {isBulkMode ? (
+                      <>
+                        <X className="h-4 w-4" />
+                        <span>Cancel</span>
+                      </>
+                    ) : (
+                      <>
+                        <Layers className="h-4 w-4 text-primary" />
+                        <span>Bulk Add</span>
+                      </>
+                    )}
+                  </Button>
                   <div className="flex bg-muted p-1 rounded-lg border shrink-0">
                     <Button
                       variant={densityMode === 'gallery' ? 'secondary' : 'ghost'}
@@ -558,21 +641,44 @@ const SetDetailsPage = () => {
             {densityMode === 'list' ? (
               <div className="border rounded-lg overflow-hidden bg-card mt-4 px-4 divide-y divide-border">
                 {filteredCards.map((card) => {
-                  const isCollected = collection.some(
+                  const cardCollectedItems = collection.filter(
                     (collected) =>
                       collected.name === card.name &&
                       collected.set === card.set.name &&
                       collected.cardNumber === card.number &&
                       collected.language === 'English'
                   );
+                  const isCollected = cardCollectedItems.length > 0;
+                  const isSelected = isBulkMode && isSelectedFn(card.id);
 
                   return (
                     <div
                       key={card.id}
-                      onClick={() => openDialogForCard(card)}
-                      className="flex items-center justify-between py-3 hover:bg-muted/30 cursor-pointer transition-colors"
+                      onClick={() => {
+                        if (isBulkMode) {
+                          toggleCardSelection(card);
+                        } else {
+                          openDialogForCard(card);
+                        }
+                      }}
+                      className={cn(
+                        'flex items-center justify-between py-3 px-3 -mx-3 hover:bg-muted/30 cursor-pointer transition-colors rounded-lg',
+                        isSelected && 'bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20'
+                      )}
                     >
                       <div className="flex items-center gap-3 min-w-0">
+                        {isBulkMode && (
+                          <div
+                            className={cn(
+                              'h-5 w-5 rounded-full flex items-center justify-center border transition-all duration-200 mr-1 flex-shrink-0',
+                              isSelected
+                                ? 'bg-blue-600 border-blue-400 text-white'
+                                : 'bg-transparent border-border text-transparent'
+                            )}
+                          >
+                            <Check className={cn('h-3 w-3 stroke-[3px]', isSelected ? 'opacity-100' : 'opacity-0')} />
+                          </div>
+                        )}
                         {/* Mini artwork thumbnail sprite */}
                         <div className="relative w-10 h-14 bg-muted/20 rounded border border-border/30 overflow-hidden flex-shrink-0">
                           <Image
@@ -591,6 +697,21 @@ const SetDetailsPage = () => {
                           <p className="text-xs text-muted-foreground">
                             #{card.number} {card.rarity && `• ${card.rarity}`}
                           </p>
+                          {isCollected && (
+                            <div className="flex flex-wrap gap-1 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                              {cardCollectedItems.map((item) => (
+                                <span
+                                  key={item.id}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/15"
+                                >
+                                  {item.variant ? formatVariantKey(item.variant) : 'Standard'}
+                                  <span className="text-muted-foreground font-normal">
+                                    x{item.quantity}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -628,7 +749,15 @@ const SetDetailsPage = () => {
                       card={card}
                       isCollected={isCollected}
                       priority={index < 8}
-                      onClick={() => openDialogForCard(card)}
+                      isBulkMode={isBulkMode}
+                      isSelected={isSelectedFn(card.id)}
+                      onClick={() => {
+                        if (isBulkMode) {
+                          toggleCardSelection(card);
+                        } else {
+                          openDialogForCard(card);
+                        }
+                      }}
                     />
                   );
                 })}
@@ -717,6 +846,49 @@ const SetDetailsPage = () => {
                 filteredCards[currentCardIndex + 1].images.small
               : null
           }
+        />
+      )}
+
+      {isBulkMode && selectedCards.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-between gap-4 px-4 py-3 rounded-full bg-white/70 dark:bg-zinc-950/70 border border-white/40 dark:border-white/10 shadow-2xl backdrop-blur-xl max-w-[90vw] w-fit min-w-[300px] sm:min-w-[380px] animate-in fade-in slide-in-from-bottom-5 duration-300">
+          <div className="text-xs sm:text-sm font-black text-foreground pl-2 select-none">
+            {selectedCards.length} card{selectedCards.length !== 1 ? 's' : ''} selected
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              className="h-8 text-xs font-semibold hover:bg-background/50 rounded-full"
+            >
+              Clear
+            </Button>
+            <Button
+              onClick={openBulkDialog}
+              size="sm"
+              className="h-8 text-xs font-bold rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-sm animate-pulse"
+            >
+              Next Step
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isBulkMode && (
+        <BulkAddDialog
+          isOpen={isBulkDialogOpen}
+          onClose={closeBulkDialog}
+          selectedCards={selectedCards}
+          quantities={bulkQuantities}
+          isAdding={isAddingBulk}
+          onIncrement={incrementQuantity}
+          onDecrement={decrementQuantity}
+          onQuantityChange={setQuantity}
+          onSubmit={() => {
+            if (user) {
+              submitBulkAdd(user.uid);
+            }
+          }}
         />
       )}
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
