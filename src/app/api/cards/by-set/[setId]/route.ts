@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
+import { enrichCardsWithPrices } from '@/lib/price-enricher';
+
 // Re-initialize Firebase Admin SDK if not already initialized
 export async function GET(request: Request, { params }: { params: Promise<{ setId: string }> }) {
   const { setId } = await params;
@@ -16,13 +18,35 @@ export async function GET(request: Request, { params }: { params: Promise<{ setI
 
     // We remove the orderBy and limit from the Firestore query to avoid the index requirement.
     // Sets usually have < 300 cards, so fetching all and sorting in memory is fast and safe.
-    const querySnapshot = await cardsRef.where('set.id', '==', setId).get();
+    let querySnapshot = await cardsRef.where('setId', '==', setId).get();
+    
+    // Fallback for legacy PokemonTCG.io data if needed
+    if (querySnapshot.empty) {
+      querySnapshot = await cardsRef.where('set.id', '==', setId).get();
+    }
 
     if (querySnapshot.empty) {
       return NextResponse.json([]);
     }
 
-    let cards = querySnapshot.docs.map((doc) => doc.data());
+    let cards = querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      if (data.image && !data.images) {
+        data.images = {
+          small: `${data.image}/low.webp`,
+          large: `${data.image}/high.webp`,
+        };
+      }
+      if (data.set) {
+        data.set = {
+          ...data.set,
+          series: data.set.serie?.name || data.set.series || 'Uncategorized',
+          printedTotal: data.set.cardCount?.official || data.set.printedTotal || 0,
+          total: data.set.cardCount?.total || data.set.total || 0,
+        };
+      }
+      return data;
+    });
 
     // Sort in memory by numberAsInt (calculate on the fly if missing)
     cards.sort((a, b) => {
@@ -31,23 +55,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ setI
         const parsed = parseInt(num);
         return isNaN(parsed) ? 9999 : parsed;
       };
-      const numA = parseNum(a.numberAsInt, a.number);
-      const numB = parseNum(b.numberAsInt, b.number);
+      const numA = parseNum(a.numberAsInt, a.localId || a.number);
+      const numB = parseNum(b.numberAsInt, b.localId || b.number);
 
       if (numA !== numB) return numA - numB;
-      return (a.number || '').localeCompare(b.number || '', undefined, { numeric: true });
+      const strA = a.localId || a.number || '';
+      const strB = b.localId || b.number || '';
+      return strA.localeCompare(strB, undefined, { numeric: true });
     });
 
     // Apply pagination in memory if startAfterNumber is provided
     if (startAfterNumber) {
-      const startIndex = cards.findIndex((c) => c.number === startAfterNumber);
+      const startIndex = cards.findIndex((c) => (c.localId || c.number) === startAfterNumber);
       if (startIndex !== -1) {
         cards = cards.slice(startIndex + 1);
       }
     }
 
     // Apply limit
-    const paginatedCards = cards.slice(0, limit);
+    let paginatedCards = cards.slice(0, limit);
+    paginatedCards = await enrichCardsWithPrices(paginatedCards);
 
     const response = NextResponse.json(paginatedCards);
     // Cache for 24 hours since card sets are static

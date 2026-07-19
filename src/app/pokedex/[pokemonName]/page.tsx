@@ -141,7 +141,7 @@ const GalleryCard = ({
   return (
     <div
       onClick={onClick}
-      className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
+      className="group relative aspect-[63/88] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
     >
       <div
         className={cn(
@@ -151,7 +151,7 @@ const GalleryCard = ({
         )}
       >
         <Image
-          src={card.images.small}
+          src={card.images?.small || card.images?.large || (card.image ? `${card.image}/low.webp` : 'https://placehold.co/250x350.png')}
           alt={card.name}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
@@ -286,10 +286,10 @@ const PokemonDetailPage = () => {
     const lowercasedFilter = searchTerm.toLowerCase();
     let filteredData = cardsForPokemon.filter(
       (card) =>
-        card.name.toLowerCase().includes(lowercasedFilter) ||
-        card.number.toLowerCase().includes(lowercasedFilter) ||
+        (card.name?.toLowerCase() || '').includes(lowercasedFilter) ||
+        (card.number?.toLowerCase() || '').includes(lowercasedFilter) ||
         (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter)) ||
-        card.set.name.toLowerCase().includes(lowercasedFilter)
+        (card.set?.name?.toLowerCase() || '').includes(lowercasedFilter)
     );
 
     if (user) {
@@ -539,7 +539,7 @@ const PokemonDetailPage = () => {
 
                   return (
                     <div
-                      key={card.id}
+                      key={`${card.id}-${(card as any).language || 'en'}`}
                       onClick={() => {
                         setSelectedApiCard(card);
                         setIsDialogOpen(true);
@@ -550,7 +550,7 @@ const PokemonDetailPage = () => {
                         {/* Mini artwork thumbnail sprite */}
                         <div className="relative w-10 h-14 bg-muted/20 rounded border border-border/30 overflow-hidden flex-shrink-0">
                           <Image
-                            src={card.images.small}
+                            src={card.images?.small || card.images?.large || (card.image ? `${card.image}/low.webp` : 'https://placehold.co/250x350.png')}
                             alt={card.name}
                             fill
                             sizes="40px"
@@ -564,7 +564,7 @@ const PokemonDetailPage = () => {
                           </p>
                           <p className="text-xs text-muted-foreground">
                             #{card.number} {card.rarity && `• ${card.rarity}`}{' '}
-                            {card.set.name && `• ${card.set.name}`}
+                            {card.set?.name && `• ${card.set.name}`}
                           </p>
                         </div>
                       </div>
@@ -595,7 +595,7 @@ const PokemonDetailPage = () => {
                   );
                   return (
                     <GalleryCard
-                      key={card.id}
+                      key={`${card.id}-${(card as any).language || 'en'}`}
                       card={card}
                       isCollected={isCollected}
                       priority={index < 8}
@@ -616,35 +616,39 @@ const PokemonDetailPage = () => {
             )}
             {/* Infinite Scroll Sentinel */}
             {hasMore && !searchTerm && ownershipFilter === 'all' && (
-              <div
-                id="infinite-scroll-sentinel"
-                className="flex justify-center p-10"
-                ref={(el) => {
-                  if (el) {
-                    const observer = new IntersectionObserver(
-                      (entries) => {
-                        if (entries[0].isIntersecting && !isLoadingMore) {
-                          handleLoadMore();
-                        }
-                      },
-                      { threshold: 0.1 }
-                    );
-                    observer.observe(el);
-                  }
-                }}
-              >
+              <>
                 {isLoadingMore && (
-                  <div className="w-full space-y-4">
+                  <div className="w-full">
                     <CardSkeleton count={6} />
+                  </div>
+                )}
+                <div
+                  id="infinite-scroll-sentinel"
+                  className="flex justify-center py-10"
+                  ref={(el) => {
+                    if (el) {
+                      const observer = new IntersectionObserver(
+                        (entries) => {
+                          if (entries[0].isIntersecting && !isLoadingMore) {
+                            handleLoadMore();
+                          }
+                        },
+                        { threshold: 0.1 }
+                      );
+                      observer.observe(el);
+                    }
+                  }}
+                >
+                  {isLoadingMore && (
                     <div className="flex flex-col items-center gap-2 mt-4">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
                       <p className="text-sm text-muted-foreground italic">
                         Summoning more cards...
                       </p>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -665,7 +669,7 @@ const PokemonDetailPage = () => {
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedApiCard.name}
-          initialCardImageUrl={selectedApiCard.images.small}
+          initialCardImageUrl={selectedApiCard.images?.small || selectedApiCard.images?.large || (selectedApiCard.image ? `${selectedApiCard.image}/low.webp` : null)}
           pokemonTcgApiCard={selectedApiCard}
           hasPrevCard={hasPrevCard}
           hasNextCard={hasNextCard}
@@ -673,14 +677,16 @@ const PokemonDetailPage = () => {
           onNextCard={handleNextCard}
           prevCardImageUrl={
             hasPrevCard
-              ? filteredCards[selectedCardIndex - 1].images.large ||
-                filteredCards[selectedCardIndex - 1].images.small
+              ? filteredCards[selectedCardIndex - 1].images?.large ||
+                filteredCards[selectedCardIndex - 1].images?.small ||
+                (filteredCards[selectedCardIndex - 1].image ? `${filteredCards[selectedCardIndex - 1].image}/high.webp` : null)
               : null
           }
           nextCardImageUrl={
             hasNextCard
-              ? filteredCards[selectedCardIndex + 1].images.large ||
-                filteredCards[selectedCardIndex + 1].images.small
+              ? filteredCards[selectedCardIndex + 1].images?.large ||
+                filteredCards[selectedCardIndex + 1].images?.small ||
+                (filteredCards[selectedCardIndex + 1].image ? `${filteredCards[selectedCardIndex + 1].image}/high.webp` : null)
               : null
           }
         />

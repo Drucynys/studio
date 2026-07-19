@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Image from 'next/image';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -27,6 +27,7 @@ import {
   Check,
   Layers,
   X,
+  Bug,
 } from 'lucide-react';
 import { CardSkeleton } from '@/components/CardSkeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -40,35 +41,41 @@ import { Badge } from '@/components/ui/badge';
 export interface ApiPokemonCard {
   id: string;
   name: string;
-  set: {
-    id: string;
-    name: string;
-    series: string;
-    logo?: string;
-    releaseDate: string;
-    printedTotal: number;
-    total: number;
-  };
-  number: string;
-  rarity?: string;
-  artist?: string;
-  images: {
+  localId: string;
+  number?: string;
+  image?: string;
+  images?: {
     small: string;
     large: string;
   };
-  tcgplayer?: {
-    prices?: {
-      [key: string]: {
-        market?: number | null;
-        low?: number | null;
-        mid?: number | null;
-        high?: number | null;
-      };
-    };
-    url?: string;
+  set?: {
+    id: string;
+    name: string;
+    series?: string;
+    logo?: string;
+    releaseDate?: string;
+    printedTotal?: number;
+    total?: number;
   };
-  supertypes?: string[];
+  rarity?: string;
+  illustrator?: string;
+  artist?: string;
+  hp?: number | string;
   types?: string[];
+  stage?: string;
+  dexId?: number[];
+  pricing?: {
+    cardmarket?: any;
+    tcgplayer?: any;
+  };
+  tcgplayer?: any;
+  variants?: {
+    normal?: boolean;
+    holo?: boolean;
+    reverse?: boolean;
+    firstEdition?: boolean;
+    wPromo?: boolean;
+  };
 }
 
 interface SetDetails {
@@ -89,6 +96,8 @@ const GalleryCard = ({
   priority,
   isBulkMode = false,
   isSelected = false,
+  isDebugMode = false,
+  onDebugClick,
 }: {
   card: ApiPokemonCard;
   isCollected: boolean;
@@ -96,13 +105,15 @@ const GalleryCard = ({
   priority?: boolean;
   isBulkMode?: boolean;
   isSelected?: boolean;
+  isDebugMode?: boolean;
+  onDebugClick?: () => void;
 }): React.JSX.Element => {
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   return (
     <div
-      onClick={onClick}
-      className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
+      onClick={isDebugMode && onDebugClick ? onDebugClick : onClick}
+      className="group relative aspect-[63/88] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
     >
       <div
         className={cn(
@@ -116,7 +127,7 @@ const GalleryCard = ({
         )}
       >
         <Image
-          src={card.images.small}
+          src={card.images?.small || card.images?.large || (card.image ? `${card.image}/low.webp` : 'https://placehold.co/250x350.png')}
           alt={card.name}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
@@ -156,8 +167,16 @@ const GalleryCard = ({
           isCollected ? 'bg-green-600' : 'bg-black/60'
         )}
       >
-        #{card.number}
+        #{card.localId}
       </Badge>
+
+      {isDebugMode && (
+        <div className="absolute inset-0 z-20 bg-black/80 flex flex-col items-center justify-center p-2 text-center text-[9px] text-green-400 font-mono break-all overflow-y-auto">
+          <div className="mb-1 text-white font-bold">FB ID: {card.id}</div>
+          <div className="mb-1">Img.sm: {card.images?.small || 'N/A'}</div>
+          <div>Img.lg: {card.images?.large || 'N/A'}</div>
+        </div>
+      )}
     </div>
   );
 };
@@ -190,8 +209,10 @@ const SetDetailsPage = (): React.JSX.Element => {
   } = useBulkAdd(collection);
 
   const [setDetails, setSetDetails] = useState<SetDetails | null>(null);
+  const [rawSetInfo, setRawSetInfo] = useState<any>(null);
   const [cardsInSet, setCardsInSet] = useState<ApiPokemonCard[]>([]);
   const [filteredCards, setFilteredCards] = useState<ApiPokemonCard[]>([]);
+  const [debugJson, setDebugJson] = useState<any>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -206,6 +227,8 @@ const SetDetailsPage = (): React.JSX.Element => {
   const [densityMode, setDensityMode] = useState<'gallery' | 'list'>('gallery');
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const searchParams = useSearchParams();
+  const [isDebugMode, setIsDebugMode] = useState(searchParams.get('debug') === 'true');
 
   const { toast } = useToast();
 
@@ -245,6 +268,7 @@ const SetDetailsPage = (): React.JSX.Element => {
         throw new Error(errorData.message || `Set with ID "${setId}" not found in database.`);
       }
       const setInfo = await setResponse.json();
+      setRawSetInfo(setInfo);
       setSetDetails({
         id: setInfo.id,
         name: setInfo.name,
@@ -296,7 +320,7 @@ const SetDetailsPage = (): React.JSX.Element => {
         setHasMore(newCards.length === CARDS_PER_PAGE);
 
         if (newCards.length > 0) {
-          setLastLoadedNumber(newCards[newCards.length - 1].number);
+          setLastLoadedNumber(newCards[newCards.length - 1].localId);
         }
       } catch (err: any) {
         setError(err.message);
@@ -324,7 +348,7 @@ const SetDetailsPage = (): React.JSX.Element => {
           setCardsInSet(data);
           setHasMore(data.length === CARDS_PER_PAGE);
           if (data.length > 0) {
-            setLastLoadedNumber(data[data.length - 1].number);
+            setLastLoadedNumber(data[data.length - 1].localId);
           }
         } catch (err: any) {
           setError(err.message);
@@ -365,7 +389,7 @@ const SetDetailsPage = (): React.JSX.Element => {
     let filteredData = cardsInSet.filter(
       (card) =>
         card.name.toLowerCase().includes(lowercasedFilter) ||
-        card.number.toLowerCase().includes(lowercasedFilter) ||
+        (card.localId && card.localId.toLowerCase().includes(lowercasedFilter)) ||
         (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter))
     );
 
@@ -432,7 +456,10 @@ const SetDetailsPage = (): React.JSX.Element => {
             <CardHeader className="p-0">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex items-center justify-between w-full md:w-auto gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div 
+                    className={cn("flex items-center gap-3 min-w-0", isDebugMode && "cursor-pointer hover:bg-muted/20 p-2 -m-2 rounded-lg transition-colors")}
+                    onClick={() => isDebugMode && setDebugJson(rawSetInfo)}
+                  >
                     {setDetails.logoUrl && (
                       <div className="relative w-16 h-12 flex-shrink-0">
                         <Image
@@ -531,6 +558,15 @@ const SetDetailsPage = (): React.JSX.Element => {
                         <span>Bulk Add</span>
                       </>
                     )}
+                  </Button>
+                  <Button
+                    variant={isDebugMode ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-9 w-9 p-0 shrink-0 shadow-sm"
+                    onClick={() => setIsDebugMode(!isDebugMode)}
+                    title="Toggle Debug Mode"
+                  >
+                    <Bug className="h-4 w-4" />
                   </Button>
                   <div className="flex bg-muted p-1 rounded-lg border shrink-0">
                     <Button
@@ -644,8 +680,8 @@ const SetDetailsPage = (): React.JSX.Element => {
                   const cardCollectedItems = collection.filter(
                     (collected) =>
                       collected.name === card.name &&
-                      collected.set === card.set.name &&
-                      collected.cardNumber === card.number &&
+                      collected.set === card.set?.name &&
+                      collected.cardNumber === card.localId &&
                       collected.language === 'English'
                   );
                   const isCollected = cardCollectedItems.length > 0;
@@ -655,7 +691,9 @@ const SetDetailsPage = (): React.JSX.Element => {
                     <div
                       key={card.id}
                       onClick={() => {
-                        if (isBulkMode) {
+                        if (isDebugMode) {
+                          setDebugJson(card);
+                        } else if (isBulkMode) {
                           toggleCardSelection(card);
                         } else {
                           openDialogForCard(card);
@@ -682,7 +720,7 @@ const SetDetailsPage = (): React.JSX.Element => {
                         {/* Mini artwork thumbnail sprite */}
                         <div className="relative w-10 h-14 bg-muted/20 rounded border border-border/30 overflow-hidden flex-shrink-0">
                           <Image
-                            src={card.images.small}
+                            src={card.images?.small || card.images?.large || (card.image ? `${card.image}/low.webp` : 'https://placehold.co/250x350.png')}
                             alt={card.name}
                             fill
                             sizes="40px"
@@ -695,7 +733,7 @@ const SetDetailsPage = (): React.JSX.Element => {
                             {card.name}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            #{card.number} {card.rarity && `• ${card.rarity}`}
+                            #{card.localId} {card.rarity && `• ${card.rarity}`}
                           </p>
                           {isCollected && (
                             <div className="flex flex-wrap gap-1 mt-1.5" onClick={(e) => e.stopPropagation()}>
@@ -729,6 +767,13 @@ const SetDetailsPage = (): React.JSX.Element => {
                           </Badge>
                         )}
                       </div>
+                      {isDebugMode && (
+                        <div className="mt-2 text-xs font-mono text-green-500 bg-black/90 p-2 rounded w-full flex flex-col gap-1 col-span-2">
+                          <div><strong>ID:</strong> {card.id}</div>
+                          <div><strong>Images.small:</strong> {card.images?.small || 'undefined'}</div>
+                          <div><strong>Images.large:</strong> {card.images?.large || 'undefined'}</div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -739,8 +784,8 @@ const SetDetailsPage = (): React.JSX.Element => {
                   const isCollected = collection.some(
                     (collected) =>
                       collected.name === card.name &&
-                      collected.set === card.set.name &&
-                      collected.cardNumber === card.number &&
+                      collected.set === card.set?.name &&
+                      collected.cardNumber === card.localId &&
                       collected.language === 'English'
                   );
                   return (
@@ -751,6 +796,8 @@ const SetDetailsPage = (): React.JSX.Element => {
                       priority={index < 8}
                       isBulkMode={isBulkMode}
                       isSelected={isSelectedFn(card.id)}
+                      isDebugMode={isDebugMode}
+                      onDebugClick={() => setDebugJson(card)}
                       onClick={() => {
                         if (isBulkMode) {
                           toggleCardSelection(card);
@@ -776,35 +823,45 @@ const SetDetailsPage = (): React.JSX.Element => {
 
             {/* Infinite Scroll Sentinel */}
             {hasMore && !searchTerm && ownershipFilter === 'all' && (
-              <div
-                id="infinite-scroll-sentinel"
-                className="flex justify-center p-10"
-                ref={(el) => {
-                  if (el) {
-                    const observer = new IntersectionObserver(
-                      (entries) => {
-                        if (entries[0].isIntersecting && !isLoadingMore) {
-                          fetchCards(true);
-                        }
-                      },
-                      { threshold: 0.1 }
-                    );
-                    observer.observe(el);
-                  }
-                }}
-              >
+              <>
                 {isLoadingMore && (
-                  <div className="w-full space-y-4">
+                  <div className="w-full">
                     <CardSkeleton count={6} />
+                  </div>
+                )}
+                <div
+                  id="infinite-scroll-sentinel"
+                  className="flex justify-center py-10"
+                  ref={(el) => {
+                    if (el) {
+                      // Properly clean up previous observer if needed (or simply attach)
+                      // The simplest way inline is to store it on the element itself
+                      if ((el as any)._observer) {
+                        (el as any)._observer.disconnect();
+                      }
+                      const observer = new IntersectionObserver(
+                        (entries) => {
+                          if (entries[0].isIntersecting && !isLoadingMore) {
+                            fetchCards(true);
+                          }
+                        },
+                        { threshold: 0.1 }
+                      );
+                      observer.observe(el);
+                      (el as any)._observer = observer;
+                    }
+                  }}
+                >
+                  {isLoadingMore && (
                     <div className="flex flex-col items-center gap-2 mt-4">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
                       <p className="text-sm text-muted-foreground italic">
                         Summoning more cards...
                       </p>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -828,7 +885,7 @@ const SetDetailsPage = (): React.JSX.Element => {
             setSelectedApiCard(null);
           }}
           cardName={selectedApiCard.name}
-          initialCardImageUrl={selectedApiCard.images.large}
+          initialCardImageUrl={selectedApiCard.image ? `${selectedApiCard.image}/high.webp` : selectedApiCard.images?.large}
           pokemonTcgApiCard={selectedApiCard}
           onPrevCard={currentCardIndex > 0 ? handlePrevCard : undefined}
           onNextCard={currentCardIndex < filteredCards.length - 1 ? handleNextCard : undefined}
@@ -836,14 +893,16 @@ const SetDetailsPage = (): React.JSX.Element => {
           hasNextCard={currentCardIndex < filteredCards.length - 1}
           prevCardImageUrl={
             currentCardIndex > 0
-              ? filteredCards[currentCardIndex - 1].images.large ||
-                filteredCards[currentCardIndex - 1].images.small
+              ? filteredCards[currentCardIndex - 1].images?.large ||
+                filteredCards[currentCardIndex - 1].images?.small ||
+                (filteredCards[currentCardIndex - 1].image ? `${filteredCards[currentCardIndex - 1].image}/high.webp` : null)
               : null
           }
           nextCardImageUrl={
             currentCardIndex < filteredCards.length - 1
-              ? filteredCards[currentCardIndex + 1].images.large ||
-                filteredCards[currentCardIndex + 1].images.small
+              ? filteredCards[currentCardIndex + 1].images?.large ||
+                filteredCards[currentCardIndex + 1].images?.small ||
+                (filteredCards[currentCardIndex + 1].image ? `${filteredCards[currentCardIndex + 1].image}/high.webp` : null)
               : null
           }
         />
@@ -891,6 +950,18 @@ const SetDetailsPage = (): React.JSX.Element => {
           }}
         />
       )}
+      {debugJson && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => setDebugJson(null)}>
+          <div className="bg-zinc-950 border border-zinc-800 text-green-400 font-mono text-xs p-6 rounded-xl w-full max-w-3xl max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4 sticky top-0 bg-zinc-950 pb-2 border-b border-zinc-800">
+              <h3 className="text-white text-sm font-bold flex items-center gap-2"><Bug className="h-4 w-4 text-green-500" /> Debug Metadata Viewer</h3>
+              <Button variant="ghost" size="icon" onClick={() => setDebugJson(null)} className="h-6 w-6 rounded-full text-zinc-400 hover:text-white"><X className="h-4 w-4" /></Button>
+            </div>
+            <pre className="whitespace-pre-wrap break-all">{JSON.stringify(debugJson, null, 2)}</pre>
+          </div>
+        </div>
+      )}
+
       <footer className="text-center py-4 text-sm text-muted-foreground border-t border-border mt-auto">
         PokéTRKR &copy; {new Date().getFullYear()}
       </footer>

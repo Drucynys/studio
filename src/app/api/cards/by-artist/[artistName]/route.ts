@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
+import { enrichCardsWithPrices } from '@/lib/price-enricher';
+
 // Re-initialize Firebase Admin SDK if not already initialized
 export async function GET(
   request: Request,
@@ -28,7 +30,24 @@ export async function GET(
       return NextResponse.json([]);
     }
 
-    let cards = querySnapshot.docs.map((doc) => doc.data());
+    let cards = querySnapshot.docs.map((doc) => {
+      const data = doc.data();
+      if (data.image && !data.images) {
+        data.images = {
+          small: `${data.image}/low.webp`,
+          large: `${data.image}/high.webp`,
+        };
+      }
+      if (data.set) {
+        data.set = {
+          ...data.set,
+          series: data.set.serie?.name || data.set.series || 'Uncategorized',
+          printedTotal: data.set.cardCount?.official || data.set.printedTotal || 0,
+          total: data.set.cardCount?.total || data.set.total || 0,
+        };
+      }
+      return data;
+    });
 
     // Sort in memory: Release Date (desc) then Number (asc)
     cards.sort((a, b) => {
@@ -49,7 +68,8 @@ export async function GET(
       }
     }
 
-    return NextResponse.json(cards.slice(0, limit));
+    const paginatedCards = await enrichCardsWithPrices(cards.slice(0, limit));
+    return NextResponse.json(paginatedCards);
   } catch (error: any) {
     console.error(`Error fetching cards for artist ${decodedArtistName}:`, error);
     return NextResponse.json(

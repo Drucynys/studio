@@ -12,6 +12,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "sync:all": "node scripts/sync-all.mjs",
+    "sync:tcgdex": "node scripts/tcgdex-sync.mjs",
     "format": "prettier --write .",
     "lint:fix": "eslint --fix ."
   },

@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db, FieldValue } from '@/lib/firebase-admin';
 import axios from 'axios';
 
-const POKEMON_TCG_API_SETS = 'https://api.pokemontcg.io/v2/sets';
-
 /**
  * Handles Set Discovery and Saving in a granular way to prevent timeouts.
  * Supported actions:
@@ -15,40 +13,56 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { action = 'legacy', page = 1, pageSize = 25, sets = [] } = body;
+    const { action = 'legacy', page = 1, pageSize = 25, sets = [], language = 'en' } = body;
 
-    const apiKey = process.env.NEXT_PUBLIC_POKEMONTCG_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ status: 'error', message: 'Missing API Key', logs });
-    }
+    const TCGDEX_API_SETS = `https://api.tcgdex.net/v2/${language}/sets`;
 
-    // --- ACTION: DISCOVER (Proxy to TCG API) ---
+    // --- ACTION: DISCOVER (Proxy to TCGdex API) ---
     if (action === 'discover') {
       try {
-        console.log(`[Backend] Discovering sets: Page ${page}, Size ${pageSize}`);
+        console.log(`[Backend] Discovering sets via TCGdex (${language}): Page ${page}, Size ${pageSize}`);
 
-        const response = await axios.get(POKEMON_TCG_API_SETS, {
+        const response = await axios.get(TCGDEX_API_SETS, {
           timeout: 50000,
           headers: {
-            'X-Api-Key': apiKey,
             'User-Agent': 'PokéTRKR/1.0',
           },
-          params: { page, pageSize },
         });
+
+        // TCGdex returns an array directly. We handle manual pagination.
+        const allSets = response.data || [];
+        
+        // Filter out Pocket sets completely before pagination so they are never synced
+        const validSets = allSets.filter((s: any) => {
+          const logo = (s.logo || '').toLowerCase();
+          const symbol = (s.symbol || '').toLowerCase();
+          const id = (s.id || '').toLowerCase();
+          const isPocketId = id === 'a1' || id === 'a1a' || id === 'a2' || id === 'a3' || id === 'a4' || id === 'p-a' || id === 'b1' || id === 'b2' || id === 'tcgp' ||
+                             id.endsWith('-a1') || id.endsWith('-a1a') || id.endsWith('-a2') || id.endsWith('-a3') || id.endsWith('-a4') || id.endsWith('-p-a') || id.endsWith('-b1') || id.endsWith('-b2') || id.endsWith('-tcgp');
+          return !(logo.includes('/tcgp/') || symbol.includes('/tcgp/') || isPocketId);
+        });
+
+        const totalCount = validSets.length;
+        
+        const startIndex = (page - 1) * pageSize;
+        const paginatedSets = validSets.slice(startIndex, startIndex + pageSize);
+
+        // Append language to each set so frontend can filter
+        const mappedSets = paginatedSets.map((s: any) => ({ ...s, language }));
 
         return NextResponse.json({
           status: 'success',
-          data: response.data.data,
-          totalCount: response.data.totalCount,
-          page: response.data.page,
-          pageSize: response.data.pageSize,
+          data: mappedSets,
+          totalCount: totalCount,
+          page: page,
+          pageSize: pageSize,
         });
       } catch (apiError: any) {
         const status = apiError.response?.status || 'Unknown';
         const errorData = apiError.response?.data
           ? JSON.stringify(apiError.response.data).substring(0, 100)
           : apiError.message;
-        console.error(`[Backend] TCG API Error (${status}):`, errorData);
+        console.error(`[Backend] TCGdex API Error (${status}):`, errorData);
         return NextResponse.json({
           status: 'error',
           message: `External API Error (${status}): ${errorData}`,
@@ -67,11 +81,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       sets.forEach((set: any) => {
         if (set && set.id) {
-          const docRef = setsCollection.doc(set.id);
+          // Append the language to the document ID to prevent overwrites across languages
+          // if TCGdex ever uses same ID for different langs, though usually they differ.
+          const docRef = setsCollection.doc(`${set.language || language}-${set.id}`);
           batch.set(
             docRef,
             {
               ...set,
+              language: set.language || language,
               lastSynced: FieldValue.serverTimestamp(),
             },
             { merge: true }

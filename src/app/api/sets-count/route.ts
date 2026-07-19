@@ -4,8 +4,16 @@ import { db } from '@/lib/firebase-admin';
 export async function GET() {
   try {
     const setsCollection = db.collection('pokemon-tcg-sets');
-    const snapshot = await setsCollection.count().get();
-    const count = snapshot.data().count;
+    const snapshot = await setsCollection.get();
+    let count = 0;
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const seriesName = (data.serie?.name || data.series || '').toLowerCase();
+      const setId = (doc.id || '').toLowerCase();
+      if (!seriesName.includes('pocket') && !seriesName.includes('tcgp') && setId !== 'tcgp') {
+        count++;
+      }
+    });
 
     return NextResponse.json({ count });
   } catch (error: any) {

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
+import { enrichSingleCardWithPrices } from '@/lib/price-enricher';
+
 // Re-initialize Firebase Admin SDK if not already initialized
 export async function GET(request: Request, context: { params: Promise<{ apiId: string }> }) {
   const { apiId } = await context.params;
@@ -18,7 +20,8 @@ export async function GET(request: Request, context: { params: Promise<{ apiId: 
       );
     }
 
-    return NextResponse.json(docSnap.data());
+    const enrichedCard = await enrichSingleCardWithPrices({ id: docSnap.id, ...docSnap.data() });
+    return NextResponse.json(enrichedCard);
   } catch (error: any) {
     console.error(`Error fetching master card ${apiId}:`, error);
     return NextResponse.json(

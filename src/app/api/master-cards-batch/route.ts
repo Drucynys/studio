@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
 import { FieldPath } from 'firebase-admin/firestore';
+import { enrichCardsWithPrices } from '@/lib/price-enricher';
 
 // Re-initialize Firebase Admin SDK if not already initialized
 export async function POST(request: Request) {
@@ -26,13 +27,21 @@ export async function POST(request: Request) {
 
     const snapshotResults = await Promise.all(queryPromises);
 
-    const cards: any[] = [];
+    let cards: any[] = [];
     snapshotResults.forEach((snapshot) => {
       snapshot.docs.forEach((doc) => {
-        cards.push(doc.data());
+        const data = doc.data();
+        if (data.image && !data.images) {
+          data.images = {
+            small: `${data.image}/low.webp`,
+            large: `${data.image}/high.webp`,
+          };
+        }
+        cards.push({ id: doc.id, ...data });
       });
     });
 
+    cards = await enrichCardsWithPrices(cards);
     return NextResponse.json(cards);
   } catch (error: any) {
     console.error('Error fetching master cards in batch:', error);

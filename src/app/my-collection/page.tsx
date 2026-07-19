@@ -70,7 +70,7 @@ function WishlistCard({
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   return (
-    <div className="group relative aspect-[2.5/3.5] w-full rounded-xl overflow-hidden border border-border/40 bg-card/45 backdrop-blur-xl shadow-md hover:shadow-primary/20 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
+    <div className="group relative aspect-[63/88] w-full rounded-xl overflow-hidden border border-border/40 bg-card/45 backdrop-blur-xl shadow-md hover:shadow-primary/20 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
       {/* Hover action overlay */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 flex flex-col justify-between p-3">
         <div className="flex justify-end gap-2">
@@ -132,7 +132,7 @@ function ExchangeCard({ item, onRemove }: ExchangeCardProps): React.JSX.Element 
   const [isImageLoading, setIsImageLoading] = useState(true);
 
   return (
-    <div className="group relative aspect-[2.5/3.5] w-full rounded-xl overflow-hidden border border-border/40 bg-card/45 backdrop-blur-xl shadow-md hover:shadow-primary/20 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
+    <div className="group relative aspect-[63/88] w-full rounded-xl overflow-hidden border border-border/40 bg-card/45 backdrop-blur-xl shadow-md hover:shadow-primary/20 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
       {/* Listed Badge */}
       <span className="absolute top-2 left-2 z-10 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-primary/95 text-primary-foreground shadow-sm flex items-center gap-1 backdrop-blur-sm">
         <Replace size={10} />
@@ -605,7 +605,7 @@ export default function MyCollectionPage(): React.JSX.Element {
       </main>
 
       {/* --- Fullscreen Card Modal --- */}
-      {isFullScreenViewOpen && currentFullScreenCardIndex !== null && (
+      {isFullScreenViewOpen && currentFullScreenCardIndex !== null && sortedCards[currentFullScreenCardIndex] && (
         <AddCardToCollectionDialog
           isOpen={isFullScreenViewOpen}
           onClose={() => setIsFullScreenViewOpen(false)}
@@ -638,6 +638,8 @@ export default function MyCollectionPage(): React.JSX.Element {
           }
           initialVariant={sortedCards[currentFullScreenCardIndex].variant}
           initialQuantity={sortedCards[currentFullScreenCardIndex].quantity}
+          apiId={sortedCards[currentFullScreenCardIndex].apiId}
+          collectionItemId={sortedCards[currentFullScreenCardIndex].id}
         />
       )}
 

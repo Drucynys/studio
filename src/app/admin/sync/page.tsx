@@ -138,30 +138,35 @@ export default function SyncAdminPage() {
       addLog(`[Step 1/3] Fetching expansion list from TCG API in pages (${PAGE_SIZE} per page)...`);
 
       let allDiscoveredSets: any[] = [];
-      let page = 1;
-      let totalSetsCount = 0;
+      
+      for (const language of ['en', 'ja']) {
+        let page = 1;
+        let totalSetsCount = 0;
+        
+        addLog(`[Step 1/3] Fetching ${language.toUpperCase()} expansion list from TCG API...`);
 
-      while (true) {
-        if (isSyncStopped.current) break;
+        while (true) {
+          if (isSyncStopped.current) break;
 
-        setMasterSyncCurrentStep(`Discovering sets (Page ${page})...`);
-        const discoveryResult = await fetchWithRetry('/api/sync-sets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'discover', page, pageSize: PAGE_SIZE }),
-        });
+          setMasterSyncCurrentStep(`Discovering sets (${language.toUpperCase()} - Page ${page})...`);
+          const discoveryResult = await fetchWithRetry('/api/sync-sets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'discover', page, pageSize: PAGE_SIZE, language }),
+          });
 
-        const newData = discoveryResult.data || [];
-        allDiscoveredSets.push(...newData);
-        totalSetsCount = discoveryResult.totalCount || 0;
+          const newData = discoveryResult.data || [];
+          allDiscoveredSets.push(...newData);
+          totalSetsCount = discoveryResult.totalCount || 0;
 
-        addLog(`✅ Discovered ${allDiscoveredSets.length} / ${totalSetsCount} sets.`);
+          addLog(`✅ Discovered ${newData.length} / ${totalSetsCount} sets (${language}).`);
 
-        if (allDiscoveredSets.length >= totalSetsCount || newData.length === 0) {
-          break;
+          if (newData.length === 0 || newData.length < PAGE_SIZE) {
+            break; // End of list for this language
+          }
+          page++;
+          await sleep(500); // Small pause between pages
         }
-        page++;
-        await sleep(1000); // 1-second pause between requests
       }
 
       if (isSyncStopped.current) throw new Error('Sync stopped by user.');
@@ -184,7 +189,9 @@ export default function SyncAdminPage() {
       addLog('[Step 2/3] Starting full card population loop...');
 
       const localSetsResult = await safeFetch('/api/sets');
-      const localSets = Array.isArray(localSetsResult) ? localSetsResult : [];
+      const localSets = Array.isArray(localSetsResult) 
+        ? localSetsResult.filter((s: any) => s.language) 
+        : [];
       if (localSets.length === 0) throw new Error('Could not retrieve local sets list.');
 
       let cumulativeCardCount = 0;

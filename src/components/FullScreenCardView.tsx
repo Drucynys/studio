@@ -118,8 +118,9 @@ export function FullScreenCardView({
 
     if (masterCard?.tcgplayer?.prices) {
       for (const [variant, priceData] of Object.entries(masterCard.tcgplayer.prices)) {
-        if (priceData?.market) {
-          const numericValue = parseFloat(priceData.market as any);
+        const entry = priceData as { market?: number | string | null } | undefined;
+        if (entry?.market) {
+          const numericValue = parseFloat(entry.market as any);
           if (!isNaN(numericValue) && numericValue > 0) {
             tcgPlayerPrices.push({
               name: formatVariantKey(variant),

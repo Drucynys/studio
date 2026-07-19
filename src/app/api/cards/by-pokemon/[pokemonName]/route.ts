@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase-admin';
+import { enrichCardsWithPrices } from '@/lib/price-enricher';
+
 // In-memory catalog cache to avoid Firestore read costs and speed up page loads to <10ms
 let cachedCatalog: any[] | null = null;
-let lastCacheTime = 0;
+let lastCacheTime = 1; // Force reset
 const CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 
 async function getCardCatalog(): Promise<any[]> {
@@ -13,7 +15,41 @@ async function getCardCatalog(): Promise<any[]> {
 
   console.log('🔄 Loading Pokedex card catalog from Firestore...');
   const snapshot = await db.collection('pokemon-tcg-cards').get();
-  cachedCatalog = snapshot.docs.map((doc) => doc.data());
+  cachedCatalog = snapshot.docs
+    .map((doc) => {
+      const data = doc.data();
+      // Map TCGdex flat image to legacy object structure
+      if (data.image && !data.images) {
+        data.images = {
+          small: `${data.image}/low.webp`,
+          large: `${data.image}/high.webp`,
+        };
+      }
+      // Map TCGdex set fields to legacy set fields
+      if (data.set) {
+        data.set = {
+          ...data.set,
+          series: data.set.serie?.name || data.set.series || 'Uncategorized',
+          printedTotal: data.set.cardCount?.official || data.set.printedTotal || 0,
+          total: data.set.cardCount?.total || data.set.total || 0,
+        };
+      }
+      // Provide legacy 'number' property
+      if (!data.number && data.localId) {
+        data.number = data.localId;
+      }
+      return data;
+    })
+    .filter((data) => {
+      if (!data.language) return false;
+      const seriesName = (data.set?.series || '').toLowerCase();
+      const setId = (data.set?.id || '').toLowerCase();
+      // Exclude Pocket sets by name or ID (which start with 'A1', 'A2', 'P-A', etc. or exactly 'tcgp' as a series ID if it existed)
+      if (seriesName.includes('pocket') || seriesName.includes('tcgp') || setId === 'tcgp') {
+        return false;
+      }
+      return true;
+    }); // Only keep new TCGdex cards which have a language field, and exclude Pocket cards
   lastCacheTime = now;
   console.log(`✅ Cached ${cachedCatalog.length} cards for fast Poke-specific fetches.`);
   return cachedCatalog;
@@ -59,7 +95,8 @@ export async function GET(request: Request, context: { params: Promise<{ pokemon
 
     // Pagination
     const startIndex = (page - 1) * pageSize;
-    const paginatedResults = results.slice(startIndex, startIndex + pageSize);
+    let paginatedResults = results.slice(startIndex, startIndex + pageSize);
+    paginatedResults = await enrichCardsWithPrices(paginatedResults);
 
     // Format matches the external TCG API structure for backward compatibility
     const response = NextResponse.json({

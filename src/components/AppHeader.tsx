@@ -20,6 +20,7 @@ import { PokedexIcon } from './icons/PokedexIcon';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotifications } from '@/hooks/useNotifications';
 import { notificationService } from '@/services/notificationService';
+import { useUIStore } from '@/store/useUIStore';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -149,6 +150,18 @@ export function AppHeader() {
               </DropdownMenu>
             )}
 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const { language, setLanguage } = useUIStore.getState();
+                setLanguage(language === 'en' ? 'ja' : 'en');
+              }}
+              className="mr-2 font-bold px-3 transition-colors bg-card/45 hover:bg-primary/20 hover:text-primary"
+            >
+              {useUIStore((state) => state.language).toUpperCase()}
+            </Button>
+            
             <AuthButton />
           </div>
         </div>

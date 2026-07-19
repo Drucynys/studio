@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
+import { useUIStore } from '@/store/useUIStore';
 import {
   Select,
   SelectContent,
@@ -72,6 +73,7 @@ interface ApiSet {
     symbol: string;
     logo: string;
   };
+  language?: string;
 }
 
 interface Artist {
@@ -83,6 +85,7 @@ const BrowsePageContent: NextPage = () => {
   const searchParams = useSearchParams();
   const { loading: authLoading, user } = useAuth();
   const { collection } = useUserCollection(user?.uid);
+  const { language } = useUIStore();
 
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -233,7 +236,9 @@ const BrowsePageContent: NextPage = () => {
   useEffect(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
     if (activeTab === 'sets') {
-      let filteredData = allSets;
+      let filteredData = allSets.filter(
+        (set) => set.language === language || (!set.language && language === 'en')
+      );
 
       if (selectedSeries.length > 0) {
         filteredData = filteredData.filter((set) => selectedSeries.includes(set.series));
@@ -260,7 +265,7 @@ const BrowsePageContent: NextPage = () => {
       );
       setFilteredArtists(filteredData);
     }
-  }, [searchTerm, allSets, allArtists, activeTab, sortOrder, selectedSeries]);
+  }, [searchTerm, allSets, allArtists, activeTab, sortOrder, selectedSeries, language]);
 
   const availableSeries = useMemo(() => {
     const seriesSet = new Set(allSets.map((set) => set.series));
@@ -562,7 +567,7 @@ const BrowsePageContent: NextPage = () => {
                                   <div className="flex items-center gap-4 min-w-0">
                                     {/* Symbol */}
                                     <div className="relative h-8 w-8 shrink-0">
-                                      {set.images.symbol && (
+                                      {set.images?.symbol && (
                                         <Image
                                           src={set.images.symbol}
                                           alt={`${set.name} symbol`}
@@ -574,7 +579,7 @@ const BrowsePageContent: NextPage = () => {
                                     </div>
                                     {/* Logo (small preview) */}
                                     <div className="relative h-10 w-24 shrink-0 hidden sm:block bg-muted/10 rounded p-1 border">
-                                      {set.images.logo ? (
+                                      {set.images?.logo ? (
                                         <Image
                                           src={set.images.logo}
                                           alt={`${set.name} logo`}
@@ -647,7 +652,7 @@ const BrowsePageContent: NextPage = () => {
                                 >
                                   <div className="flex justify-between items-start w-full">
                                     <div className="relative h-6 w-6">
-                                      {set.images.symbol && (
+                                      {set.images?.symbol && (
                                         <Image
                                           src={set.images.symbol}
                                           alt={`${set.name} symbol`}
@@ -672,7 +677,7 @@ const BrowsePageContent: NextPage = () => {
                                     )}
                                   </div>
                                   <div className="flex-grow flex items-center justify-center w-full my-2">
-                                    {set.images.logo ? (
+                                    {set.images?.logo ? (
                                       <div className="relative w-full h-full">
                                         <Image
                                           src={set.images.logo}

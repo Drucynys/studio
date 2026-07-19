@@ -78,27 +78,49 @@ export async function POST(request: Request) {
         } else {
           const masterCardData = snapshot.docs[0].data();
           const { value: cardValue, variant: cardVariant } = getDefaultMarketPrice(masterCardData);
+          const finalVariant = card.variant ?? cardVariant ?? null;
 
-          const newCardDocRef = userCardsRef.doc();
-          const newCard: PokemonCard = {
-            id: newCardDocRef.id,
-            userId: userId,
-            apiId: masterCardData.id,
-            name: masterCardData.name,
-            set: masterCardData.set.name,
-            cardNumber: masterCardData.number,
-            rarity: masterCardData.rarity || 'N/A',
-            imageUrl: masterCardData.images?.large || masterCardData.images?.small || null,
-            quantity: card.quantity || 1,
-            value: cardValue, // Always use the fetched market price
-            variant: card.variant ?? cardVariant ?? null,
-            language: card.language || 'English',
-            artist: masterCardData.artist || null,
-            timestamp: FieldValue.serverTimestamp(),
-            isFavorite: card.isFavorite === 'true' || false,
-          };
-          batch.set(newCardDocRef, newCard);
-          addedCount++;
+          // Check if user already has this exact card and variant in their collection
+          const userCardQuery = await userCardsRef
+            .where('apiId', '==', masterCardData.id)
+            .where('variant', '==', finalVariant)
+            .limit(1)
+            .get();
+
+          const qtyToAdd = card.quantity || 1;
+
+          if (!userCardQuery.empty) {
+            // Update existing card quantity
+            const existingDoc = userCardQuery.docs[0];
+            const currentQty = existingDoc.data().quantity || 0;
+            batch.update(existingDoc.ref, {
+              quantity: currentQty + qtyToAdd,
+              // Optionally update value if you want the latest market price, but usually we just increment qty
+            });
+            addedCount++; // Count as an addition for the user feedback
+          } else {
+            // Create new card document
+            const newCardDocRef = userCardsRef.doc();
+            const newCard: PokemonCard = {
+              id: newCardDocRef.id,
+              userId: userId,
+              apiId: masterCardData.id,
+              name: masterCardData.name,
+              set: masterCardData.set.name,
+              cardNumber: masterCardData.localId || masterCardData.number || 'N/A',
+              rarity: masterCardData.rarity || 'N/A',
+              imageUrl: masterCardData.images?.large || masterCardData.images?.small || (masterCardData.image ? `${masterCardData.image}/high.webp` : null),
+              quantity: qtyToAdd,
+              value: cardValue,
+              variant: finalVariant,
+              language: card.language || 'English',
+              artist: masterCardData.artist || null,
+              timestamp: FieldValue.serverTimestamp(),
+              isFavorite: card.isFavorite === 'true' || false,
+            };
+            batch.set(newCardDocRef, newCard);
+            addedCount++;
+          }
         }
       }
     }

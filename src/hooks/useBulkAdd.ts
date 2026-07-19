@@ -207,13 +207,13 @@ export function useBulkAdd(collection: PokemonCard[] = []): UseBulkAddResult {
                 await collectionService.addCard(uid, {
                   apiId: card.id,
                   name: card.name,
-                  set: card.set.name,
-                  cardNumber: card.number,
+                  set: card.set?.name || 'Unknown Set',
+                  cardNumber: card.localId || card.number || 'N/A',
                   rarity: card.rarity || 'N/A',
                   value: price,
                   variant: variant || null,
                   quantity: qty,
-                  imageUrl: card.images.large || card.images.small || null,
+                  imageUrl: card.images?.large || card.images?.small || null,
                   language: 'English',
                   artist: card.artist || null,
                 });

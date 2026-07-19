@@ -108,7 +108,7 @@ export function OCRDiagnosticTool() {
             <CardTitle>Uploaded Image</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="relative aspect-[2.5/3.5] w-full max-w-sm mx-auto">
+            <div className="relative aspect-[63/88] w-full max-w-sm mx-auto">
               <Image
                 src={imagePreview}
                 alt="Test image"

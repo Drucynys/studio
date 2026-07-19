@@ -70,7 +70,7 @@ export const CardItem = memo(
       <div
         onClick={() => onView(cardIndex)}
         className={cn(
-          'group relative aspect-[2.5/3.5] w-full cursor-pointer rounded-xl overflow-hidden border border-border/40 bg-card/45 backdrop-blur-xl shadow-md transition-all duration-300 group-hover:shadow-primary/25 hover:scale-105 hover:-translate-y-1 hover:z-10 active:scale-[0.98]',
+          'group relative aspect-[63/88] w-full cursor-pointer rounded-xl overflow-hidden border border-border/40 bg-card/45 backdrop-blur-xl shadow-md transition-all duration-300 group-hover:shadow-primary/25 hover:scale-105 hover:-translate-y-1 hover:z-10 active:scale-[0.98]',
           isImageLoading && 'animate-shimmer bg-muted/40',
           isHolo && 'list-card-holo'
         )}

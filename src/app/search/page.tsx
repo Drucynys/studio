@@ -200,7 +200,7 @@ export default function SearchPage() {
                   const isCollected = collection.some(
                     (collected) =>
                       collected.name === card.name &&
-                      collected.set === card.set.name &&
+                      collected.set === (card.set?.name || 'Unknown Set') &&
                       collected.cardNumber === card.number &&
                       collected.language === 'English'
                   );
@@ -211,7 +211,7 @@ export default function SearchPage() {
                         setSelectedApiCard(card);
                         setIsDialogOpen(true);
                       }}
-                      className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-all duration-200 hover:scale-105"
+                      className="group relative aspect-[63/88] w-full cursor-pointer transition-all duration-200 hover:scale-105"
                     >
                       <div
                         className={cn(
@@ -220,7 +220,7 @@ export default function SearchPage() {
                         )}
                       >
                         <Image
-                          src={card.images.small}
+                          src={card.images?.small || card.images?.large || 'https://placehold.co/200x280.png'}
                           alt={card.name}
                           fill
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
@@ -270,7 +270,7 @@ export default function SearchPage() {
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedApiCard.name}
-          initialCardImageUrl={selectedApiCard.images.small}
+          initialCardImageUrl={selectedApiCard.images?.small || selectedApiCard.images?.large || null}
           pokemonTcgApiCard={selectedApiCard}
           onPrevCard={currentCardIndex > 0 ? handlePrevCard : undefined}
           onNextCard={currentCardIndex < searchResults.length - 1 ? handleNextCard : undefined}
@@ -278,14 +278,14 @@ export default function SearchPage() {
           hasNextCard={currentCardIndex < searchResults.length - 1}
           prevCardImageUrl={
             currentCardIndex > 0
-              ? searchResults[currentCardIndex - 1].images.large ||
-                searchResults[currentCardIndex - 1].images.small
+              ? searchResults[currentCardIndex - 1].images?.large ||
+                searchResults[currentCardIndex - 1].images?.small || null
               : null
           }
           nextCardImageUrl={
             currentCardIndex < searchResults.length - 1
-              ? searchResults[currentCardIndex + 1].images.large ||
-                searchResults[currentCardIndex + 1].images.small
+              ? searchResults[currentCardIndex + 1].images?.large ||
+                searchResults[currentCardIndex + 1].images?.small || null
               : null
           }
         />

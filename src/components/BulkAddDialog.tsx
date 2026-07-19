@@ -92,7 +92,7 @@ export function BulkAddDialog({
                   <div className="flex-shrink-0 flex items-center justify-center sm:justify-start">
                     <div className="relative aspect-[63/88] w-20 rounded-lg overflow-hidden shadow-md border border-border/30 bg-muted/20 hover:scale-105 transition-transform duration-200">
                       <Image
-                        src={card.images.small || card.images.large || 'https://placehold.co/200x280.png'}
+                        src={card.images?.small || card.images?.large || 'https://placehold.co/200x280.png'}
                         alt={card.name}
                         fill
                         sizes="80px"

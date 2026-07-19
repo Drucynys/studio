@@ -511,7 +511,7 @@ export function CardScannerDialog({ isOpen, onClose, onScanComplete }: CardScann
               )}
             >
               <div
-                className="w-[60%] aspect-[2.5/3.5] border-2 border-dashed border-background/70 rounded-lg"
+                className="w-[60%] aspect-[63/88] border-2 border-dashed border-background/70 rounded-lg"
                 style={{
                   boxShadow: '0 0 0 9999px hsla(0, 0%, 0%, 0.3)',
                 }}

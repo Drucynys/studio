@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardTitle } from '@/components/ui/card';
 import { TrendingUp, Loader2, ServerCrash } from 'lucide-react';
 import {
@@ -12,20 +12,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { format } from 'date-fns';
+import { format, subDays, isAfter } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-interface PriceHistoryEntry {
-  date: string;
-  prices: {
-    tcgplayer?: {
-      [key: string]: {
-        market?: number | null;
-      };
-    };
-  };
-}
+import { usePriceHistory } from '@/hooks/usePriceHistory';
 
 interface ChartDataPoint {
   date: string;
@@ -34,76 +24,48 @@ interface ChartDataPoint {
 
 type Range = '30d' | '90d' | '180d' | '365d';
 
-const getPrimaryMarketPrice = (entry: PriceHistoryEntry): number | undefined => {
-  const prices = entry.prices?.tcgplayer;
-  if (!prices) return undefined;
-
-  const variantPriority = [
-    'normal',
-    'holofoil',
-    'reverseHolofoil',
-    '1stEditionNormal',
-    '1stEditionHolofoil',
-    'unlimitedHolofoil',
-    'unlimitedNormal',
-  ];
-  for (const v of variantPriority) {
-    if (prices[v]?.market) {
-      return prices[v]!.market!;
-    }
-  }
-  for (const key in prices) {
-    if (Object.prototype.hasOwnProperty.call(prices, key) && prices[key]?.market) {
-      return prices[key]!.market!;
-    }
-  }
-  return undefined;
-};
-
 export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | null }) {
-  const [data, setData] = useState<ChartDataPoint[]>([]);
+  const { data: priceHistory, loading, error } = usePriceHistory(cardApiId);
   const [range, setRange] = useState<Range>('30d');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!cardApiId) return;
+  const chartData = useMemo(() => {
+    if (!priceHistory?.data) return [];
 
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/price-history/${cardApiId}?range=${range}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch price history.');
-        }
-        const history: PriceHistoryEntry[] = await response.json();
+    // Find the best variant to display
+    const keys = Object.keys(priceHistory.data);
+    if (keys.length === 0) return [];
 
-        if (history.length === 0) {
-          setData([]);
-          return;
-        }
+    // Priority: 'normal-nearmint', 'holo-nearmint', 'reverse holo-nearmint', etc.
+    let selectedKey = keys.find(k => k.includes('nearmint')) || keys[0];
 
-        const chartData = history
-          .map((entry) => ({
-            date: format(new Date(entry.date), 'MMM d'),
-            price: getPrimaryMarketPrice(entry),
-          }))
-          .filter((point) => point.price !== undefined);
+    const historyData = priceHistory.data[selectedKey]?.history;
+    if (!historyData) return [];
 
-        setData(chartData);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    const daysToSubtract = range === '30d' ? 30 : range === '90d' ? 90 : range === '180d' ? 180 : 365;
+    
+    // Find the latest date in the history data to use as our reference point instead of new Date()
+    // This ensures we always show data even if the repository hasn't been updated recently.
+    const allDates = Object.keys(historyData).sort();
+    const latestDateStr = allDates[allDates.length - 1];
+    const latestDate = latestDateStr ? new Date(latestDateStr) : new Date();
+    
+    const cutoffDate = subDays(latestDate, daysToSubtract);
 
-    fetchData();
-  }, [cardApiId, range]);
+    // Convert to array and sort by date
+    const sortedEntries = Object.entries(historyData)
+      .map(([dateStr, entry]) => ({
+        rawDate: new Date(dateStr),
+        date: format(new Date(dateStr), 'MMM d, yyyy'),
+        price: entry.avg ? entry.avg / 100 : undefined,
+      }))
+      .filter(entry => isAfter(entry.rawDate, cutoffDate) && entry.price !== undefined)
+      .sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime());
+
+    return sortedEntries;
+  }, [priceHistory, range]);
 
   const renderContent = () => {
-    if (isLoading) {
+    if (loading) {
       return (
         <div className="flex items-center justify-center h-full text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
@@ -118,7 +80,7 @@ export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | nul
         </div>
       );
     }
-    if (data.length < 2) {
+    if (chartData.length < 2) {
       return (
         <div className="flex items-center justify-center h-full text-muted-foreground">
           <p className="text-xs text-center">
@@ -130,7 +92,7 @@ export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | nul
 
     return (
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 5, right: 20, left: -15, bottom: 0 }}>
+        <LineChart data={chartData} margin={{ top: 5, right: 20, left: -15, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis
             dataKey="date"
@@ -138,6 +100,7 @@ export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | nul
             fontSize={10}
             tickLine={false}
             axisLine={false}
+            minTickGap={20}
           />
           <YAxis
             stroke="hsl(var(--muted-foreground))"
@@ -155,15 +118,15 @@ export function MarketPriceHistoryChart({ cardApiId }: { cardApiId: string | nul
               padding: '8px',
             }}
             labelStyle={{ color: 'hsl(var(--foreground))' }}
-            formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Price']}
+            formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Avg Price']}
           />
           <Line
             type="monotone"
             dataKey="price"
-            name="Market Price"
+            name="Avg Price"
             stroke="hsl(var(--primary))"
             strokeWidth={2}
-            dot={{ r: 3, fill: 'hsl(var(--primary))' }}
+            dot={false}
             activeDot={{ r: 5 }}
           />
         </LineChart>

@@ -46,11 +46,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'assets.tcgdx.net',
+        hostname: 'assets.tcgdex.net',
       },
       {
         protocol: 'https',
-        hostname: 'tcgdx.net',
+        hostname: 'tcgdex.net',
       },
       {
         protocol: 'https',

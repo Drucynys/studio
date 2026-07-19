@@ -119,10 +119,10 @@ const ArtistDetailPage = () => {
     const lowercasedFilter = searchTerm.toLowerCase();
     let filteredData = cardsByArtist.filter(
       (card) =>
-        card.name.toLowerCase().includes(lowercasedFilter) ||
-        card.number.toLowerCase().includes(lowercasedFilter) ||
+        (card.name?.toLowerCase() || '').includes(lowercasedFilter) ||
+        (card.number?.toLowerCase() || '').includes(lowercasedFilter) ||
         (card.rarity && card.rarity.toLowerCase().includes(lowercasedFilter)) ||
-        card.set.name.toLowerCase().includes(lowercasedFilter)
+        (card.set?.name?.toLowerCase() || '').includes(lowercasedFilter)
     );
 
     if (user) {
@@ -131,7 +131,7 @@ const ArtistDetailPage = () => {
           const isCollected = collection.some(
             (collected) =>
               collected.name === card.name &&
-              collected.set === card.set.name &&
+              collected.set === (card.set?.name || 'Unknown Set') &&
               collected.cardNumber === card.number &&
               collected.language === 'English'
           );
@@ -321,7 +321,7 @@ const ArtistDetailPage = () => {
                   const isCollected = collection.some(
                     (collected) =>
                       collected.name === card.name &&
-                      collected.set === card.set.name &&
+                      collected.set === (card.set?.name || 'Unknown Set') &&
                       collected.cardNumber === card.number &&
                       collected.language === 'English'
                   );
@@ -339,7 +339,7 @@ const ArtistDetailPage = () => {
                         {/* Mini artwork thumbnail sprite */}
                         <div className="relative w-10 h-14 bg-muted/20 rounded border border-border/30 overflow-hidden flex-shrink-0">
                           <Image
-                            src={card.images.small}
+                            src={card.images?.small || card.images?.large || 'https://placehold.co/200x280.png'}
                             alt={card.name}
                             fill
                             sizes="40px"
@@ -353,7 +353,7 @@ const ArtistDetailPage = () => {
                           </p>
                           <p className="text-xs text-muted-foreground">
                             #{card.number} {card.rarity && `• ${card.rarity}`}{' '}
-                            {card.set.name && `• ${card.set.name}`}
+                            {card.set?.name && `• ${card.set.name}`}
                           </p>
                         </div>
                       </div>
@@ -382,7 +382,7 @@ const ArtistDetailPage = () => {
                   const isCollected = collection.some(
                     (collected) =>
                       collected.name === card.name &&
-                      collected.set === card.set.name &&
+                      collected.set === (card.set?.name || 'Unknown Set') &&
                       collected.cardNumber === card.number &&
                       collected.language === 'English'
                   );
@@ -393,7 +393,7 @@ const ArtistDetailPage = () => {
                         setSelectedApiCard(card);
                         setIsDialogOpen(true);
                       }}
-                      className="group relative aspect-[2.5/3.5] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
+                      className="group relative aspect-[63/88] w-full cursor-pointer transition-transform duration-200 hover:scale-105"
                     >
                       <div
                         className={cn(
@@ -402,7 +402,7 @@ const ArtistDetailPage = () => {
                         )}
                       >
                         <Image
-                          src={card.images.small}
+                          src={card.images?.small || card.images?.large || 'https://placehold.co/200x280.png'}
                           alt={card.name}
                           fill
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px"
@@ -474,7 +474,7 @@ const ArtistDetailPage = () => {
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
           cardName={selectedApiCard.name}
-          initialCardImageUrl={selectedApiCard.images.small}
+          initialCardImageUrl={selectedApiCard.images?.small || selectedApiCard.images?.large || null}
           pokemonTcgApiCard={selectedApiCard}
           onPrevCard={currentCardIndex > 0 ? handlePrevCard : undefined}
           onNextCard={currentCardIndex < filteredCards.length - 1 ? handleNextCard : undefined}
@@ -482,14 +482,14 @@ const ArtistDetailPage = () => {
           hasNextCard={currentCardIndex < filteredCards.length - 1}
           prevCardImageUrl={
             currentCardIndex > 0
-              ? filteredCards[currentCardIndex - 1].images.large ||
-                filteredCards[currentCardIndex - 1].images.small
+              ? filteredCards[currentCardIndex - 1].images?.large ||
+                filteredCards[currentCardIndex - 1].images?.small || null
               : null
           }
           nextCardImageUrl={
             currentCardIndex < filteredCards.length - 1
-              ? filteredCards[currentCardIndex + 1].images.large ||
-                filteredCards[currentCardIndex + 1].images.small
+              ? filteredCards[currentCardIndex + 1].images?.large ||
+                filteredCards[currentCardIndex + 1].images?.small || null
               : null
           }
         />

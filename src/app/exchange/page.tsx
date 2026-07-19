@@ -255,7 +255,7 @@ export default function ExchangePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow flex flex-col items-center">
-                  <div className="relative w-full aspect-[2.5/3.5] rounded-md overflow-hidden mb-4">
+                  <div className="relative w-full aspect-[63/88] rounded-md overflow-hidden mb-4">
                     <Image
                       src={item.imageUrl || 'https://placehold.co/250x350.png'}
                       alt={item.name}

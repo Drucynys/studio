@@ -57,6 +57,8 @@ import { SingleCardTiltView } from '@/components/SingleCardTiltView';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { PokedexIcon } from '@/components/icons/PokedexIcon';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { MarketPriceHistoryChart } from './MarketPriceHistoryChart';
 
 import { formatVariantKey, getCardVariants, getDefaultVariant } from '@/utils/cardUtils';
 
@@ -81,6 +83,8 @@ type AddCardToCollectionDialogProps = {
   nextCardImageUrl?: string | null;
   initialVariant?: string | null;
   initialQuantity?: number;
+  apiId?: string | null;
+  collectionItemId?: string | null;
 };
 
 export function AddCardToCollectionDialog({
@@ -97,6 +101,8 @@ export function AddCardToCollectionDialog({
   nextCardImageUrl,
   initialVariant,
   initialQuantity,
+  apiId,
+  collectionItemId,
 }: AddCardToCollectionDialogProps) {
   const { user } = useAuth();
   const { collection } = useUserCollection(user?.uid);
@@ -121,20 +127,42 @@ export function AddCardToCollectionDialog({
 
   // Derive prices from the current card and its sorted variants
   const displayPrices = useMemo<DisplayPriceInfo[]>(() => {
-    if (!pokemonTcgApiCard?.tcgplayer?.prices) return [];
-    const prices = pokemonTcgApiCard.tcgplayer.prices;
+    if (!pokemonTcgApiCard) return [];
+    
     const newPrices: DisplayPriceInfo[] = [];
-    for (const key of currentAvailableVariants) {
-      const priceEntry = prices[key as keyof typeof prices];
-      if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
-        newPrices.push({
-          variantKey: `tcgplayer-${key}`,
-          variantName: `TCGplayer - ${formatVariantKey(key)}`,
-          price: priceEntry.market,
-          currencySymbol: '$',
-        });
+
+    // If new pricing object is present
+    if (pokemonTcgApiCard.pricing?.tcgplayer) {
+      const prices = pokemonTcgApiCard.pricing.tcgplayer;
+      for (const key of currentAvailableVariants) {
+        // TCGdex mapping: 'normal' -> 'normal', 'holofoil' -> 'holofoil', 'reverseHolofoil' -> 'reverseHolofoil'
+        const priceEntry = prices[key as keyof typeof prices];
+        if (priceEntry && typeof priceEntry.marketPrice === 'number' && !isNaN(priceEntry.marketPrice)) {
+          newPrices.push({
+            variantKey: `tcgplayer-${key}`,
+            variantName: `TCGplayer - ${formatVariantKey(key)}`,
+            price: priceEntry.marketPrice,
+            currencySymbol: '$',
+          });
+        }
+      }
+    } 
+    // Fallback to legacy format
+    else if (pokemonTcgApiCard.tcgplayer?.prices) {
+      const prices = pokemonTcgApiCard.tcgplayer.prices;
+      for (const key of currentAvailableVariants) {
+        const priceEntry = prices[key as keyof typeof prices];
+        if (priceEntry && typeof priceEntry.market === 'number' && !isNaN(priceEntry.market)) {
+          newPrices.push({
+            variantKey: `tcgplayer-${key}`,
+            variantName: `TCGplayer - ${formatVariantKey(key)}`,
+            price: priceEntry.market,
+            currencySymbol: '$',
+          });
+        }
       }
     }
+
     return newPrices;
   }, [pokemonTcgApiCard, currentAvailableVariants]);
 
@@ -143,8 +171,10 @@ export function AddCardToCollectionDialog({
     if (fallbackImageUrl) return fallbackImageUrl;
     if (pokemonTcgApiCard) {
       return (
-        pokemonTcgApiCard.images.large ||
-        pokemonTcgApiCard.images.small ||
+        pokemonTcgApiCard.images?.large ||
+        pokemonTcgApiCard.images?.small ||
+        (pokemonTcgApiCard.image ? `${pokemonTcgApiCard.image}/high.webp` : null) ||
+        (pokemonTcgApiCard.image ? `${pokemonTcgApiCard.image}/low.webp` : null) ||
         initialCardImageUrl ||
         'https://placehold.co/200x280.png'
       );
@@ -157,7 +187,7 @@ export function AddCardToCollectionDialog({
   const prevIsOpenRef = useRef<boolean>(false);
   const prevInitialVariantRef = useRef<string | null | undefined>(undefined);
   const prevInitialQuantityRef = useRef<number | undefined>(undefined);
-  const activeCardId = pokemonTcgApiCard?.id;
+  const activeCardId = pokemonTcgApiCard?.id || apiId || undefined;
 
   if (
     activeCardId !== prevCardIdRef.current ||
@@ -182,15 +212,17 @@ export function AddCardToCollectionDialog({
       const defaultVariant = getDefaultVariant(variants);
       setSelectedVariant(initialVariant || defaultVariant);
       
-      const existingItem = (pokemonTcgApiCard && collection)
-        ? collection.find(
-            (c) => c.apiId === pokemonTcgApiCard.id && c.variant === ((initialVariant || defaultVariant) || null)
-          )
-        : null;
+      const existingItem = collectionItemId 
+        ? collection.find(c => c.id === collectionItemId)
+        : (activeCardId && collection)
+          ? collection.find(
+              (c) => c.apiId === activeCardId && c.variant === ((initialVariant || defaultVariant) || null)
+            )
+          : null;
       setQuantityInput(initialQuantity !== undefined ? initialQuantity : (existingItem ? existingItem.quantity : 0));
     } else {
-      setSelectedVariant('');
-      setQuantityInput(0);
+      setSelectedVariant(initialVariant || '');
+      setQuantityInput(initialQuantity !== undefined ? initialQuantity : 0);
     }
   }
 
@@ -342,23 +374,37 @@ export function AddCardToCollectionDialog({
   }, [isOpen, prevCardImageUrl, nextCardImageUrl, preloadWithOptimizer]);
 
   const marketPriceForSelectedVariant = useMemo(() => {
-    if (!selectedVariant || !pokemonTcgApiCard?.tcgplayer?.prices) return 0;
-    const priceEntry =
-      pokemonTcgApiCard.tcgplayer.prices[
+    if (!selectedVariant || !pokemonTcgApiCard) return 0;
+    
+    if (pokemonTcgApiCard.pricing?.tcgplayer) {
+      const priceEntry = pokemonTcgApiCard.pricing.tcgplayer[
+        selectedVariant as keyof typeof pokemonTcgApiCard.pricing.tcgplayer
+      ];
+      return priceEntry?.marketPrice || 0;
+    } else if (pokemonTcgApiCard.tcgplayer?.prices) {
+      const priceEntry = pokemonTcgApiCard.tcgplayer.prices[
         selectedVariant as keyof typeof pokemonTcgApiCard.tcgplayer.prices
       ];
-    return priceEntry?.market || 0;
+      return priceEntry?.market || 0;
+    }
+    return 0;
   }, [selectedVariant, pokemonTcgApiCard]);
 
   const handleDecrement = () => setQuantityInput((prev) => Math.max(0, prev - 1));
   const handleIncrement = () => setQuantityInput((prev) => prev + 1);
 
   const syncChangesToDatabase = async (variantKey: string, quantity: number) => {
-    if (!user || !pokemonTcgApiCard) return;
+    if (!user) return;
 
-    const existingItem = collection.find(
-      (c) => c.apiId === pokemonTcgApiCard.id && c.variant === (variantKey || null)
-    );
+    const existingItem = collectionItemId
+      ? collection.find((c) => c.id === collectionItemId)
+      : collection.find(
+          (c) => c.apiId === (pokemonTcgApiCard?.id || apiId) && c.variant === (variantKey || null)
+        );
+        
+    // If we have no API data AND no existing item, we can't create a new one from scratch
+    if (!pokemonTcgApiCard && !existingItem) return;
+
     const dbQty = existingItem ? existingItem.quantity : 0;
 
     if (quantity === dbQty) return;
@@ -374,9 +420,12 @@ export function AddCardToCollectionDialog({
           await collectionService.updateCard(user.uid, {
             ...existingItem,
             quantity: quantity,
-            value: marketPriceForSelectedVariant,
+            value: marketPriceForSelectedVariant > 0 ? marketPriceForSelectedVariant : existingItem.value,
           });
         } else {
+          // To add a completely new card, we must have the full API object
+          if (!pokemonTcgApiCard) return;
+          
           const marketPrices = pokemonTcgApiCard.tcgplayer?.prices;
           const priceEntry = marketPrices
             ? marketPrices[variantKey as keyof typeof marketPrices]
@@ -386,13 +435,13 @@ export function AddCardToCollectionDialog({
           await collectionService.addCard(user.uid, {
             apiId: pokemonTcgApiCard.id,
             name: pokemonTcgApiCard.name,
-            set: pokemonTcgApiCard.set.name,
-            cardNumber: pokemonTcgApiCard.number,
+            set: pokemonTcgApiCard.set?.name || 'Unknown Set',
+            cardNumber: pokemonTcgApiCard.localId || pokemonTcgApiCard.number || 'N/A',
             rarity: pokemonTcgApiCard.rarity || 'N/A',
             value: price,
             variant: variantKey || null,
             quantity: quantity,
-            imageUrl: pokemonTcgApiCard.images.large || null,
+            imageUrl: pokemonTcgApiCard.image ? `${pokemonTcgApiCard.image}/high.webp` : (pokemonTcgApiCard.images?.large || null),
             language: 'English',
             artist: pokemonTcgApiCard.artist || null,
           });
@@ -443,10 +492,10 @@ export function AddCardToCollectionDialog({
         await wishlistService.addItem(user.uid, {
           apiId: pokemonTcgApiCard.id,
           name: pokemonTcgApiCard.name,
-          set: pokemonTcgApiCard.set.name,
-          cardNumber: pokemonTcgApiCard.number,
+          set: pokemonTcgApiCard.set?.name || 'Unknown Set',
+          cardNumber: pokemonTcgApiCard.localId || pokemonTcgApiCard.number || 'N/A',
           rarity: pokemonTcgApiCard.rarity || 'N/A',
-          imageUrl: pokemonTcgApiCard.images.large || null,
+          imageUrl: pokemonTcgApiCard.image ? `${pokemonTcgApiCard.image}/high.webp` : (pokemonTcgApiCard.images?.large || null),
           artist: pokemonTcgApiCard.artist || null,
         });
         toast({
@@ -508,13 +557,13 @@ export function AddCardToCollectionDialog({
 
           <DialogHeader className="space-y-1 flex flex-col items-center justify-center text-center flex-shrink-0">
             <DialogTitle className="flex items-center justify-center gap-2 text-2xl font-black w-full text-center">
-              <span>{cardName}</span>
               <Link
                 href={`/pokedex/${encodeURIComponent(cardName.toLowerCase())}`}
                 onClick={handleClose}
                 title={`View ${cardName} in Pokédex`}
-                className="inline-flex items-center"
+                className="inline-flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
+                <span>{cardName}</span>
                 <PokedexIcon
                   className={cn(
                     'h-6 w-6 transition-all duration-300 hover:scale-110 active:scale-95',
@@ -525,7 +574,7 @@ export function AddCardToCollectionDialog({
                 />
               </Link>
             </DialogTitle>
-            {pokemonTcgApiCard?.set.name && (
+            {pokemonTcgApiCard?.set?.name && (
               <DialogDescription className="hover:underline cursor-pointer text-muted-foreground hover:text-primary transition-colors font-semibold text-sm text-center">
                 <Link href={`/sets/${pokemonTcgApiCard.set.id}`} onClick={handleClose}>
                   {pokemonTcgApiCard.set.name}
@@ -542,12 +591,12 @@ export function AddCardToCollectionDialog({
                   </strong>
                 </span>
               )}
-              {pokemonTcgApiCard?.number && pokemonTcgApiCard.set.printedTotal > 0 && (
+              {pokemonTcgApiCard?.number && (pokemonTcgApiCard.set?.printedTotal ?? 0) > 0 && (
                 <span className="flex items-center gap-1 bg-white/40 dark:bg-white/5 px-2 py-0.5 rounded-full border border-white/40 dark:border-white/5 backdrop-blur-sm shadow-sm">
                   <Hash className="h-3 w-3 text-slate-500" />
                   Number:{' '}
                   <strong className="ml-0.5 text-zinc-850 dark:text-zinc-200">
-                    {pokemonTcgApiCard.number} / {pokemonTcgApiCard.set.printedTotal}
+                    {pokemonTcgApiCard.number} / {pokemonTcgApiCard.set?.printedTotal}
                   </strong>
                 </span>
               )}
@@ -655,25 +704,49 @@ export function AddCardToCollectionDialog({
                     Variant
                   </Label>
                   {selectedVariant && marketPriceForSelectedVariant > 0 && (
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 px-2 py-0.5 rounded-md border border-green-200/30 dark:border-green-800/30 shadow-sm transition-all hover:scale-105">
-                      <DollarSign className="h-3 w-3 text-green-500" />
-                      <span>${marketPriceForSelectedVariant.toFixed(2)}</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          toast({
-                            title: 'Historical Trends',
-                            description:
-                              'Historical price tracking and interactive charts will be activated as price logs sync in real time!',
-                            className: 'bg-secondary text-secondary-foreground',
-                          })
-                        }
-                        className="ml-1 text-zinc-450 hover:text-zinc-650 dark:hover:text-zinc-200 transition-colors focus:outline-none"
-                        title="View Price Trends"
-                      >
-                        <TrendingUp className="h-3 w-3" />
-                      </button>
-                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5 text-xs font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 px-2 py-0.5 rounded-md border border-green-200/30 dark:border-green-800/30 shadow-sm transition-all hover:scale-105"
+                          title="View Price Trends"
+                        >
+                          <DollarSign className="h-3 w-3 text-green-500" />
+                          <span>${marketPriceForSelectedVariant.toFixed(2)}</span>
+                          <TrendingUp className="h-3 w-3 ml-1 text-zinc-450 hover:text-zinc-650 dark:hover:text-zinc-200 transition-colors" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80" align="end" side="top">
+                        <div className="space-y-2">
+                          <h4 className="font-medium leading-none">Market Prices</h4>
+                          <p className="text-xs text-muted-foreground">Live prices from TCGPlayer.</p>
+                        </div>
+                        <div className="mt-4 max-h-40 overflow-y-auto pr-2">
+                          {displayPrices.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center">
+                              No price data available.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {displayPrices.map((price, index) => (
+                                <div
+                                  key={`tcg-${index}`}
+                                  className="grid grid-cols-[1fr,auto] items-center gap-4 text-xs"
+                                >
+                                  <span className="text-muted-foreground">{price.variantName}</span>
+                                  <span className="font-semibold text-right">
+                                    {price.currencySymbol}
+                                    {Number(price.price).toFixed(2)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Separator className="my-3" />
+                        <MarketPriceHistoryChart cardApiId={pokemonTcgApiCard?.id || apiId || null} />
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </div>
                 <div className="flex items-center p-1 bg-white/30 dark:bg-black/35 border border-white/20 dark:border-zinc-800/40 rounded-full w-full overflow-x-auto no-scrollbar gap-1 backdrop-blur-md">

@@ -15,7 +15,7 @@ export function CardSkeleton({
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="aspect-[2.5/3.5] w-full rounded-lg bg-card border border-border/40 p-2 flex flex-col justify-between shadow-sm relative overflow-hidden"
+          className="aspect-[63/88] w-full rounded-lg bg-card border border-border/40 p-2 flex flex-col justify-between shadow-sm relative overflow-hidden"
         >
           {/* Top card detail line */}
           <div className="flex justify-between items-center mb-2">

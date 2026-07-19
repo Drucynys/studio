@@ -66,7 +66,19 @@ export function formatVariantKey(key: string): string {
  * @returns Array of variant keys
  */
 export function getCardVariants(card: ApiPokemonCard): string[] {
-  // If card has tcgplayer prices, use those keys
+  // If we have the explicit TCGdex variants boolean map, use it!
+  if (card.variants) {
+    const keys: string[] = [];
+    if (card.variants.normal) keys.push('normal');
+    if (card.variants.holo) keys.push('holofoil');
+    if (card.variants.reverse) keys.push('reverseHolofoil');
+    if (card.variants.firstEdition) keys.push('1stEdition');
+    if (card.variants.wPromo) keys.push('wPromo');
+
+    if (keys.length > 0) return keys;
+  }
+
+  // Fallback 1: If card has tcgplayer prices, use those keys
   if (card.tcgplayer?.prices) {
     const keys = Object.keys(card.tcgplayer.prices);
     if (keys.length > 0) {
@@ -93,7 +105,7 @@ export function getCardVariants(card: ApiPokemonCard): string[] {
     }
   }
 
-  // Fallback: derive variants based on rarity if tcgplayer metadata is missing
+  // Fallback 2: derive variants based on rarity if tcgplayer metadata is missing
   const rarity = (card.rarity || '').toLowerCase();
   
   // Ultra rare categories (usually only have a Holofoil print style)

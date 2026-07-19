@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { db } from '@/lib/firebase-admin';
+import { enrichCardsWithPrices } from '@/lib/price-enricher';
 
 // Define the exact shape of a Pokemon card from the API that we need for search
 interface ApiPokemonCard {
@@ -43,7 +44,7 @@ interface CachedCard extends ApiPokemonCard {
 
 // In-memory server cache for instant search with stale-while-revalidate
 let catalog: CachedCard[] | null = null; // Last known good catalog
-let lastCacheTime = 0;
+let lastCacheTime = 1;
 let catalogPromise: Promise<CachedCard[]> | null = null; // Promise for ongoing refresh
 const CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours fresh
 const STALE_TTL_MS = CACHE_TTL_MS * 2;   // 12 hours - still usable while refreshing
@@ -61,14 +62,29 @@ function fetchFreshCatalog(): Promise<CachedCard[]> {
     .get()
     .then((snapshot) => {
       const cards = snapshot.docs.map((doc) => {
-        const data = doc.data() as ApiPokemonCard;
+        const rawData = doc.data() as any;
         return {
-          ...data,
-          nameLower: data.name?.toLowerCase() || '',
-          numberLower: data.number?.toLowerCase() || '',
-          setNameLower: data.set?.name?.toLowerCase() || '',
-          artistLower: data.artist?.toLowerCase() || '',
+          ...rawData,
+          set: rawData.set ? {
+            ...rawData.set,
+            series: rawData.set.serie?.name || rawData.set.series || 'Uncategorized',
+            printedTotal: rawData.set.cardCount?.official || rawData.set.printedTotal || 0,
+            total: rawData.set.cardCount?.total || rawData.set.total || 0,
+          } : undefined,
+          images: rawData.images || (rawData.image ? { small: `${rawData.image}/low.webp`, large: `${rawData.image}/high.webp` } : { small: '', large: '' }),
+          nameLower: rawData.name?.toLowerCase() || '',
+          numberLower: rawData.number?.toLowerCase() || '',
+          setNameLower: rawData.set?.name?.toLowerCase() || '',
+          artistLower: rawData.artist?.toLowerCase() || '',
         } as CachedCard;
+      }).filter((data) => {
+        if (!(data as any).language) return false;
+        const seriesName = ((data as any).set?.series || '').toLowerCase();
+        const setId = ((data as any).set?.id || '').toLowerCase();
+        if (seriesName.includes('pocket') || seriesName.includes('tcgp') || setId === 'tcgp') {
+          return false;
+        }
+        return true;
       });
       console.log(`✅ Cached ${cards.length} cards in server memory for instant search.`);
       return cards;
@@ -199,7 +215,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
 
     // Apply pagination
-    const paginated = results.slice(offset, offset + limit);
+    let paginated = results.slice(offset, offset + limit);
+    paginated = await enrichCardsWithPrices(paginated);
 
     const response = NextResponse.json({
       results: paginated,

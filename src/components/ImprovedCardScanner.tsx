@@ -146,7 +146,7 @@ export function ImprovedCardScanner({ onScanResult }: ImprovedCardScannerProps) 
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="relative aspect-[2.5/3.5] w-full max-w-[250px] mx-auto my-4 shadow-xl rounded-lg overflow-hidden border">
+            <div className="relative aspect-[63/88] w-full max-w-[250px] mx-auto my-4 shadow-xl rounded-lg overflow-hidden border">
               <Image
                 src={imagePreview}
                 alt="Captured card preview"

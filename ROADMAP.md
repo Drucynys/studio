@@ -46,3 +46,22 @@ Both platforms will share the exact same Firebase Database and Authentication sy
 ### 4. Deployment
 - [ ] **TestFlight**: Compile to iOS and deploy via TestFlight for real-world scanning tests.
 - [ ] **App Store**: Prepare icons, screenshots, and submit to the Apple App Store.
+
+---
+
+## Phase 3: Global Expansion (TCGdex Migration)
+*Goal: Support multi-language cards while maintaining accurate market pricing.*
+
+### 1. API Analysis & Strategy
+- **Catalog Data (TCGdex)**: Migrate core card data from `pokemontcg.io` to `tcgdex.dev` to access extensive multi-language support (English, Japanese, French, Spanish, etc.).
+- **Pricing Data (Hybrid Approach)**: Since TCGdex is primarily a catalog API and lacks reliable real-time market valuations, implement a hybrid data layer:
+  - Use TCGdex for card metadata, imagery, and localization.
+  - Maintain a separate pricing service (via PriceCharting API, JustTCG, or retaining limited pokemontcg.io endpoints just for TCGplayer/Cardmarket data) mapped by set/card ID.
+
+### 2. Database Restructuring
+- [ ] **Locale Mapping**: Update Firestore schema to support locale-specific card variants (e.g., `cardId_en`, `cardId_jp`).
+- [ ] **Sync Scripts**: Rewrite background sync scripts (`sync-cards`, `sync-sets`) to utilize TCGdex REST/GraphQL endpoints.
+
+### 3. UI Implementation
+- [ ] **Language Toggle**: Add a global language selector for the catalog and user collection.
+- [ ] **Multi-currency Support**: Integrate currency conversion logic tied to the selected regional pricing data (USD, EUR, JPY).
